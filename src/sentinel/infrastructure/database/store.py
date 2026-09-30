@@ -12,7 +12,7 @@ import secrets
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from sentinel.core.domain.graph import CodeGraph
@@ -232,10 +232,16 @@ class Store:
         for old in list(review.findings):
             self.s.delete(old)
         self.s.flush()
-        for rank, f in enumerate(result.findings):
-            self.s.add(self._finding_row(review.id, f, rank, suppressed=False))
-        for rank, f in enumerate(result.suppressed, start=len(result.findings)):
-            self.s.add(self._finding_row(review.id, f, rank, suppressed=True))
+        rows = [
+            self._finding_row(review.id, f, rank, suppressed=False)
+            for rank, f in enumerate(result.findings)
+        ]
+        rows += [
+            self._finding_row(review.id, f, rank, suppressed=True)
+            for rank, f in enumerate(result.suppressed, start=len(result.findings))
+        ]
+        review.findings = rows
+        self.s.execute(delete(AnalysisRunRow).where(AnalysisRunRow.review_id == review.id))
         for run in result.analysis_runs:
             self.s.add(AnalysisRunRow(review_id=review.id, **run.model_dump()))
         if result.graph is not None:

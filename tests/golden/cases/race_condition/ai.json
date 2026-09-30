@@ -1,0 +1,6 @@
+[
+  {"category": "bug", "severity": "medium", "confidence": 0.6, "file": "app/wallet.py", "line": 12,
+   "title": "Race condition: check-then-act on balance without the lock",
+   "explanation": "withdraw() reads the balance and writes it back without holding `_lock`; two concurrent withdrawals can both pass the check (lost update).",
+   "evidence": ["`_lock` exists but withdraw() never acquires it"]}
+]

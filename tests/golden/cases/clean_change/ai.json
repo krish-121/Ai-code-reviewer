@@ -1,0 +1,5 @@
+[
+  {"category": "bug", "severity": "medium", "confidence": 0.7, "file": "app/strings.py", "line": 3,
+   "title": "normalize_unicode() result is discarded",
+   "explanation": "`normalize_unicode()` is called but `strip_accents()` never uses its result."}
+]

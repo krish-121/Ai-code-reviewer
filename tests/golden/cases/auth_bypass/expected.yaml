@@ -1,0 +1,5 @@
+risk: high
+surfaced:
+  - {tag: auth, file: app/views.py, severity: high, verification: supported, title_contains: delete_user}
+suppressed:
+  - {title_contains: "in stats", verification: rejected}

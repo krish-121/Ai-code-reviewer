@@ -1,0 +1,9 @@
+[
+  {"category": "security", "severity": "high", "confidence": 0.8, "file": "app/db.py", "line": 14,
+   "title": "SQL injection in find_orders",
+   "explanation": "`status` from the query string is concatenated into the SQL string. orders() calls find_orders() with request data.",
+   "evidence": ["orders() calls find_orders()"]},
+  {"category": "security", "severity": "high", "confidence": 0.6, "file": "app/db.py", "line": 9,
+   "title": "SQL injection in find_user",
+   "explanation": "find_user() may be injectable through email."}
+]

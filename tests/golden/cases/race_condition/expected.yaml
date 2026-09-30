@@ -1,0 +1,3 @@
+risk: medium
+surfaced:
+  - {tag: race-condition, file: app/wallet.py, verification: [likely, uncertain]}

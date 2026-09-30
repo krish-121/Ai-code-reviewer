@@ -1,0 +1,4 @@
+risk: high
+surfaced:
+  - {tag: sql-injection, file: src/users.ts, severity: high}
+  - {tag: n+1, file: src/users.ts}

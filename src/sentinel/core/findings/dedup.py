@@ -134,6 +134,10 @@ def merge(group: list[Finding]) -> Finding:
     return primary
 
 
+def _rejected(f: Finding) -> bool:
+    return f.verification is not None and f.verification.status is VerificationStatus.REJECTED
+
+
 def deduplicate(findings: list[Finding], slack: int = 3) -> list[Finding]:
     """Union-find over (overlapping location AND related concept)."""
     parent = list(range(len(findings)))
@@ -147,6 +151,8 @@ def deduplicate(findings: list[Finding], slack: int = 3) -> list[Finding]:
     for i in range(len(findings)):
         for j in range(i + 1, len(findings)):
             a, b = findings[i], findings[j]
+            if _rejected(a) != _rejected(b):
+                continue  # a refuted claim must not borrow credibility from a real finding
             if _overlap(a, b, slack) and _related(a, b):
                 parent[find(j)] = find(i)
     groups: dict[int, list[Finding]] = {}

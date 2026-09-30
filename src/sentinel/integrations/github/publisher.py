@@ -17,7 +17,7 @@ from sentinel.core.domain.models import ChangeSet, Finding, LineKind, ReviewResu
 from sentinel.integrations.github.client import GitHubClient
 from sentinel.integrations.github.render import SUMMARY_MARKER, finding_comment, summary_comment
 
-FP_RE = re.compile(r"<!-- sentinel:fp=([0-9a-f]+) -->")
+FP_RE = re.compile(r"<!-- sentinel:fp=([\w-]+) -->")
 
 
 @dataclass

@@ -17,6 +17,7 @@ web/dist/
 *.sqlite
 .env
 !demo/sentinel-demo-repo/feature/.env
+!tests/golden/cases/secrets/change/.env
 .env.*
 !.env.example
 .DS_Store

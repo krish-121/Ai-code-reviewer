@@ -1,0 +1,4 @@
+risk: high
+surfaced:
+  - {tag: prompt-injection, file: app/util.py, severity: medium}
+  - {tag: code-injection, file: app/util.py, severity: high}

@@ -1,0 +1,5 @@
+risk: high
+surfaced:
+  - {tag: sql-injection, file: app/db.py, severity: high, verification: supported, source: combined}
+suppressed:
+  - {title_contains: "find_user", verification: rejected}

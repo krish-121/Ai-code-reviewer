@@ -1,0 +1,9 @@
+[
+  {"category": "security", "severity": "high", "confidence": 0.85, "file": "app/views.py", "line": 20,
+   "title": "Authorization check runs before authentication in delete_user",
+   "explanation": "delete_user() calls is_admin() on a role taken from the X-Role header before verify_token() authenticates the caller, so anyone can send X-Role: admin.",
+   "evidence": ["delete_user() calls is_admin()", "delete_user() calls verify_token()"]},
+  {"category": "security", "severity": "high", "confidence": 0.6, "file": "app/views.py", "line": 11,
+   "title": "Authorization check runs before authentication in stats",
+   "explanation": "stats() checks is_admin() before verify_token()."}
+]

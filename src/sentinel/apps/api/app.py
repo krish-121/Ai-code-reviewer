@@ -9,7 +9,8 @@ foreign ``Host`` headers (DNS rebinding), and requires an ``X-Sentinel-Client`` 
 state-changing requests, which cross-site forms cannot send without a CORS preflight.
 """
 
-from __future__ import annotations
+# NOTE: no `from __future__ import annotations` here: FastAPI must evaluate the
+# Annotated[..., Depends()] aliases defined inside create_app() at definition time.
 
 import asyncio
 import json
