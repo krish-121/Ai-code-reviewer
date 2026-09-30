@@ -92,6 +92,7 @@ ignore = [
 "tests/**" = ["S105", "S106", "S108", "S311", "S608", "E501"]
 "src/sentinel/analysis/static/builtin_security.py" = ["S105"]
 "src/sentinel/analysis/diff/secrets.py" = ["S105"]
+"src/sentinel/apps/cli/main.py" = ["E501"]  # typer Annotated signatures
 
 [tool.mypy]
 python_version = "3.11"

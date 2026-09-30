@@ -66,7 +66,12 @@ def reachability(finding: Finding, ctx: VerificationContext) -> tuple[str, list[
         if ctx.graph.callers(node.id):
             return "unknown", []  # called, but we can't see an entry point (library code?)
         return "unreachable", []
-    labels = [n.name if n.kind is NodeKind.ENDPOINT else f"{n.name}()" for n in path]
+    labels: list[str] = []
+    for n in path:
+        label = n.name if n.kind is NodeKind.ENDPOINT else f"{n.name}()"
+        if labels and label.removesuffix("()") == labels[-1].removesuffix("()"):
+            continue  # inline route handlers are named after their endpoint
+        labels.append(label)
     if path[0].kind is NodeKind.TEST:
         return "test-only", labels
     return "entrypoint", labels

@@ -155,6 +155,11 @@ class Settings(BaseModel):
     github_webhook_secret: SecretStr | None = None
     github_api_url: str = "https://api.github.com"
     auth_mode: str = Field(default="local", description="local | token")
+    local_roots: str = Field(
+        default="",
+        description="os.pathsep-separated directories the API may review (local mode: $HOME)",
+    )
+    public_url: str | None = None
     log_format: str = Field(default="text", description="text | json")
 
     @field_validator("provider")
@@ -168,6 +173,11 @@ class Settings(BaseModel):
     @property
     def resolved_model(self) -> str:
         return self.model or DEFAULT_MODELS[self.provider]
+
+    def allowed_roots(self) -> list[Path]:
+        if self.local_roots:
+            return [Path(p).expanduser().resolve() for p in self.local_roots.split(os.pathsep) if p]
+        return [Path.home().resolve()] if self.auth_mode == "local" else []
 
     def api_key_for(self, provider: str) -> str | None:
         secret = {"claude": self.claude_api_key, "gemini": self.gemini_api_key}.get(provider)
@@ -199,6 +209,8 @@ _ENV_MAP = {
     "SENTINEL_GITHUB_API_URL": "github_api_url",
     "SENTINEL_AUTH_MODE": "auth_mode",
     "SENTINEL_LOG_FORMAT": "log_format",
+    "SENTINEL_LOCAL_ROOTS": "local_roots",
+    "SENTINEL_PUBLIC_URL": "public_url",
 }
 
 

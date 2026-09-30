@@ -68,18 +68,20 @@ class ESLintAnalyzer:
     name = "eslint"
     languages = frozenset({Language.JAVASCRIPT, Language.TYPESCRIPT})
 
-    def __init__(self, timeout_s: int = 120) -> None:
+    def __init__(self, timeout_s: int = 120, *, trust_workspace: bool = True) -> None:
         self.timeout_s = timeout_s
+        # Never run binaries/plugins shipped inside an untrusted checkout (e.g. a PR).
+        self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
         return find_tool("eslint") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
-        exe = find_tool("eslint", workspace)
+        exe = find_tool("eslint", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "eslint not installed"))
         ts_parser = workspace / "node_modules" / "@typescript-eslint" / "parser"
-        parser = ts_parser if ts_parser.is_dir() else None
+        parser = ts_parser if self.trust_workspace and ts_parser.is_dir() else None
         ts_exts = (".ts", ".tsx", ".mts", ".cts")
         targets = [f for f in files if parser is not None or not f.endswith(ts_exts)]
         if not targets:
@@ -148,14 +150,16 @@ class TscAnalyzer:
     name = "tsc"
     languages = frozenset({Language.TYPESCRIPT})
 
-    def __init__(self, timeout_s: int = 240) -> None:
+    def __init__(self, timeout_s: int = 240, *, trust_workspace: bool = True) -> None:
         self.timeout_s = timeout_s
+        # Never run binaries/plugins shipped inside an untrusted checkout (e.g. a PR).
+        self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
         return find_tool("tsc") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
-        exe = find_tool("tsc", workspace)
+        exe = find_tool("tsc", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "tsc not installed"))
         if not (workspace / "tsconfig.json").is_file():

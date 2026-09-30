@@ -293,6 +293,10 @@ def filter_changeset(
     return FilterOutcome(changeset=filtered, findings=findings, redactions=redactions)
 
 
+def _article(word: str) -> str:
+    return "an" if word[:1].lower() in "aeiou" else "a"
+
+
 def _sensitive_file_finding(change: FileChange, severity: Severity, reason: str) -> Finding:
     return Finding(
         category=Category.SECURITY,
@@ -300,8 +304,8 @@ def _sensitive_file_finding(change: FileChange, severity: Severity, reason: str)
         confidence=0.9,
         title=f"Sensitive file committed: {posixpath.basename(change.path)}",
         explanation=(
-            f"`{change.path}` looks like a {reason}. Files like this usually contain "
-            "credentials and should never be committed. Its contents were not analyzed "
+            f"`{change.path}` looks like {_article(reason)} {reason}. Files like this usually "
+            "contain credentials and should never be committed. Its contents were not analyzed "
             "or sent to any AI provider."
         ),
         file=change.path,

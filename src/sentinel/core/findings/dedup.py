@@ -81,13 +81,16 @@ _VER_RANK = {
 }
 
 
-def _primary_key(f: Finding) -> tuple[int, int, int, float]:
+def _primary_key(f: Finding) -> tuple[int, int, int, int, float]:
     ver = _VER_RANK[f.verification.status] if f.verification else 1
-    # Prefer AI wording (it explains *why*), then severity, then confidence.
+    # Prefer AI wording (it explains *why*), then a real explanation over a bare tool
+    # message, then severity, then confidence.
+    explained = int(bool(f.explanation) and f.explanation.strip() != f.title.strip())
     return (
         ver,
         _SEV_RANK[f.severity.value],
         int(f.source is not FindingSource.STATIC_ANALYZER),
+        explained,
         f.confidence,
     )
 

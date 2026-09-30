@@ -145,3 +145,40 @@ def path_changeset(root: Path, sub: Path | None = None) -> ChangeSet:
             continue
         cs.files.append(whole_file_change(rel, data.decode("utf-8", errors="replace")))
     return cs
+
+
+def unstaged_paths(repo: Path) -> set[str]:
+    return set(_git(repo, "diff", "--name-only").splitlines())
+
+
+def export_index(repo: Path, dest: Path) -> None:
+    """Materialize the staged tree (the index) into ``dest``."""
+    dest.mkdir(parents=True, exist_ok=True)
+    prefix = str(dest.resolve()) + "/"
+    _git(repo, "checkout-index", "-a", "-f", f"--prefix={prefix}")
+
+
+def export_tree(repo: Path, ref: str, dest: Path) -> None:
+    """Materialize the tree of commit ``ref`` into ``dest`` (safe tar extraction)."""
+    import io
+    import tarfile
+
+    if ref.startswith("-"):
+        raise GitError(f"invalid ref {ref!r}")
+    proc = subprocess.run(
+        ["git", "-C", str(repo), "archive", "--format=tar", ref],
+        capture_output=True,
+        check=False,
+        timeout=300,
+    )
+    if proc.returncode != 0:
+        raise GitError(proc.stderr.decode(errors="replace").strip() or "git archive failed")
+    dest.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(fileobj=io.BytesIO(proc.stdout)) as tar:
+        tar.extractall(dest, filter="data")
+
+
+def rev_parse(repo: Path, ref: str) -> str:
+    if ref.startswith("-"):
+        raise GitError(f"invalid ref {ref!r}")
+    return _git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}").strip()

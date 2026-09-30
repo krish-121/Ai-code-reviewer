@@ -265,14 +265,16 @@ class _PyRules(ast.NodeVisitor):
         self.loops = []
         self.generic_visit(node)
         for outer, inner in loop_bodies_with_nested_iteration(node):
+            same = expr_name(outer.iter) == expr_name(inner.iter) != ""
             self.add(
                 rule="quadratic-loop",
                 category=Category.PERFORMANCE,
-                severity=Severity.LOW,
-                confidence=0.55,
+                severity=Severity.MEDIUM if same else Severity.LOW,
+                confidence=0.75 if same else 0.55,
                 line=inner.lineno,
                 end_line=inner.end_lineno,
-                title="Nested loop compares every pair of elements (O(n·m))",
+                title="Nested loop compares every pair of elements "
+                + ("(O(n²))" if same else "(O(n·m))"),
                 explanation=(
                     f"The loop at line {inner.lineno} runs once per element of the loop at "
                     f"line {outer.lineno} and compares elements pairwise. Indexing one side in "

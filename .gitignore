@@ -16,6 +16,7 @@ web/dist/
 *.db
 *.sqlite
 .env
+!demo/sentinel-demo-repo/feature/.env
 .env.*
 !.env.example
 .DS_Store

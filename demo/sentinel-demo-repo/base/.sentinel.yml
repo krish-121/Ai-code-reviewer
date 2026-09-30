@@ -1,0 +1,8 @@
+review:
+  categories: [bug, security, performance, tests, architecture]
+  max_findings: 15
+severity_threshold: low
+ignore:
+  - migrations/
+fix:
+  test_command: [python, -m, pytest, -q, -p, no:cacheprovider, tests]

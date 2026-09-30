@@ -67,13 +67,19 @@ class StaticAnalysisRunner:
 
 
 def default_analyzers(
-    registry: LanguageRegistry | None = None, timeout_s: int = 120
+    registry: LanguageRegistry | None = None,
+    timeout_s: int = 120,
+    *,
+    trust_workspace: bool = True,
 ) -> list[StaticAnalyzer]:
+    """``trust_workspace=False`` for code you don't control (pull requests): tools and
+    plugins are then never loaded from the checked-out repository itself."""
+    t = trust_workspace
     return [
         BuiltinAnalyzer(registry),
-        RuffAnalyzer(timeout_s),
-        MypyAnalyzer(timeout_s),
-        BanditAnalyzer(timeout_s),
-        ESLintAnalyzer(timeout_s),
-        TscAnalyzer(timeout_s),
+        RuffAnalyzer(timeout_s, trust_workspace=t),
+        MypyAnalyzer(timeout_s, trust_workspace=t),
+        BanditAnalyzer(timeout_s, trust_workspace=t),
+        ESLintAnalyzer(timeout_s, trust_workspace=t),
+        TscAnalyzer(timeout_s, trust_workspace=t),
     ]

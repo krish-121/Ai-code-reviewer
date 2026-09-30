@@ -85,8 +85,17 @@ def build_summary(
     attention = [f"[{f.severity.value.upper()}] {f.title} — {f.location}" for f in surfaced[:3]]
 
     verified: list[str] = []
+    deterministic = [f for f in surfaced if f.is_deterministic]
+    if deterministic:
+        tools = sorted({o.split(":", 1)[0] for f in deterministic for o in f.origins})
+        verified.append(
+            f"{len(deterministic)} finding(s) come from deterministic analysis "
+            f"({', '.join(tools)}) and need no further verification"
+        )
     for f in surfaced:
-        if f.verification and f.verification.status is VerificationStatus.SUPPORTED:
+        if f.is_deterministic or f.verification is None:
+            continue
+        if f.verification.status is VerificationStatus.SUPPORTED:
             verified.append(f"{f.title}: {f.verification.summary}")
     rejected = [f for f in suppressed if _status(f) is VerificationStatus.REJECTED]
     if rejected:

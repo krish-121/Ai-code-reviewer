@@ -20,7 +20,7 @@ from sentinel.core.domain.ports import StaticAnalysisOutput
 
 # --------------------------------------------------------------------------- Ruff
 
-RUFF_SELECT = "E9,F,B,S,ASYNC,PERF"
+RUFF_SELECT = "E9,F,B,S,ASYNC"
 RUFF_IGNORE = "S101,S603,S607,S404,S311,S104,E501,B905"
 
 # Longest-prefix wins. (category, severity, confidence, tags)
@@ -70,14 +70,16 @@ class RuffAnalyzer:
     name = "ruff"
     languages = frozenset({Language.PYTHON})
 
-    def __init__(self, timeout_s: int = 120) -> None:
+    def __init__(self, timeout_s: int = 120, *, trust_workspace: bool = True) -> None:
         self.timeout_s = timeout_s
+        # Never run binaries/plugins shipped inside an untrusted checkout (e.g. a PR).
+        self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
         return find_tool("ruff") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
-        exe = find_tool("ruff", workspace)
+        exe = find_tool("ruff", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "ruff not installed"))
         cmd = [
@@ -151,6 +153,7 @@ MYPY_IMPORTANT = {
     "unused-coroutine",
     "truthy-function",
 }
+MYPY_TAGS = {"unused-coroutine": ["missing-await"], "union-attr": ["none-check"]}
 MYPY_TEXT_RE = re.compile(
     r"^(?P<file>[^:\n]+):(?P<line>\d+):(?:(?P<col>\d+):)? (?P<sev>error|note|warning): "
     r"(?P<msg>.*?)(?:  \[(?P<code>[\w-]+)\])?$"
@@ -161,14 +164,16 @@ class MypyAnalyzer:
     name = "mypy"
     languages = frozenset({Language.PYTHON})
 
-    def __init__(self, timeout_s: int = 180) -> None:
+    def __init__(self, timeout_s: int = 180, *, trust_workspace: bool = True) -> None:
         self.timeout_s = timeout_s
+        # Never run binaries/plugins shipped inside an untrusted checkout (e.g. a PR).
+        self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
         return find_tool("mypy") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
-        exe = find_tool("mypy", workspace)
+        exe = find_tool("mypy", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "mypy not installed"))
         base = [
@@ -185,6 +190,11 @@ class MypyAnalyzer:
         # Never leave a .mypy_cache behind in the reviewed repository.
         with tempfile.TemporaryDirectory(prefix="sentinel-mypy-") as cache:
             base.append(f"--cache-dir={cache}")
+            if not self.trust_workspace:
+                # A repository's mypy config can load plugins (arbitrary code): ignore it.
+                isolated = Path(cache) / "isolated.ini"
+                isolated.write_text("[mypy]\n", encoding="utf-8")
+                base.append(f"--config-file={isolated}")
             result = run_tool([*base, "-O", "json", "--", *files], workspace, self.timeout_s)
             if "unrecognized arguments" in result.stderr or "invalid choice" in result.stderr:
                 result = run_tool([*base, "--", *files], workspace, self.timeout_s)
@@ -229,7 +239,7 @@ class MypyAnalyzer:
                     title=str(item.get("message", "type error")),
                     file=relpath(str(item.get("file", "")), workspace),
                     line=line if isinstance(line, int) else 1,
-                    tags=["type-error"],
+                    tags=["type-error", *MYPY_TAGS.get(code, [])],
                 )
             )
         return out
@@ -261,14 +271,16 @@ class BanditAnalyzer:
     name = "bandit"
     languages = frozenset({Language.PYTHON})
 
-    def __init__(self, timeout_s: int = 120) -> None:
+    def __init__(self, timeout_s: int = 120, *, trust_workspace: bool = True) -> None:
         self.timeout_s = timeout_s
+        # Never run binaries/plugins shipped inside an untrusted checkout (e.g. a PR).
+        self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
         return find_tool("bandit") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
-        exe = find_tool("bandit", workspace)
+        exe = find_tool("bandit", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "bandit not installed"))
         result: ToolResult = run_tool(

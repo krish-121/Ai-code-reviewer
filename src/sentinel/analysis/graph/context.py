@@ -103,7 +103,16 @@ class ContextEngine:
     def changed_symbols(self, changeset: ChangeSet) -> list[ChangedSymbol]:
         found: dict[str, ChangedSymbol] = {}
         for change in changeset.reviewable():
-            for line in sorted(change.added_lines()):
+            meaningful = {
+                ln.new_lineno
+                for h in change.hunks
+                for ln in h.lines
+                if ln.kind is LineKind.ADDED
+                and ln.new_lineno is not None
+                and ln.content.strip()
+                and not ln.content.strip().startswith(("#", "//"))
+            }
+            for line in sorted(meaningful):
                 node = self.graph.enclosing(change.path, line)
                 if node is None:
                     node = self.graph.node(node_id(NodeKind.FILE, change.path, "<file>"))
