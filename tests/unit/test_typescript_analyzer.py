@@ -5,12 +5,8 @@ import shutil
 import pytest
 
 from sentinel.analysis.ast.registry import LanguageRegistry, default_registry
-from sentinel.analysis.ast.typescript_analyzer import (
-    FALLBACK_NOTE,
-    TypeScriptAnalyzer,
-    find_typescript_module,
-    regex_extract,
-)
+from sentinel.analysis.ast.typescript_analyzer import TypeScriptAnalyzer, find_typescript_module
+from sentinel.analysis.ast.typescript_fallback import FALLBACK_NOTE, regex_extract
 from sentinel.core.domain.code import SymbolKind
 from sentinel.infrastructure.storage.cache import MemoryCache
 
