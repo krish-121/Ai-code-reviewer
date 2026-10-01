@@ -23,6 +23,7 @@ from sentinel.infrastructure.database.session import Database
 from sentinel.services.fixes import FixService
 from sentinel.services.reviews import ReviewService
 from tests.fakes import ScriptedProvider, ai_finding
+from tests.helpers import DATABASE_BACKENDS, fresh_database_url
 from tests.unit.test_github import FakeGitHub, pr_payload, sign
 
 DEMO_BUILDER = Path(__file__).resolve().parents[2] / "demo"
@@ -96,11 +97,12 @@ AI = [
 ]
 
 
-def test_github_pull_request_end_to_end(demo_repo: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("backend", DATABASE_BACKENDS)
+def test_github_pull_request_end_to_end(demo_repo: Path, tmp_path: Path, backend: str) -> None:
     gh = DemoGitHub(demo_repo)
     settings = Settings(
         provider="none",
-        database_url=f"sqlite:///{tmp_path}/e2e.db",
+        database_url=fresh_database_url(backend, tmp_path),
         github_webhook_secret=SECRET,
         cache_dir=tmp_path / "cache",  # type: ignore[arg-type]
     )

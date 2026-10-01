@@ -17,6 +17,7 @@ from sentinel.infrastructure.database.store import Store
 from sentinel.services.fixes import FixService
 from sentinel.services.reviews import ReviewService
 from tests.fakes import ScriptedProvider
+from tests.helpers import DATABASE_BACKENDS, fresh_database_url
 from tests.unit.test_fix_engine import FIXED, VULN, fix_payload
 
 DEMO_BUILDER = Path(__file__).resolve().parents[2] / "demo"
@@ -34,9 +35,11 @@ def demo(tmp_path: Path) -> Path:
         sys.path.remove(str(DEMO_BUILDER))
 
 
-def make(tmp_path: Path, **kw: object) -> tuple[TestClient, Database, Worker, ScriptedProvider]:
+def make(
+    tmp_path: Path, backend: str = "sqlite", **kw: object
+) -> tuple[TestClient, Database, Worker, ScriptedProvider]:
     settings = Settings(
-        database_url=f"sqlite:///{tmp_path}/api.db",
+        database_url=fresh_database_url(backend, tmp_path),
         cache_dir=tmp_path / "c",
         local_roots=str(tmp_path),
         **kw,
@@ -61,8 +64,9 @@ def make(tmp_path: Path, **kw: object) -> tuple[TestClient, Database, Worker, Sc
     return TestClient(create_app(settings, db=db, reviews=reviews, fixes=fixes)), db, worker, ai
 
 
-def test_local_review_lifecycle_and_fix_flow(tmp_path: Path, demo: Path) -> None:
-    client, _db, worker, _ai = make(tmp_path)
+@pytest.mark.parametrize("backend", DATABASE_BACKENDS)
+def test_local_review_lifecycle_and_fix_flow(tmp_path: Path, demo: Path, backend: str) -> None:
+    client, _db, worker, _ai = make(tmp_path, backend)
     assert client.get("/api/health").json()["status"] == "ok"
     assert client.get("/api/me").json()["id"] == "local"
 
@@ -135,8 +139,9 @@ def test_local_review_lifecycle_and_fix_flow(tmp_path: Path, demo: Path) -> None
     assert "sentinel_" in client.get("/metrics").text or client.get("/metrics").status_code == 200
 
 
-def test_token_mode_isolates_tenants(tmp_path: Path) -> None:
-    client, db, _worker, _ai = make(tmp_path, auth_mode="token")
+@pytest.mark.parametrize("backend", DATABASE_BACKENDS)
+def test_token_mode_isolates_tenants(tmp_path: Path, backend: str) -> None:
+    client, db, _worker, _ai = make(tmp_path, backend, auth_mode="token")
     from sentinel.core.domain.models import ChangeSet, Finding, ReviewResult
 
     with db.transaction() as s:

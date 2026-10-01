@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 from collections import defaultdict
+from collections.abc import Iterable
 
 from sentinel.core.domain.models import ReviewResult, StageStatus
 
@@ -69,10 +70,23 @@ class Metrics:
         )
         self.inc("sentinel_ai_tokens_total", result.usage.output_tokens, direction="output")
 
-    def record_fix(self, status: str, duration_ms: float) -> None:
-        """Count a fix attempt and its duration."""
+    def record_fix(
+        self, status: str, duration_ms: float, check_results: Iterable[tuple[str, str]] = ()
+    ) -> None:
+        """Count a fix attempt, its duration, and each validation check's result.
+
+        ``check_results`` are ``(check name, status)`` pairs, e.g. ``("tests", "failed")``;
+        they give the fix success rate and the test failure rate the spec asks for.
+        """
         self.inc("sentinel_fix_attempts_total", help="Fix attempts by outcome", status=status)
         self.observe("sentinel_fix_duration_ms", duration_ms, help="Fix generation+validation")
+        for check, result in check_results:
+            self.inc(
+                "sentinel_fix_checks_total",
+                help="Fix validation checks by outcome",
+                check=check,
+                status=result,
+            )
 
     def render(self) -> str:
         """Everything in the Prometheus text exposition format."""

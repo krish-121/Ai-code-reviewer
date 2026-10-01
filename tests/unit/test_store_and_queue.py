@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Iterator
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from sqlalchemy import update
@@ -27,13 +30,16 @@ from sentinel.infrastructure.database.models import Job
 from sentinel.infrastructure.database.session import Database, normalize_url
 from sentinel.infrastructure.database.store import Store, hash_token
 from sentinel.infrastructure.queue import jobs
+from tests.helpers import DATABASE_BACKENDS, fresh_database_url
 
 
-@pytest.fixture
-def db() -> Database:
-    database = Database("sqlite://")
+@pytest.fixture(params=DATABASE_BACKENDS)
+def db(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Database]:
+    """An empty database: SQLite, and PostgreSQL when SENTINEL_TEST_DATABASE_URL is set."""
+    database = Database(fresh_database_url(request.param, tmp_path))
     database.create_all()
-    return database
+    yield database
+    database.engine.dispose()
 
 
 def _finding(**kw: object) -> Finding:
@@ -222,3 +228,34 @@ def test_crashed_worker_lease_expires_and_job_is_reclaimed(db: Database) -> None
         recovered = jobs.claim(s, "healthy")
         assert recovered is not None and recovered.id == job.id
         assert recovered.worker_id == "healthy" and recovered.attempts == 2
+
+
+def test_concurrent_workers_never_claim_the_same_job(db: Database) -> None:
+    # Arrange: more jobs than workers, so every worker claims several times.
+    with db.session() as s:
+        for n in range(24):
+            jobs.enqueue(s, "review", {"n": n})
+        s.commit()
+    claimed: list[str] = []
+    lock = threading.Lock()
+
+    def work(worker: str) -> None:
+        while True:
+            with db.session() as s:
+                job = jobs.claim(s, worker)
+                if job is None:
+                    return
+                with lock:
+                    claimed.append(job.id)
+                jobs.complete(s, job)
+
+    # Act: four workers race for the same queue.
+    threads = [threading.Thread(target=work, args=(f"w{i}",)) for i in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    # Assert: every job ran exactly once.
+    assert len(claimed) == 24
+    assert len(set(claimed)) == 24

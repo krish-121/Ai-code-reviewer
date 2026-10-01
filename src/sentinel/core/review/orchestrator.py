@@ -64,6 +64,8 @@ MAX_PARSE_ERRORS_LISTED = 5
 # A finding counts as "on a changed line" if it is within this many lines of one.
 CHANGED_LINE_SLACK = 2
 log = logging.getLogger("sentinel.review")
+# Attribute names a log record already has; metrics with these names are not logged as extras.
+LOG_RECORD_FIELDS = frozenset(vars(logging.makeLogRecord({})))
 
 
 class SymbolExtractor(Protocol):
@@ -143,6 +145,7 @@ class ReviewOrchestrator:
                 run_stage(state, record)
         state.result.status = _final_status(state.result)
         state.result.duration_ms = int((self.clock() - started) * 1000)
+        _log_review(state.result)
         return state.result
 
     # ------------------------------------------------------------------ stages
@@ -387,6 +390,38 @@ class ReviewOrchestrator:
         finally:
             record.duration_ms = int((self.clock() - start) * 1000)
             self.progress.stage_changed(record)
+            _log_stage(result.review_id, record)
+
+
+def _log_stage(review_id: str, record: StageRecord) -> None:
+    """One structured line per stage: ``review_id=… stage=… duration_ms=… files=…``."""
+    metrics = {k: v for k, v in record.metrics.items() if k not in LOG_RECORD_FIELDS}
+    log.info(
+        "stage finished",
+        extra={
+            "review_id": review_id,
+            "stage": record.name.value,
+            "status": record.status.value,
+            "duration_ms": record.duration_ms,
+            **metrics,
+        },
+    )
+
+
+def _log_review(result: ReviewResult) -> None:
+    """One structured line per review with the totals operators look at first."""
+    log.info(
+        "review finished",
+        extra={
+            "review_id": result.review_id,
+            "status": result.status.value,
+            "duration_ms": result.duration_ms,
+            "files": result.summary.stats.files_reviewed,
+            "findings": len(result.findings),
+            "suppressed": len(result.suppressed),
+            "tokens": result.usage.input_tokens + result.usage.output_tokens,
+        },
+    )
 
 
 def _mark_failed(result: ReviewResult, record: StageRecord, reason: str) -> None:

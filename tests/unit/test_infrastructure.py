@@ -246,10 +246,11 @@ def test_metrics_render() -> None:
         stages=[StageRecord(name=StageName.AI_REVIEW, status=StageStatus.DONE, duration_ms=900)],
     )
     m.record_review(result)
-    m.record_fix("validated", 5000)
+    m.record_fix("validated", 5000, [("tests", "passed"), ("syntax", "passed")])
     text = m.render()
     assert 'sentinel_reviews_total{status="completed"} 1' in text
     assert 'sentinel_stage_duration_ms_bucket{stage="ai_review",le="1000"} 1' in text
     assert "sentinel_review_duration_ms_count 1" in text
     assert 'sentinel_fix_attempts_total{status="validated"} 1' in text
+    assert 'sentinel_fix_checks_total{check="tests",status="passed"} 1' in text
     assert "# TYPE sentinel_review_duration_ms histogram" in text

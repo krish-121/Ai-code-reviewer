@@ -70,7 +70,8 @@ class Worker:
     def _fix(self, job: Job) -> None:
         start = time.monotonic()
         outcome = self.fixes.run(str(job.payload["fix_id"]))
-        METRICS.record_fix(outcome.status, (time.monotonic() - start) * 1000)
+        checks = [(check.name, check.status) for check in outcome.checks]
+        METRICS.record_fix(outcome.status, (time.monotonic() - start) * 1000, checks)
 
     def run_once(self) -> bool:
         """Claim and run one job. Returns False when the queue was empty."""

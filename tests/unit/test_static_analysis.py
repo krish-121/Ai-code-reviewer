@@ -435,7 +435,9 @@ def test_default_analyzers_names() -> None:
     assert names == ["sentinel", "ruff", "mypy", "bandit", "eslint", "tsc"]
 
 
-def test_tool_environment_is_scrubbed_and_paths_are_relative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tool_environment_is_scrubbed_and_paths_are_relative(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("SENTINEL_CLAUDE_KEY", "secret")
     assert "SENTINEL_CLAUDE_KEY" not in scrubbed_env()
     assert relpath("/repo/a/b.py", Path("/repo")) == "a/b.py"

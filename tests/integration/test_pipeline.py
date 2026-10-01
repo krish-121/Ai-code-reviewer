@@ -5,6 +5,7 @@ git diff -> context -> static -> AI (scripted) -> verification -> findings. No n
 
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 from pathlib import Path
@@ -277,3 +278,21 @@ def test_empty_change(tmp_path: Path) -> None:
     assert result.findings == []
     assert result.summary.risk is RiskLevel.NONE
     assert result.summary.headline == "No problems found in this change"
+
+
+def test_each_stage_logs_a_structured_line(
+    repo: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange: `configure_logging` (run by CLI tests) stops propagation to pytest's handler.
+    monkeypatch.setattr(logging.getLogger("sentinel"), "propagate", True)
+
+    # Act
+    with caplog.at_level("INFO", logger="sentinel.review"):
+        result = run(repo, None)
+
+    # Assert: one line per stage, tagged with the review id, then a summary line.
+    stage_lines = [r for r in caplog.records if r.getMessage() == "stage finished"]
+    assert [getattr(r, "stage", None) for r in stage_lines] == [s.name.value for s in result.stages]
+    assert all(getattr(r, "review_id", None) == result.review_id for r in stage_lines)
+    summary = next(r for r in caplog.records if r.getMessage() == "review finished")
+    assert getattr(summary, "files", None) == result.summary.stats.files_reviewed
