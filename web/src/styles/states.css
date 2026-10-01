@@ -1,0 +1,44 @@
+/* Loading, empty and error states. */
+
+.empty {
+  padding: 40px 24px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--r-md);
+}
+
+.empty-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.empty-body {
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+
+.spinner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 0;
+  color: var(--ink-2);
+}
+
+.spinner-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  animation: spin 0.9s linear infinite;
+}
+
+.error-note {
+  padding: 10px 14px;
+  border-left: 3px solid var(--high);
+  background: var(--high-soft);
+  color: var(--ink);
+  margin: 12px 0;
+}

@@ -1,0 +1,147 @@
+/* Overview tab. */
+
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 32px;
+}
+
+.ov-section {
+  margin-bottom: 28px;
+}
+
+.ov-section h2 {
+  margin-bottom: 10px;
+}
+
+.ov-section ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  max-width: 80ch;
+}
+
+.attention {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.attention-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  text-align: left;
+}
+
+.attention-item:hover {
+  border-color: var(--rule-strong);
+}
+
+.attention-title {
+  font-weight: 550;
+}
+
+.attention-loc {
+  color: var(--ink-3);
+  font-family: var(--font-code);
+  font-size: 12px;
+}
+
+.errors {
+  color: var(--high);
+}
+
+.ov-side {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.ov-card {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+}
+
+.ov-card h3 {
+  margin-bottom: 12px;
+}
+
+.stack {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.stack-high {
+  background: var(--high);
+}
+
+.stack-medium {
+  background: var(--medium);
+}
+
+.stack-low {
+  background: var(--low);
+}
+
+.legend {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.legend div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.legend dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.tools {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.tool {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.tool-name {
+  font-family: var(--font-code);
+  font-size: 12.5px;
+}
+
+.tool-status {
+  color: var(--ink-3);
+}
+
+.tool-failed .tool-status,
+.tool-timeout .tool-status {
+  color: var(--high);
+}

@@ -1,0 +1,61 @@
+/* Code views with line numbers and highlighting. */
+
+.code {
+  margin: 0;
+  padding: 8px 0;
+  background: var(--sunken);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+.code-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+}
+
+.code-ln {
+  color: var(--ink-3);
+  text-align: right;
+  padding-right: 14px;
+  user-select: none;
+}
+
+.code-text {
+  white-space: pre;
+  padding-right: 16px;
+}
+
+.code-marked {
+  background: color-mix(in srgb, var(--medium) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--medium);
+}
+
+.tok-kw {
+  color: var(--tok-kw);
+}
+
+.tok-str {
+  color: var(--tok-str);
+}
+
+.tok-com {
+  color: var(--tok-com);
+  font-style: italic;
+}
+
+.tok-num {
+  color: var(--tok-num);
+}
+
+.tok-fn {
+  color: var(--tok-fn);
+}
+
+.tok-dec {
+  color: var(--tok-dec);
+}
+
+.tok-bi {
+  color: var(--tok-bi);
+}

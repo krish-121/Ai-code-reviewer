@@ -1,9 +1,9 @@
-import { api } from "../api";
-import { location } from "../format";
-import { useQuery } from "../hooks";
-import type { Finding } from "../types";
-import { FindingRow } from "./FindingRow";
-import { Spinner } from "./ui";
+import { api } from "../lib/api";
+import { location } from "../lib/format";
+import { useQuery } from "../lib/hooks";
+import type { Finding } from "../lib/types";
+import { FindingRow } from "../findings/FindingRow";
+import { Spinner } from "../components/ui";
 
 export function SecurityTab({ reviewId, findings }: { reviewId: string; findings: Finding[] }) {
   const files = useQuery(`files:${reviewId}`, () => api.files(reviewId));

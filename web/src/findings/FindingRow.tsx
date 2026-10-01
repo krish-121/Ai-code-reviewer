@@ -1,7 +1,7 @@
-import { location } from "../format";
-import { navigate } from "../hooks";
-import type { Finding } from "../types";
-import { Inline, SeverityMark, VerificationPill } from "./ui";
+import { location } from "../lib/format";
+import { navigate } from "../lib/hooks";
+import type { Finding } from "../lib/types";
+import { Inline, SeverityMark, VerificationPill } from "../components/ui";
 
 export function FindingRow({ f, reviewId }: { f: Finding; reviewId: string }) {
   return (

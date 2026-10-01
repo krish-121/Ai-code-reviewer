@@ -1,8 +1,8 @@
 import { type ReactNode, useMemo } from "react";
 
-import { checkLabel, pct, VERIFICATION_LABEL } from "../format";
-import { highlightLines, languageOf } from "../highlight";
-import type { Risk, Severity, Verification, VerificationStatus } from "../types";
+import { checkLabel, pct, VERIFICATION_LABEL } from "../lib/format";
+import { highlightLines, languageOf } from "../lib/highlight";
+import type { Risk, Severity, Verification, VerificationStatus } from "../lib/types";
 
 export function SeverityMark({
   severity,

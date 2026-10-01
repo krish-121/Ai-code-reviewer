@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { highlightLines, languageOf, type Token } from "../src/highlight.ts";
+import { highlightLines, languageOf, type Token } from "../src/lib/highlight.ts";
 
 const types = (tokens: Token[]) =>
   tokens.filter((t) => t.v.trim()).map((t) => `${t.t}:${t.v.trim()}`);

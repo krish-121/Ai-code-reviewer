@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 
-import { api, subscribeProgress } from "../api";
-import { duration, pluralize } from "../format";
-import { invalidate, navigate, setSearchParam, useQuery, useSearchParam } from "../hooks";
-import type { Finding, ReviewDetail, Stage } from "../types";
-import { ArchitectureTab } from "./ArchitectureTab";
-import { FilesTab } from "./FilesTab";
-import { FindingsTab } from "./FindingsTab";
-import { OverviewTab } from "./OverviewTab";
-import { Pipeline } from "./Pipeline";
-import { SecurityTab } from "./SecurityTab";
-import { TestsTab } from "./TestsTab";
-import { ErrorNote, RiskBadge, Spinner } from "./ui";
+import { api, subscribeProgress } from "../lib/api";
+import { duration, pluralize } from "../lib/format";
+import { invalidate, navigate, setSearchParam, useQuery, useSearchParam } from "../lib/hooks";
+import type { Finding, ReviewDetail, Stage } from "../lib/types";
+import { ArchitectureTab } from "../review/ArchitectureTab";
+import { FilesTab } from "../review/FilesTab";
+import { FindingsTab } from "../findings/FindingsTab";
+import { OverviewTab } from "../review/OverviewTab";
+import { Pipeline } from "../review/Pipeline";
+import { SecurityTab } from "../review/SecurityTab";
+import { TestsTab } from "../review/TestsTab";
+import { ErrorNote, RiskBadge, Spinner } from "../components/ui";
 
 const TABS = ["overview", "files", "findings", "architecture", "security", "tests"] as const;
 type Tab = (typeof TABS)[number];

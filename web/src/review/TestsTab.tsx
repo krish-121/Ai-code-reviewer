@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 
-import { api } from "../api";
-import { useQuery } from "../hooks";
-import type { Finding } from "../types";
-import { FindingRow } from "./FindingRow";
-import { Empty, Spinner } from "./ui";
+import { api } from "../lib/api";
+import { useQuery } from "../lib/hooks";
+import type { Finding } from "../lib/types";
+import { FindingRow } from "../findings/FindingRow";
+import { Empty, Spinner } from "../components/ui";
 
 export function TestsTab({ reviewId, findings }: { reviewId: string; findings: Finding[] }) {
   const graph = useQuery(`graph:${reviewId}`, () => api.graph(reviewId));

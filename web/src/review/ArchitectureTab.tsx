@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 
-import { api } from "../api";
-import { layoutGraph, type LaidOutNode } from "../graphLayout";
-import { navigate, useQuery, useSearchParam } from "../hooks";
-import type { CodeGraphJson, Finding, GraphNode } from "../types";
-import { CodeView, Empty, ErrorNote, Inline, SeverityMark, Spinner } from "./ui";
+import { api } from "../lib/api";
+import { layoutGraph, type LaidOutNode } from "../lib/graphLayout";
+import { navigate, useQuery, useSearchParam } from "../lib/hooks";
+import type { CodeGraphJson, Finding, GraphNode } from "../lib/types";
+import { CodeView, Empty, ErrorNote, Inline, SeverityMark, Spinner } from "../components/ui";
 
 const KIND_LABEL: Record<string, string> = {
   endpoint: "Endpoint",

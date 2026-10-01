@@ -1,0 +1,209 @@
+/* Files tab: file list and diff viewer. */
+
+.files {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.filelist {
+  position: sticky;
+  top: 72px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.filelist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.filelist button {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.filelist button.on {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.fl-path {
+  font-family: var(--font-code);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.fl-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  align-items: center;
+}
+
+.ct {
+  color: var(--ink-3);
+}
+
+.ct-added {
+  color: var(--add-ink);
+}
+
+.ct-deleted {
+  color: var(--del-ink);
+}
+
+.fl-findings {
+  margin-left: auto;
+  background: var(--medium-soft);
+  color: var(--medium);
+  border-radius: 999px;
+  padding: 0 7px;
+  font-weight: 600;
+}
+
+.skipped {
+  padding: 12px;
+  background: var(--paper);
+}
+
+.skipped h3 {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+
+.skipped li {
+  display: grid;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.diffpane {
+  min-width: 0;
+}
+
+.diff-path {
+  font-family: var(--font-code);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.diff-file {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+}
+
+.difftable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.difftable .ln {
+  width: 1%;
+  min-width: 44px;
+  padding: 0 10px;
+  color: var(--ink-3);
+  text-align: right;
+  user-select: none;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.difftable .dc {
+  white-space: pre;
+  padding-right: 16px;
+}
+
+.dsign {
+  display: inline-block;
+  width: 16px;
+  color: var(--ink-3);
+  user-select: none;
+}
+
+.dl-added {
+  background: var(--add-bg);
+}
+
+.dl-added .dsign {
+  color: var(--add-ink);
+}
+
+.dl-removed {
+  background: var(--del-bg);
+}
+
+.dl-removed .dsign {
+  color: var(--del-ink);
+}
+
+.dl-focus {
+  box-shadow: inset 3px 0 0 var(--medium);
+}
+
+.hunk-head td {
+  padding: 4px 12px;
+  color: var(--likely);
+  background: var(--sunken);
+  font-size: 12px;
+}
+
+.dl-callouts td {
+  padding: 6px 12px 8px 60px;
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.callout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  margin: 2px 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  border-radius: var(--r-sm);
+  border-left: 3px solid var(--rule-strong);
+  background: var(--paper);
+}
+
+.callout-high {
+  border-left-color: var(--high);
+}
+
+.callout-medium {
+  border-left-color: var(--medium);
+}
+
+.callout-low {
+  border-left-color: var(--low);
+}
+
+.callout-title {
+  font-weight: 550;
+  color: var(--ink);
+}
+
+.orphans {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+}

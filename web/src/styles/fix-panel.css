@@ -1,0 +1,108 @@
+/* Fix panel: patch, checks and actions. */
+
+.fix-panel {
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  background: var(--paper);
+}
+
+.fix-panel h3 {
+  margin-bottom: 10px;
+}
+
+.verdict {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.verdict-validated,
+.verdict-applied {
+  color: var(--supported);
+}
+
+.verdict-unverified {
+  color: var(--medium);
+}
+
+.verdict-failed,
+.verdict-error {
+  color: var(--high);
+}
+
+.fix-checks {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.fix-checks th,
+.fix-checks td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.fix-checks th {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.fc-status {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fc-passed .fc-status {
+  color: var(--supported);
+}
+
+.fc-failed .fc-status,
+.fc-error .fc-status {
+  color: var(--high);
+}
+
+.fc-skipped .fc-status {
+  color: var(--ink-3);
+}
+
+.fc-detail {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.diff {
+  margin: 12px 0 0;
+  padding: 10px 0;
+  background: var(--sunken);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+  line-height: 1.55;
+}
+
+.diff span {
+  display: block;
+  padding: 0 14px;
+  white-space: pre;
+}
+
+.d-add {
+  background: var(--add-bg);
+  color: var(--add-ink);
+}
+
+.d-del {
+  background: var(--del-bg);
+  color: var(--del-ink);
+}
+
+.d-hunk {
+  color: var(--likely);
+}
+
+.d-meta {
+  color: var(--ink-3);
+}

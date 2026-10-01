@@ -1,0 +1,99 @@
+/* Review list page. */
+
+.review-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.review-table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.review-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+
+.review-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface));
+}
+
+.review-title {
+  display: block;
+  color: var(--ink);
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.review-sub {
+  display: flex;
+  gap: 14px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.counts {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.count {
+  min-width: 26px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-high {
+  background: var(--high-soft);
+  color: var(--high);
+}
+
+.count-medium {
+  background: var(--medium-soft);
+  color: var(--medium);
+}
+
+.count-low {
+  background: var(--low-soft);
+  color: var(--low);
+}
+
+.status {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.status-running,
+.status-queued {
+  color: var(--accent);
+}
+
+.status-failed {
+  color: var(--high);
+}
+
+.status-partial {
+  color: var(--medium);
+}

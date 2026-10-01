@@ -1,0 +1,240 @@
+/* Architecture tab: graph canvas and node inspector. */
+
+.arch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+.arch-canvas {
+  min-width: 0;
+}
+
+.arch-caption {
+  color: var(--ink-2);
+  max-width: 76ch;
+  margin-bottom: 12px;
+}
+
+.arch-scroll {
+  overflow: auto;
+  max-height: 72vh;
+  background:
+    radial-gradient(circle, var(--rule) 1px, transparent 1.2px) 0 0 / 18px 18px,
+    var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+}
+
+.gnode {
+  cursor: pointer;
+}
+
+.gnode rect {
+  fill: var(--surface);
+  stroke: var(--rule-strong);
+  stroke-width: 1.2;
+}
+
+.gnode:hover rect,
+.gnode:focus-visible rect {
+  stroke: var(--ink-3);
+}
+
+.gnode:focus {
+  outline: none;
+}
+
+.gnode-endpoint rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+}
+
+.gnode-database rect {
+  fill: var(--sunken);
+  stroke-dasharray: 0;
+}
+
+.gnode-test rect {
+  stroke-dasharray: 4 3;
+}
+
+.gnode-changed rect {
+  stroke: var(--accent);
+  stroke-width: 2.6;
+}
+
+.gnode-selected rect {
+  stroke: var(--focus);
+  stroke-width: 2.4;
+}
+
+.gkind {
+  font-size: 10.5px;
+  fill: var(--ink-3);
+  font-family: var(--font-ui);
+}
+
+.glabel {
+  font-size: 12.5px;
+  fill: var(--ink);
+  font-family: var(--font-code);
+}
+
+.gbadge-high {
+  fill: var(--high);
+}
+
+.gbadge-medium {
+  fill: var(--medium);
+}
+
+.gbadge-low {
+  fill: var(--low);
+}
+
+.gbadge-text {
+  font-size: 10.5px;
+  font-weight: 700;
+  fill: #fff;
+  font-family: var(--font-ui);
+}
+
+.gedge {
+  fill: none;
+  stroke: var(--rule-strong);
+  stroke-width: 1.3;
+}
+
+.gedge-routes {
+  stroke: var(--accent);
+}
+
+.gedge-reads,
+.gedge-writes {
+  stroke: var(--likely);
+  stroke-dasharray: 5 3;
+}
+
+.gedge-tests {
+  stroke: var(--ink-3);
+  stroke-dasharray: 2 3;
+}
+
+.gedge-hot {
+  stroke: var(--focus);
+  stroke-width: 2;
+}
+
+.garrow {
+  fill: var(--ink-3);
+}
+
+.arch-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.arch-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lg {
+  display: inline-block;
+  width: 22px;
+  border-top: 2px solid var(--rule-strong);
+}
+
+.lg-routes {
+  border-top-color: var(--accent);
+}
+
+.lg-data {
+  border-top: 2px dashed var(--likely);
+}
+
+.lg-tests {
+  border-top: 2px dotted var(--ink-3);
+}
+
+.node-panel {
+  position: sticky;
+  top: 72px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+}
+
+.np-kind {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.node-panel h2 {
+  font-family: var(--font-code);
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.np-loc {
+  color: var(--ink-3);
+  font-family: var(--font-code);
+  font-size: 12px;
+  margin: 4px 0 8px;
+}
+
+.np-changed {
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.np-findings {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+  display: grid;
+  gap: 6px;
+}
+
+.np-findings li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.np-rel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.np-rel h3 {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-bottom: 4px;
+}
+
+.np-rel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-code);
+  font-size: 12px;
+  display: grid;
+  gap: 2px;
+}

@@ -1,0 +1,88 @@
+/* Narrow-screen layout (keep last: it overrides earlier rules). */
+
+@media (max-width: 1100px) {
+  .overview,
+  .arch {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .node-panel {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .findings,
+  .files {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .findings-list,
+  .filelist {
+    position: static;
+    max-height: 50vh;
+  }
+
+  .review-head {
+    flex-direction: column;
+  }
+
+  .review-head-side {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .security-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .main {
+    padding: 20px 16px 48px;
+  }
+
+  .topbar {
+    padding: 0 16px;
+    gap: 12px;
+  }
+
+  .engine {
+    display: none;
+  }
+
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .review-table th:nth-child(4),
+  .review-table td:nth-child(4),
+  .review-table th:nth-child(5),
+  .review-table td:nth-child(5) {
+    display: none;
+  }
+
+  .attention-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .attention-loc,
+  .attention-item .ver {
+    grid-column: 2;
+  }
+
+  .evidence li {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .finding-detail {
+    padding: 18px;
+  }
+
+  .srow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}

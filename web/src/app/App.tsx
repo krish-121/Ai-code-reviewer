@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 
-import { api } from "../api";
-import { navigate, usePath, useQuery, useTheme, type Theme } from "../hooks";
-import { ReviewPage } from "./ReviewPage";
-import { ReviewsPage } from "./ReviewsPage";
+import { api } from "../lib/api";
+import { navigate, usePath, useQuery, useTheme, type Theme } from "../lib/hooks";
+import { ReviewPage } from "../pages/ReviewPage";
+import { ReviewsPage } from "../pages/ReviewsPage";
 
 function Logo() {
   return (

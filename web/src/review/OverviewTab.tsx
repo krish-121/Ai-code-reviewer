@@ -1,7 +1,7 @@
-import { navigate } from "../hooks";
-import type { Finding, ReviewDetail, VerificationStatus } from "../types";
+import { navigate } from "../lib/hooks";
+import type { Finding, ReviewDetail, VerificationStatus } from "../lib/types";
 import { Pipeline } from "./Pipeline";
-import { Inline, SeverityMark, VerificationPill } from "./ui";
+import { Inline, SeverityMark, VerificationPill } from "../components/ui";
 
 const VER_ORDER: VerificationStatus[] = ["supported", "likely", "uncertain", "rejected"];
 

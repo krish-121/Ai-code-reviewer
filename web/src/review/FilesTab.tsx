@@ -1,11 +1,18 @@
 import { Fragment, useEffect, useMemo } from "react";
 
-import { api } from "../api";
-import { groupByFile } from "../format";
-import { highlightLines, languageOf } from "../highlight";
-import { navigate, setSearchParam, useQuery, useSearchParam } from "../hooks";
-import type { FileChange, Finding } from "../types";
-import { Empty, ErrorNote, Inline, SeverityMark, Spinner, VerificationPill } from "./ui";
+import { api } from "../lib/api";
+import { groupByFile } from "../lib/format";
+import { highlightLines, languageOf } from "../lib/highlight";
+import { navigate, setSearchParam, useQuery, useSearchParam } from "../lib/hooks";
+import type { FileChange, Finding } from "../lib/types";
+import {
+  Empty,
+  ErrorNote,
+  Inline,
+  SeverityMark,
+  Spinner,
+  VerificationPill,
+} from "../components/ui";
 
 const CHANGE_LABEL: Record<FileChange["change_type"], string> = {
   added: "added",

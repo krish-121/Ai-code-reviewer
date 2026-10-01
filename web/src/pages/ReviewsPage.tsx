@@ -1,10 +1,10 @@
 import { type FormEvent, useState } from "react";
 
-import { api, type NewReview } from "../api";
-import { duration, relativeTime } from "../format";
-import { navigate, useQuery } from "../hooks";
-import type { ReviewItem } from "../types";
-import { Empty, ErrorNote, RiskBadge, Spinner } from "./ui";
+import { api, type NewReview } from "../lib/api";
+import { duration, relativeTime } from "../lib/format";
+import { navigate, useQuery } from "../lib/hooks";
+import type { ReviewItem } from "../lib/types";
+import { Empty, ErrorNote, RiskBadge, Spinner } from "../components/ui";
 
 function sourceLabel(r: ReviewItem): string {
   if (r.pull_request) return `Pull request #${r.pull_request.number}`;

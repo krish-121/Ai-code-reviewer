@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { api } from "../api";
-import { duration } from "../format";
-import { invalidate, useQuery } from "../hooks";
-import type { FixAttempt } from "../types";
-import { ErrorNote, Spinner } from "./ui";
+import { api } from "../lib/api";
+import { duration } from "../lib/format";
+import { invalidate, useQuery } from "../lib/hooks";
+import type { FixAttempt } from "../lib/types";
+import { ErrorNote, Spinner } from "../components/ui";
 
 const PENDING = new Set(["queued", "running"]);
 const CHECK_NAME: Record<string, string> = {

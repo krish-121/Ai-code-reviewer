@@ -1,0 +1,218 @@
+/* Review page header, tabs and live progress. */
+
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 32px;
+  padding-bottom: 20px;
+  margin-bottom: 4px;
+}
+
+.crumbs {
+  display: flex;
+  gap: 8px;
+  color: var(--ink-3);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.crumbs a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.pr-number {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 14px 0 0;
+}
+
+.facts div {
+  display: grid;
+}
+
+.facts dt {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.review-head-side {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 8px;
+  text-align: right;
+  max-width: 360px;
+}
+
+.headline {
+  color: var(--ink-2);
+}
+
+.partial-note {
+  color: var(--medium);
+  font-size: 13px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.tab {
+  border: 0;
+  background: none;
+  padding: 10px 14px;
+  color: var(--ink-2);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+
+.tab.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+  font-weight: 550;
+}
+
+.tab-count {
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--sunken);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.footnote {
+  margin-top: 32px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+/* progress */
+
+.progress-panel {
+  max-width: 720px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+}
+
+.progress-panel > p {
+  margin: 6px 0 18px;
+}
+
+.pipeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "g name time"
+    ". detail detail"
+    ". bar bar";
+  column-gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--rule);
+}
+
+.stage:last-child {
+  border-bottom: 0;
+}
+
+.stage-glyph {
+  grid-area: g;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--rule-strong);
+}
+
+.stage-done .stage-glyph {
+  background: var(--supported);
+  border-color: var(--supported);
+}
+
+.stage-running .stage-glyph {
+  border-color: var(--accent);
+  border-top-color: transparent;
+  animation: spin 0.9s linear infinite;
+}
+
+.stage-failed .stage-glyph {
+  background: var(--high);
+  border-color: var(--high);
+}
+
+.stage-skipped .stage-glyph {
+  border-style: dashed;
+}
+
+.stage-name {
+  grid-area: name;
+  font-weight: 500;
+}
+
+.stage-pending .stage-name {
+  color: var(--ink-3);
+}
+
+.stage-detail {
+  grid-area: detail;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.stage-time {
+  grid-area: time;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-bar {
+  grid-area: bar;
+  height: 3px;
+  background: var(--sunken);
+  border-radius: 2px;
+  margin-top: 4px;
+}
+
+.stage-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

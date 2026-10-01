@@ -1,5 +1,5 @@
-import { duration } from "../format";
-import type { Stage } from "../types";
+import { duration } from "../lib/format";
+import type { Stage } from "../lib/types";
 
 const LABELS: Record<string, string> = {
   parse_diff: "Parse diff",

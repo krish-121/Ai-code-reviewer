@@ -10,8 +10,8 @@ import {
   pct,
   pluralize,
   relativeTime,
-} from "../src/format.ts";
-import type { Finding } from "../src/types.ts";
+} from "../src/lib/format.ts";
+import type { Finding } from "../src/lib/types.ts";
 
 function finding(partial: Partial<Finding>): Finding {
   return {

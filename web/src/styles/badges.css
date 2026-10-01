@@ -1,0 +1,219 @@
+/* Severity marks, risk badges, verification pills and the verification ribbon. */
+
+.sev {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sev-shape {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+}
+
+.sev-high .sev-shape {
+  background: var(--high);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.sev-medium .sev-shape {
+  background: var(--medium);
+  clip-path: polygon(50% 4%, 100% 96%, 0 96%);
+}
+
+.sev-low .sev-shape {
+  background: var(--low);
+  border-radius: 50%;
+  transform: scale(0.8);
+}
+
+.sev-label {
+  font-weight: 500;
+}
+
+.risk {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+
+.risk-high {
+  background: var(--high-soft);
+  color: var(--high);
+  border-color: color-mix(in srgb, var(--high) 35%, transparent);
+}
+
+.risk-medium {
+  background: var(--medium-soft);
+  color: var(--medium);
+  border-color: color-mix(in srgb, var(--medium) 35%, transparent);
+}
+
+.risk-low {
+  background: var(--low-soft);
+  color: var(--low);
+  border-color: color-mix(in srgb, var(--low) 35%, transparent);
+}
+
+.risk-none {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.risk-pending {
+  color: var(--ink-3);
+  border-color: var(--rule);
+}
+
+.ver {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ver-glyph {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  flex-shrink: 0;
+}
+
+.ver-supported {
+  color: var(--supported);
+}
+
+.ver-supported .ver-glyph {
+  background: currentColor;
+}
+
+.ver-likely {
+  color: var(--likely);
+}
+
+.ver-likely .ver-glyph {
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+}
+
+.ver-uncertain,
+.ver-none {
+  color: var(--uncertain);
+}
+
+.ver-rejected {
+  color: var(--rejected);
+}
+
+.ver-rejected .ver-glyph {
+  background: linear-gradient(
+    135deg,
+    transparent 42%,
+    currentColor 42%,
+    currentColor 58%,
+    transparent 58%
+  );
+}
+
+.conf {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conf-bars {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.conf-bars span {
+  width: 6px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--rule);
+}
+
+.conf-bars span.on {
+  background: var(--ink-2);
+}
+
+.conf-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+/* The verification ribbon: one cell per check. */
+.ribbon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+}
+
+.ribbon .cell {
+  padding: 3px 9px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-2);
+  background: var(--surface);
+}
+
+.ribbon .cell-supports {
+  background: color-mix(in srgb, var(--supported) 16%, var(--surface));
+  border-color: color-mix(in srgb, var(--supported) 45%, transparent);
+  color: var(--ink);
+}
+
+.ribbon .cell-contradicts {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--rejected) 18%, var(--surface)) 0 4px,
+    var(--surface) 4px 8px
+  );
+  border-color: color-mix(in srgb, var(--rejected) 55%, transparent);
+  color: var(--ink);
+}
+
+.ribbon .cell-decisive {
+  border-width: 2px;
+}
+
+.ribbon .cell-skipped {
+  border-style: dotted;
+  color: var(--ink-3);
+}
+
+.ribbon-compact {
+  gap: 2px;
+  margin: 6px 0 0;
+}
+
+.ribbon-compact .cell {
+  width: 12px;
+  height: 6px;
+  padding: 0;
+  border-radius: 1px;
+  border-color: var(--rule-strong);
+  background: transparent;
+}
+
+.ribbon-compact .cell-supports {
+  background: var(--supported);
+  border-color: var(--supported);
+}
+
+.ribbon-compact .cell-contradicts {
+  background: var(--rejected);
+  border-color: var(--rejected);
+}

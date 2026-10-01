@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { layoutGraph } from "../src/graphLayout.ts";
-import type { CodeGraphJson, GraphNode } from "../src/types.ts";
+import { layoutGraph } from "../src/lib/graphLayout.ts";
+import type { CodeGraphJson, GraphNode } from "../src/lib/types.ts";
 
 function node(id: string, kind: GraphNode["kind"] = "function"): GraphNode {
   return { id, kind, name: id, file: "a.py", line_start: 1, line_end: 2, meta: {} };
