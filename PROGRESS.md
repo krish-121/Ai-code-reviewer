@@ -14,7 +14,7 @@ Spec: `project (1).md` (sections referenced as §N). Last updated: 2026-10-02.
 | 5 | Test suite (unit, integration, end-to-end, golden) | Done |
 | 6 | Web UI | Done |
 | 7 | Benchmarks, docs, CI, Docker files | Done |
-| 8 | Final check against the Definition of Done (§54), packaging | Not started |
+| 8 | Final check against the Definition of Done (§54), packaging | Done (see below) |
 | — | Readability audit of steps 1–6 (owner's code-quality standard) | Done (see below) |
 
 Step 3/4 note: the API, worker and GitHub integration were half-done when an earlier
@@ -30,9 +30,58 @@ GitHub comments → re-run deduplication).
 - `mypy --strict`: clean (118 source files). `ruff check` (now including complexity,
   naming and docstring rules) and `ruff format --check`: clean.
 - Coverage: 93.9% overall, 97% for `sentinel/core` (gates: 80% / 90%).
-- Frontend: `tsc --noEmit`, prettier, 11 `node --test` tests, esbuild production build: all pass.
+- Frontend: `tsc --noEmit`, prettier, 13 `node --test` tests, esbuild production build: all pass.
 - Demo: `scripts/seed_demo.py` reviews the demo repo (scripted AI replay), rejects all three
   planted wrong AI claims, and validates the SQL-injection fix in the Docker sandbox.
+
+## Step 8: Definition of Done check (§54)
+
+Re-run on 2026-10-02 with PostgreSQL 16 and Docker available. ✓ = met and checked here,
+◐ = implemented but only verifiable live (see *Verified only with mocks*), ✗ = not met.
+
+| Area | Item | State | Evidence |
+|---|---|---|---|
+| Functional | CLI review works | ✓ | `sentinel review --range main..feature/search-and-reports --no-ai` on the demo repo; `tests/integration/test_cli.py` |
+| | GitHub PR review works | ◐ | webhook → worker → comments → re-run dedup in `tests/e2e/test_github_flow.py` against a faked GitHub API |
+| | Web UI works | ✓ | browser-checked in local and token mode, no console errors; screenshots in `docs/screenshots/` |
+| | AI providers work | ◐ | Claude, Gemini, Ollama adapters tested with `httpx.MockTransport` (bad JSON, rate limits, timeouts); never called live |
+| | Static analysis works | ✓ | ruff, mypy, bandit (when installed), built-in rules and probes; `tests/unit/test_static_analysis.py` |
+| | Context analysis works | ✓ | code graph + call paths + related tests; `tests/unit/test_graph.py`, `test_context_engine.py`, golden cases |
+| | Findings are verified | ✓ | every finding carries checks; demo rejects 3 planted wrong AI claims |
+| | Fixes can be generated | ✓ | demo fix `X-…` for the SQL injection; `tests/unit/test_fix_engine.py` |
+| | Fixes are sandbox-tested | ✓ | demo fix validated with `isolation: docker`; `tests/integration/test_sandbox.py` |
+| Quality | ≥80% overall coverage | ✓ | 93.9% |
+| | ≥90% core coverage | ✓ | 97% |
+| | mypy strict passes | ✓ | 118 files, no issues |
+| | Ruff passes | ✓ | incl. C901 ≤ 10, pep8-naming, docstrings (google), bugbear, simplify |
+| | Frontend checks pass | ✓ | typecheck, prettier, 13 tests, build. ESLint for `.ts/.tsx` needs `@typescript-eslint/parser` (not available offline) |
+| | CI passes | ◐ | `.github/workflows/ci.yml` runs every gate above; each command passes locally, the workflow itself has not run on GitHub |
+| Security | Secrets filtered | ✓ | `.env`/keys never read; redaction in diff, context and prompt; golden case `secrets` |
+| | Repo content treated as untrusted | ✓ | nonce-fenced prompt, injection finding, untrusted workspace mode for PRs; golden case `prompt_injection` |
+| | Generated code sandboxed | ✓ | Docker sandbox: no network, read-only root, limits, no capabilities; process sandbox opt-in only |
+| | GitHub permissions minimized | ◐ | tokens requested with `MIN_PERMISSIONS` (contents read, PRs write, issues write); not tried against a real App |
+| | Tenant/repository isolation tested | ✓ | `test_tenant_isolation` (store), `test_token_mode_isolates_tenants` (API), both on SQLite and PostgreSQL |
+| Docs | README, ARCHITECTURE, DESIGN_DECISIONS, WALKTHROUGH, STUDY_GUIDE | ✓ | plus GITHUB_APP, DEPLOYMENT, BENCHMARKS |
+| Demo | bug · security · performance · test gap · false positive rejected · fix generated · fix validated | ✓ | `python scripts/seed_demo.py`: 15 findings (SQL injection, auth order, N+1, O(n²), blocking async, missing await, swallowed exception, untested `search_products`, secrets…), 3 rejected claims, fix validated in Docker |
+
+### Still missing or partial
+
+1. **Live verification** of the AI providers, the GitHub App and the CI workflow — everything
+   on the *Verified only with mocks* list. Nothing is known to be wrong; it has simply never
+   met the real services.
+2. **Docker images** (`Dockerfile`, `docker-compose.yml`) were written but not built here
+   (no registry access). `Dockerfile.sandbox` was built and is used by the tests.
+3. **Frontend stack** differs from the recommended Next.js/Tailwind/shadcn/Monaco (NEEDS
+   REVIEW 1).
+4. **OpenTelemetry tracing** (a SHOULD HAVE) is not implemented; observability is structured
+   JSON logs plus Prometheus metrics at `/metrics`.
+5. **Fix-validation report shape**: §22 shows type-check, lint and security as separate rows;
+   Sentinel runs them as one *no new issues* check across mypy/ruff/bandit/built-in rules,
+   whose detail names each tool. Splitting it is a display change in `core/fixes/validation.py`.
+6. **Migrations**: tables are created with `create_all()` (NEEDS REVIEW 2).
+7. **Quality-standard leftovers** (judgement calls): 13 Python files of 300–520 lines, 11
+   functions of 41–46 lines (long docstrings or one flat sequence of steps), inline
+   verification-check weights in `checks.py`. Details under *Readability audit*.
 
 ## Readability audit (owner's code-quality standard)
 
@@ -72,7 +121,8 @@ Behaviour-preserving cleanup of steps 1–6. Gates were green before and after e
 Known gaps against the standard (judgement calls, not blockers):
 - 13 Python files are still between 300 and 520 lines. Each is cohesive (e.g.
   `core/domain/models.py` is only data classes; `orchestrator.py` is one method per stage)
-  and every function in them is short. Natural next splits if wanted: `models.py` →
+  and their functions are short (11 functions in the codebase are 41–46 lines, e.g.
+  `scan_for_injection`, `Store.save_result`). Natural next splits if wanted: `models.py` →
   `changes.py` / `findings.py` / `review.py`; `store.py` → per-entity stores.
 - Verification-check weights in `core/verification/checks.py` are inline keyword arguments
   (`weight=0.75`) rather than named constants; probes use named weights.
