@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import ast
 import posixpath
-import re
 
+from sentinel.analysis.ast.python_sql import db_operation_kind, sql_tables
 from sentinel.core.domain.code import (
     CallSite,
     DbOperation,
@@ -23,57 +23,11 @@ from sentinel.core.domain.code import (
 from sentinel.core.domain.models import Language
 
 HTTP_METHODS = {"get", "post", "put", "delete", "patch", "head", "options", "websocket"}
-DB_EXEC_METHODS = {"execute", "executemany", "executescript", "raw", "mogrify"}
-ORM_READ_METHODS = {
-    "query",
-    "filter",
-    "filter_by",
-    "get",
-    "select_related",
-    "prefetch_related",
-    "exclude",
-    "find",
-    "find_one",
-    "aggregate",
-    "scalars",
-}
-ORM_WRITE_METHODS = {
-    "add",
-    "add_all",
-    "commit",
-    "delete",
-    "merge",
-    "flush",
-    "bulk_create",
-    "update",
-    "create",
-    "save",
-    "insert_one",
-    "insert_many",
-    "update_one",
-    "delete_one",
-    "bulk_update",
-}
-DB_RECEIVER_HINTS = (
-    "cursor",
-    "cur",
-    "conn",
-    "connection",
-    "db",
-    "session",
-    "objects",
-    "engine",
-    "collection",
-    "repo",
-    "database",
-    "tx",
-    "transaction",
-)
-SQL_VERB_RE = re.compile(
-    r"^\s*(select|with|insert|update|delete|replace|merge|create|drop|alter)\b", re.I
-)
-SQL_TABLE_RE = re.compile(r"\b(?:from|into|update|join)\s+[`\"\[]?([A-Za-z_][\w.]*)", re.I)
-ENTRYPOINT_DECORATORS = ("command", "group", "task", "route", "handler", "callback", "cli")
+ROUTE_DECORATORS = frozenset({"route", "api_route"})
+ROUTE_KEYWORDS = ("path", "rule")
+DEFAULT_ROUTE_METHOD = "GET"
+MODULE_SYMBOL = "<module>"
+MAIN_BLOCK = "__main__"
 
 
 def module_name_for(path: str) -> str:
@@ -111,46 +65,6 @@ def expr_name(node: ast.AST) -> str:
     return ""
 
 
-def sql_literal(node: ast.AST | None) -> str | None:
-    """The static text of a SQL argument (literal parts of f-strings included)."""
-    if node is None:
-        return None
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    if isinstance(node, ast.JoinedStr):
-        return "".join(
-            v.value if isinstance(v, ast.Constant) and isinstance(v.value, str) else "{}"
-            for v in node.values
-        )
-    if isinstance(node, ast.BinOp):
-        left = sql_literal(node.left)
-        right = sql_literal(node.right)
-        return (left or "") + (right or "") or None
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-        if node.func.attr == "format":
-            return sql_literal(node.func.value)
-        if node.func.attr in ("text",) and node.args:
-            return sql_literal(node.args[0])
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "text":
-        return sql_literal(node.args[0]) if node.args else None
-    return None
-
-
-def classify_sql(sql: str | None) -> str:
-    if not sql:
-        return "unknown"
-    m = SQL_VERB_RE.match(sql)
-    if not m:
-        return "unknown"
-    return "read" if m.group(1).lower() in ("select", "with") else "write"
-
-
-def sql_tables(sql: str | None) -> list[str]:
-    if not sql:
-        return []
-    return list(dict.fromkeys(t.split(".")[-1].lower() for t in SQL_TABLE_RE.findall(sql)))
-
-
 class _Visitor(ast.NodeVisitor):
     def __init__(self, path: str, is_test_file: bool) -> None:
         self.path = path
@@ -168,7 +82,7 @@ class _Visitor(ast.NodeVisitor):
     # ---------------------------------------------------------------- helpers
     @property
     def current(self) -> str:
-        return self.scope[-1][0] if self.scope else "<module>"
+        return self.scope[-1][0] if self.scope else MODULE_SYMBOL
 
     @property
     def class_scope(self) -> str | None:
@@ -207,11 +121,12 @@ class _Visitor(ast.NodeVisitor):
 
     # ---------------------------------------------------------------- definitions
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        qn = self._qualify(node.name)
+        """Record the class, then visit its body inside the class scope."""
+        qualified = self._qualify(node.name)
         self.symbols.append(
             Symbol(
                 name=node.name,
-                qualified_name=qn,
+                qualified_name=qualified,
                 kind=SymbolKind.CLASS,
                 line_start=node.lineno,
                 line_end=node.end_lineno or node.lineno,
@@ -220,54 +135,45 @@ class _Visitor(ast.NodeVisitor):
                 bases=[expr_name(b) for b in node.bases if expr_name(b)],
             )
         )
-        for d in node.decorator_list:
-            self.visit(d)
-        self.scope.append((qn, SymbolKind.CLASS))
-        saved_loop = self.loop_depth
-        self.loop_depth = 0
-        for stmt in node.body:
-            self.visit(stmt)
-        self.loop_depth = saved_loop
-        self.scope.pop()
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        self._visit_body(qualified, SymbolKind.CLASS, node.body)
 
     def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-        qn = self._qualify(node.name)
+        """Record the function (and any route it declares), then visit its body."""
+        qualified = self._qualify(node.name)
         in_class = bool(self.scope) and self.scope[-1][1] is SymbolKind.CLASS
         kind = SymbolKind.METHOD if in_class else SymbolKind.FUNCTION
         if self.is_test_file and node.name.startswith("test"):
             kind = SymbolKind.TEST
-        decorators = [expr_name(d) for d in node.decorator_list]
-        args = node.args
-        params = [a.arg for a in [*args.posonlyargs, *args.args, *args.kwonlyargs]]
-        if args.vararg:
-            params.append("*" + args.vararg.arg)
-        if args.kwarg:
-            params.append("**" + args.kwarg.arg)
         self.symbols.append(
             Symbol(
                 name=node.name,
-                qualified_name=qn,
+                qualified_name=qualified,
                 kind=kind,
                 line_start=min([node.lineno, *(d.lineno for d in node.decorator_list)]),
                 line_end=node.end_lineno or node.lineno,
                 parent=self.class_scope,
-                decorators=decorators,
-                params=params,
+                decorators=[expr_name(d) for d in node.decorator_list],
+                params=_parameter_names(node.args),
                 is_async=isinstance(node, ast.AsyncFunctionDef),
             )
         )
-        for d in node.decorator_list:
-            self._maybe_endpoint(d, qn)
-            self.visit(d)
-        for default in [*args.defaults, *args.kw_defaults]:
+        for decorator in node.decorator_list:
+            self.endpoints += endpoints_from_decorator(decorator, qualified)
+            self.visit(decorator)
+        for default in [*node.args.defaults, *node.args.kw_defaults]:
             if default is not None:
                 self.visit(default)
-        self.scope.append((qn, kind))
-        saved_loop = self.loop_depth
-        self.loop_depth = 0
-        for stmt in node.body:
-            self.visit(stmt)
-        self.loop_depth = saved_loop
+        self._visit_body(qualified, kind, node.body)
+
+    def _visit_body(self, qualified: str, kind: SymbolKind, body: list[ast.stmt]) -> None:
+        """Visit a class or function body in its own scope (loops do not leak inward)."""
+        self.scope.append((qualified, kind))
+        outer_loop_depth, self.loop_depth = self.loop_depth, 0
+        for statement in body:
+            self.visit(statement)
+        self.loop_depth = outer_loop_depth
         self.scope.pop()
 
     visit_FunctionDef = _visit_function
@@ -287,38 +193,6 @@ class _Visitor(ast.NodeVisitor):
                         )
                     )
         self.generic_visit(node)
-
-    def _maybe_endpoint(self, deco: ast.expr, handler: str) -> None:
-        if not isinstance(deco, ast.Call) or not isinstance(deco.func, ast.Attribute):
-            return
-        attr = deco.func.attr.lower()
-        route = None
-        if (
-            deco.args
-            and isinstance(deco.args[0], ast.Constant)
-            and isinstance(deco.args[0].value, str)
-        ):
-            route = deco.args[0].value
-        for kw in deco.keywords:
-            if kw.arg in ("path", "rule") and isinstance(kw.value, ast.Constant):
-                route = str(kw.value.value)
-        if route is None:
-            return
-        if attr in HTTP_METHODS:
-            self.endpoints.append(
-                EndpointRef(method=attr.upper(), route=route, handler=handler, line=deco.lineno)
-            )
-        elif attr in ("route", "api_route"):
-            methods = ["GET"]
-            for kw in deco.keywords:
-                if kw.arg == "methods" and isinstance(kw.value, ast.List | ast.Tuple | ast.Set):
-                    methods = [
-                        str(e.value).upper() for e in kw.value.elts if isinstance(e, ast.Constant)
-                    ] or methods
-            for m in methods:
-                self.endpoints.append(
-                    EndpointRef(method=m, route=route, handler=handler, line=deco.lineno)
-                )
 
     # ---------------------------------------------------------------- control flow
     def _visit_loop(self, node: ast.For | ast.AsyncFor | ast.While) -> None:
@@ -371,7 +245,7 @@ class _Visitor(ast.NodeVisitor):
         )
         if is_main:
             self.main_span = (node.lineno, node.end_lineno or node.lineno)
-            self.scope.append(("__main__", SymbolKind.FUNCTION))
+            self.scope.append((MAIN_BLOCK, SymbolKind.FUNCTION))
             self.generic_visit(node)
             self.scope.pop()
             return
@@ -399,31 +273,16 @@ class _Visitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _maybe_db(self, node: ast.Call, callee: str) -> None:
-        parts = callee.split(".")
-        method = parts[-1]
-        receiver = ".".join(parts[:-1]).lower()
-        op: str | None = None
-        sql = None
-        if method in DB_EXEC_METHODS:
-            sql = sql_literal(node.args[0]) if node.args else None
-            op = classify_sql(sql)
-        elif (
-            receiver
-            and not any(m in receiver.split(".") for m in DB_EXEC_METHODS)
-            and any(h in receiver for h in DB_RECEIVER_HINTS)
-        ):
-            if method in ORM_READ_METHODS:
-                op = "read"
-            elif method in ORM_WRITE_METHODS:
-                op = "write"
-        if op is None:
+        """Record a ``DbOperation`` when the call reads or writes a database."""
+        operation, sql = db_operation_kind(callee, node)
+        if operation is None:
             return
         tables = sql_tables(sql)
         detail = callee + (f" [{', '.join(tables)}]" if tables else "")
         self.db_ops.append(
             DbOperation(
                 function=self.current,
-                operation=op,
+                operation=operation,
                 line=node.lineno,
                 detail=detail,
                 in_loop=self.loop_depth > 0,
@@ -432,10 +291,13 @@ class _Visitor(ast.NodeVisitor):
 
 
 class PythonAnalyzer:
+    """``LanguageAnalyzer`` for Python files."""
+
     language = Language.PYTHON
     extensions: tuple[str, ...] = (".py", ".pyi")
 
     def analyze(self, path: str, source: str) -> FileSymbols:
+        """Parse one file; a syntax error is reported in ``parse_error``, not raised."""
         is_test = is_python_test_file(path)
         result = FileSymbols(
             path=path,
@@ -455,29 +317,84 @@ class PythonAnalyzer:
         visitor = _Visitor(path, is_test)
         visitor.visit(tree)
         # The module itself, so module-level code has a node to attach calls to.
-        result.symbols = [
-            Symbol(
-                name=result.module_name.split(".")[-1] or path,
-                qualified_name="<module>",
-                kind=SymbolKind.MODULE,
-                line_start=1,
-                line_end=max(result.loc, 1),
-            ),
-            *visitor.symbols,
-        ]
+        module = Symbol(
+            name=result.module_name.split(".")[-1] or path,
+            qualified_name=MODULE_SYMBOL,
+            kind=SymbolKind.MODULE,
+            line_start=1,
+            line_end=max(result.loc, 1),
+        )
+        result.symbols = [module, *visitor.symbols]
         if visitor.main_span is not None:
-            result.symbols.append(
-                Symbol(
-                    name="__main__",
-                    qualified_name="__main__",
-                    kind=SymbolKind.FUNCTION,
-                    line_start=visitor.main_span[0],
-                    line_end=visitor.main_span[1],
-                    decorators=["entrypoint"],
-                )
-            )
+            result.symbols.append(_main_block_symbol(*visitor.main_span))
         result.imports = visitor.imports
         result.calls = visitor.calls
         result.endpoints = visitor.endpoints
         result.db_operations = visitor.db_ops
         return result
+
+
+def endpoints_from_decorator(decorator: ast.expr, handler: str) -> list[EndpointRef]:
+    """Routes declared by ``@app.get("/x")``, ``@app.post(path="/x")`` or ``@app.route``."""
+    if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+        return []
+    route = _route_argument(decorator)
+    attribute = decorator.func.attr.lower()
+    if route is None:
+        return []
+    if attribute in HTTP_METHODS:
+        methods = [attribute.upper()]
+    elif attribute in ROUTE_DECORATORS:
+        methods = _declared_methods(decorator)
+    else:
+        return []
+    return [
+        EndpointRef(method=method, route=route, handler=handler, line=decorator.lineno)
+        for method in methods
+    ]
+
+
+def _route_argument(decorator: ast.Call) -> str | None:
+    """The route path: the first string argument, or a ``path=`` / ``rule=`` keyword."""
+    route = None
+    first = decorator.args[0] if decorator.args else None
+    if isinstance(first, ast.Constant) and isinstance(first.value, str):
+        route = first.value
+    for keyword in decorator.keywords:
+        if keyword.arg in ROUTE_KEYWORDS and isinstance(keyword.value, ast.Constant):
+            route = str(keyword.value.value)
+    return route
+
+
+def _declared_methods(decorator: ast.Call) -> list[str]:
+    """HTTP methods from ``methods=[...]`` (Flask style); GET when not given."""
+    for keyword in decorator.keywords:
+        if keyword.arg == "methods" and isinstance(keyword.value, ast.List | ast.Tuple | ast.Set):
+            declared = [
+                str(e.value).upper() for e in keyword.value.elts if isinstance(e, ast.Constant)
+            ]
+            if declared:
+                return declared
+    return [DEFAULT_ROUTE_METHOD]
+
+
+def _parameter_names(args: ast.arguments) -> list[str]:
+    """Parameter names, with ``*args`` / ``**kwargs`` marked."""
+    params = [a.arg for a in [*args.posonlyargs, *args.args, *args.kwonlyargs]]
+    if args.vararg:
+        params.append("*" + args.vararg.arg)
+    if args.kwarg:
+        params.append("**" + args.kwarg.arg)
+    return params
+
+
+def _main_block_symbol(start: int, end: int) -> Symbol:
+    """A pseudo-function for ``if __name__ == "__main__":`` so it can be an entry point."""
+    return Symbol(
+        name=MAIN_BLOCK,
+        qualified_name=MAIN_BLOCK,
+        kind=SymbolKind.FUNCTION,
+        line_start=start,
+        line_end=end,
+        decorators=["entrypoint"],
+    )

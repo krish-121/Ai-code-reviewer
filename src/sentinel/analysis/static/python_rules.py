@@ -12,7 +12,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from sentinel.analysis.ast.python_analyzer import DB_EXEC_METHODS, expr_name
+from sentinel.analysis.ast.python_analyzer import expr_name
+from sentinel.analysis.ast.python_sql import DB_EXEC_METHODS
 from sentinel.analysis.static.base import static_finding
 from sentinel.analysis.static.python_patterns import (
     BLOCKING_CALLS,

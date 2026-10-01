@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from sentinel.analysis.ast.python_analyzer import (
     PythonAnalyzer,
-    classify_sql,
     is_python_test_file,
     module_name_for,
-    sql_tables,
 )
+from sentinel.analysis.ast.python_sql import classify_sql, sql_tables
 from sentinel.core.domain.code import SymbolKind
 
 SRC = """\

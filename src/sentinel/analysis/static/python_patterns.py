@@ -12,7 +12,8 @@ from __future__ import annotations
 import ast
 import re
 
-from sentinel.analysis.ast.python_analyzer import DB_EXEC_METHODS, expr_name
+from sentinel.analysis.ast.python_analyzer import expr_name
+from sentinel.analysis.ast.python_sql import DB_EXEC_METHODS
 
 SQL_SINK_NAMES = DB_EXEC_METHODS | {"text"}
 SQL_KEYWORD_ARGS = ("sql", "query", "statement", "operation")

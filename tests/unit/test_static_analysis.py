@@ -9,8 +9,8 @@ import pytest
 from sentinel.analysis.ast.registry import default_registry
 from sentinel.analysis.static.base import find_tool, relpath, run_tool, scrubbed_env
 from sentinel.analysis.static.builtin_security import BuiltinAnalyzer
-from sentinel.analysis.static.python_patterns import dynamic_sql_kind
 from sentinel.analysis.static.js_tools import ESLintAnalyzer, TscAnalyzer, _config_source
+from sentinel.analysis.static.python_patterns import dynamic_sql_kind
 from sentinel.analysis.static.python_tools import BanditAnalyzer, MypyAnalyzer, RuffAnalyzer
 from sentinel.analysis.static.runner import StaticAnalysisRunner, default_analyzers
 from sentinel.core.domain.models import AnalysisRun, Category, Language, Severity
