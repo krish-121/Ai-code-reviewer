@@ -181,11 +181,13 @@ class Settings(BaseModel):
         return [Path.home().resolve()] if self.auth_mode == "local" else []
 
     def api_key_for(self, provider: str) -> str | None:
+        """The API key configured for ``provider``, if any."""
         secret = {"claude": self.claude_api_key, "gemini": self.gemini_api_key}.get(provider)
         return secret.get_secret_value() if secret else None
 
 
 def user_config_path() -> Path:
+    """Where ``sentinel config set`` stores settings (``$XDG_CONFIG_HOME`` aware)."""
     base = os.environ.get("XDG_CONFIG_HOME")
     root = Path(base) if base else Path.home() / ".config"
     return root / "sentinel" / "config.toml"
@@ -220,27 +222,19 @@ def load_settings(
     env: dict[str, str] | None = None,
     overrides: dict[str, Any] | None = None,
 ) -> Settings:
+    """Load settings. Later sources win: config file < environment < ``overrides``.
+
+    Args:
+        config_path: TOML file to read; defaults to ``~/.config/sentinel/config.toml``.
+        env: Environment variables; defaults to ``os.environ`` (tests pass a dict).
+        overrides: Values from command-line flags; ``None`` values are ignored.
+    """
     env = dict(os.environ) if env is None else env
-    data: dict[str, Any] = {}
-    path = config_path or user_config_path()
-    if path.is_file():
-        try:
-            data.update(tomllib.loads(path.read_text(encoding="utf-8")))
-        except tomllib.TOMLDecodeError as exc:
-            raise ConfigError(f"{path}: {exc}") from exc
-    for var, key in _ENV_MAP.items():
-        if env.get(var):
-            data[key] = env[var]
-    for provider, names in KEY_ENV_VARS.items():
-        for name in names:
-            if env.get(name):
-                data[f"{provider}_api_key"] = env[name]
-                break
+    data = _read_config_file(config_path or user_config_path())
+    data.update(_settings_from_env(env))
     if env.get("GITHUB_TOKEN") and "github_token" not in data:
         data["github_token"] = env["GITHUB_TOKEN"]
-    for key, value in (overrides or {}).items():
-        if value is not None:
-            data[key] = value
+    data.update({key: value for key, value in (overrides or {}).items() if value is not None})
     try:
         return Settings.model_validate(data)
     except ValidationError as exc:
@@ -248,6 +242,25 @@ def load_settings(
             f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in exc.errors()
         )
         raise ConfigError(f"invalid settings: {problems}") from exc
+
+
+def _read_config_file(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"{path}: {exc}") from exc
+
+
+def _settings_from_env(env: dict[str, str]) -> dict[str, Any]:
+    """Settings given as ``SENTINEL_*`` variables, plus API keys under their usual names."""
+    data: dict[str, Any] = {key: env[var] for var, key in _ENV_MAP.items() if env.get(var)}
+    for provider, names in KEY_ENV_VARS.items():
+        value = next((env[name] for name in names if env.get(name)), None)
+        if value:
+            data[f"{provider}_api_key"] = value
+    return data
 
 
 _WRITABLE_KEYS = {
@@ -286,6 +299,7 @@ def save_user_setting(key: str, value: str, path: Path | None = None) -> Path:
 
 
 def _toml_value(v: Any) -> str:
+    """Render a scalar as a TOML value."""
     if isinstance(v, bool):
         return "true" if v else "false"
     if isinstance(v, int | float):

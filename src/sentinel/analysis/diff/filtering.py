@@ -179,6 +179,7 @@ def _matches_ignore(path: str, patterns: list[str]) -> bool:
 
 
 def sensitive_file_reason(path: str) -> tuple[Severity, str] | None:
+    """``(severity, description)`` when the file must never be read or sent to a model."""
     base = posixpath.basename(path).lower()
     if base in SAFE_ENV_TEMPLATES:
         return None
@@ -189,6 +190,7 @@ def sensitive_file_reason(path: str) -> tuple[Severity, str] | None:
 
 
 def _is_generated(change: FileChange) -> bool:
+    """Build output, vendored code, or a file whose first lines say it is generated."""
     low = change.path.lower()
     if any(low.startswith(d) or f"/{d}" in low for d in GENERATED_DIRS):
         return True
@@ -199,6 +201,7 @@ def _is_generated(change: FileChange) -> bool:
 
 
 def _is_minified(change: FileChange) -> bool:
+    """JS/TS/CSS whose added lines are very long on average."""
     if change.language not in (Language.JAVASCRIPT, Language.TYPESCRIPT) and not (
         change.path.endswith(".css")
     ):
@@ -211,6 +214,7 @@ def _is_minified(change: FileChange) -> bool:
 
 
 def _skip_reason(change: FileChange, ignore: list[str]) -> str | None:
+    """Why a (non-sensitive) file is not worth reviewing, or None to review it."""
     base = posixpath.basename(change.path).lower()
     ext = posixpath.splitext(base)[1]
     if change.is_binary or ext in BINARY_EXTENSIONS:
@@ -236,64 +240,73 @@ def filter_changeset(
     ignore: list[str] | None = None,
     languages: list[Language] | None = None,
 ) -> FilterOutcome:
-    ignore = ignore or []
+    """Decide which changed files are reviewed, and redact secrets in the ones that are.
+
+    Called by the orchestrator's filter stage, before anything reaches an AI provider.
+
+    Args:
+        changeset: The parsed diff. Diff lines of kept files are redacted in place.
+        ignore: Glob patterns from ``.sentinel.yml`` (``ignore:``).
+        languages: Languages enabled in ``.sentinel.yml``; None means all.
+    """
     enabled = set(languages) if languages else None
     kept: list[FileChange] = []
     skipped: list[SkippedFile] = list(changeset.skipped)
     findings: list[Finding] = []
     redactions = 0
-
     for change in changeset.files:
         sensitive = sensitive_file_reason(change.path)
         if sensitive is not None:
             severity, reason = sensitive
-            skipped.append(
-                SkippedFile(
-                    path=change.path, reason=f"sensitive file ({reason}) — never sent to AI"
-                )
-            )
+            note = f"sensitive file ({reason}) — never sent to AI"
+            skipped.append(SkippedFile(path=change.path, reason=note))
             if change.change_type is not ChangeType.DELETED:
                 findings.append(_sensitive_file_finding(change, severity, reason))
             continue
-
-        skip = _skip_reason(change, ignore)
+        skip = _skip_reason(change, ignore or [])
         if skip is not None:
             skipped.append(SkippedFile(path=change.path, reason=skip))
             continue
-
-        # Secret scan + in-place redaction of every diff line (context lines included,
-        # since the whole hunk is shown to the model).
-        for hunk in change.hunks:
-            for ln in hunk.lines:
-                if ln.kind is LineKind.ADDED and ln.new_lineno is not None:
-                    for m in scan_line(ln.content, ln.new_lineno):
-                        findings.append(
-                            _secret_finding(
-                                change.path,
-                                m.rule.id,
-                                m.rule.title,
-                                m.rule.confidence,
-                                m.line,
-                                m.masked,
-                            )
-                        )
-                redacted, matches = redact_line(ln.content)
-                if matches:
-                    ln.content = redacted
-                    redactions += len(matches)
-
+        findings += _secret_findings(change)
+        redactions += _redact_in_place(change)
         if enabled is not None and change.language not in enabled:
-            skipped.append(
-                SkippedFile(path=change.path, reason=f"language not enabled ({change.language})")
-            )
+            note = f"language not enabled ({change.language})"
+            skipped.append(SkippedFile(path=change.path, reason=note))
             continue
         kept.append(change)
-
     filtered = changeset.model_copy(update={"files": kept, "skipped": skipped})
     return FilterOutcome(changeset=filtered, findings=findings, redactions=redactions)
 
 
+def _secret_findings(change: FileChange) -> list[Finding]:
+    """A finding for every secret on an added line."""
+    return [
+        _secret_finding(change.path, m.rule.id, m.rule.title, m.rule.confidence, m.line, m.masked)
+        for hunk in change.hunks
+        for line in hunk.lines
+        if line.kind is LineKind.ADDED and line.new_lineno is not None
+        for m in scan_line(line.content, line.new_lineno)
+    ]
+
+
+def _redact_in_place(change: FileChange) -> int:
+    """Redact secrets on every diff line and return how many were replaced.
+
+    Context and removed lines are redacted too, because the whole hunk is shown to the
+    model.
+    """
+    count = 0
+    for hunk in change.hunks:
+        for line in hunk.lines:
+            redacted, matches = redact_line(line.content)
+            if matches:
+                line.content = redacted
+                count += len(matches)
+    return count
+
+
 def _article(word: str) -> str:
+    """'a' or 'an' for ``word``."""
     return "an" if word[:1].lower() in "aeiou" else "a"
 
 

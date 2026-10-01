@@ -14,7 +14,7 @@ from functools import lru_cache
 
 from sentinel.analysis.ast.python_analyzer import expr_name
 from sentinel.analysis.diff.secrets import scan_line
-from sentinel.analysis.static.builtin_security import (
+from sentinel.analysis.static.python_patterns import (
     BLOCKING_CALLS,
     calls_in_lines,
     dynamic_sql_kind,

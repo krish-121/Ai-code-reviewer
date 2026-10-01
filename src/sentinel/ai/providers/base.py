@@ -7,6 +7,10 @@ the reliability policy so each provider only describes its wire format:
 * timeout         -> retry once, then fail clearly
 * 401 / 403       -> configuration error (bad key), no retry
 * invalid JSON or schema violation -> one retry with a correction message
+
+Concrete providers (``http_providers.py``) implement ``_complete``; the factory
+(``factory.py``) builds one from settings. The orchestrator only sees the ``AIProvider``
+port, never this class.
 """
 
 from __future__ import annotations
@@ -38,17 +42,33 @@ from sentinel.core.domain.ports import AIConfigurationError, AIError, AIResponse
 from sentinel.infrastructure.storage.cache import content_key
 
 RETRYABLE_STATUS = {408, 409, 425, 429, 500, 502, 503, 504, 529}
+AUTH_FAILURE_STATUS = {401, 403}
+RATE_LIMITED = 429
+FIRST_ERROR_STATUS = 400
+MAX_TIMEOUTS = 2
+CONNECT_TIMEOUT_S = 10.0
+MAX_RETRY_AFTER_S = 60.0
+MAX_BACKOFF_S = 30.0
+ERROR_TEXT_LIMIT = 300
+MAX_ECHOED_REPLY_CHARS = 4000  # how much of a bad reply is shown back to the model
+USER_AGENT = "sentinel-review/0.1"
+REVIEW_CACHE_NAMESPACE = "ai-review"
+NONCE_LENGTH = 16
 P = TypeVar("P", bound=BaseModel)
 FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.S)
 
 
 @dataclass
 class Completion:
+    """Raw model output (text that should contain JSON) and its token usage."""
+
     text: str
     usage: TokenUsage
 
 
 class ProviderHTTPError(AIError):
+    """The provider answered with an HTTP error that retrying did not fix."""
+
     def __init__(self, status: int, message: str) -> None:
         super().__init__(f"HTTP {status}: {message}")
         self.status = status
@@ -70,6 +90,11 @@ def extract_json(text: str) -> Any:
 
 
 class HTTPProvider(ABC):
+    """Base class for providers: retries, JSON validation, caching.
+
+    Subclasses only describe their wire format by implementing ``_complete``.
+    """
+
     name: str = "provider"
     default_base_url: str = ""
 
@@ -98,9 +123,9 @@ class HTTPProvider(ABC):
         self.backoff_base_s = backoff_base_s
         self.client = httpx.Client(
             base_url=base_url or self.default_base_url,
-            timeout=httpx.Timeout(timeout_s, connect=min(10.0, timeout_s)),
+            timeout=httpx.Timeout(timeout_s, connect=min(CONNECT_TIMEOUT_S, timeout_s)),
             transport=transport,
-            headers={"user-agent": "sentinel-review/0.1"},
+            headers={"user-agent": USER_AGENT},
         )
         self.calls = 0
 
@@ -113,72 +138,86 @@ class HTTPProvider(ABC):
 
     # ------------------------------------------------------------------ HTTP + retries
     def _post(self, path: str, payload: dict[str, Any], headers: dict[str, str]) -> Any:
+        """POST JSON and return the decoded reply, applying the retry policy above."""
         attempt = 0
         timeouts = 0
         while True:
             attempt += 1
             self.calls += 1
             try:
-                resp = self.client.post(path, json=payload, headers=headers)
+                response = self.client.post(path, json=payload, headers=headers)
             except httpx.TimeoutException as exc:
                 timeouts += 1
-                if timeouts >= 2:
+                if timeouts >= MAX_TIMEOUTS:
                     raise AIError(
                         f"{self.name} request timed out twice; try again or raise SENTINEL_TIMEOUT"
                     ) from exc
                 continue
-            except httpx.ConnectError as exc:
-                raise AIConfigurationError(
-                    f"cannot reach {self.name} at {self.client.base_url}: {exc}"
-                ) from exc
             except httpx.HTTPError as exc:
-                raise AIError(f"{self.name} transport error: {exc}") from exc
-
-            if resp.status_code < 400:
-                try:
-                    return resp.json()
-                except json.JSONDecodeError as exc:
-                    raise AIResponseError(f"{self.name} returned non-JSON body") from exc
-            message = self._error_message(resp)
-            if resp.status_code in (401, 403):
-                raise AIConfigurationError(
-                    f"{self.name} rejected the API key (HTTP {resp.status_code}): {message}"
-                )
-            if resp.status_code in RETRYABLE_STATUS and attempt <= self.max_retries:
-                self.sleep(self._backoff(attempt, resp))
+                raise self._transport_error(exc) from exc
+            if response.status_code < FIRST_ERROR_STATUS:
+                return self._json_body(response)
+            if response.status_code in RETRYABLE_STATUS and attempt <= self.max_retries:
+                self.sleep(self._backoff(attempt, response))
                 continue
-            if resp.status_code == 429:
-                raise AIError(f"{self.name} rate limit persisted after {attempt} attempts")
-            raise ProviderHTTPError(resp.status_code, message)
+            raise self._http_error(response, attempt)
+
+    def _transport_error(self, exc: httpx.HTTPError) -> AIError:
+        """Map a network failure to the error type the caller can act on."""
+        if isinstance(exc, httpx.ConnectError):
+            return AIConfigurationError(
+                f"cannot reach {self.name} at {self.client.base_url}: {exc}"
+            )
+        return AIError(f"{self.name} transport error: {exc}")
+
+    def _json_body(self, response: httpx.Response) -> Any:
+        try:
+            return response.json()
+        except json.JSONDecodeError as exc:
+            raise AIResponseError(f"{self.name} returned non-JSON body") from exc
+
+    def _http_error(self, response: httpx.Response, attempts: int) -> AIError:
+        """The error for a final (non-retried) HTTP failure."""
+        message = self._error_message(response)
+        if response.status_code in AUTH_FAILURE_STATUS:
+            return AIConfigurationError(
+                f"{self.name} rejected the API key (HTTP {response.status_code}): {message}"
+            )
+        if response.status_code == RATE_LIMITED:
+            return AIError(f"{self.name} rate limit persisted after {attempts} attempts")
+        return ProviderHTTPError(response.status_code, message)
 
     def _backoff(self, attempt: int, resp: httpx.Response) -> float:
+        """Seconds to wait: the server's ``Retry-After``, else exponential backoff with jitter."""
         retry_after = resp.headers.get("retry-after")
         if retry_after:
             try:
-                return min(float(retry_after), 60.0)
+                return min(float(retry_after), MAX_RETRY_AFTER_S)
             except ValueError:
                 pass
         base: float = self.backoff_base_s * (2 ** (attempt - 1))
-        return min(base + random.uniform(0, base / 2), 30.0)  # noqa: S311 - jitter, not crypto
+        return min(base + random.uniform(0, base / 2), MAX_BACKOFF_S)  # noqa: S311 - jitter, not crypto
 
     @staticmethod
     def _error_message(resp: httpx.Response) -> str:
+        """The provider's error message, from its JSON error body if there is one."""
         try:
             body = resp.json()
         except json.JSONDecodeError:
-            return resp.text[:300]
+            return resp.text[:ERROR_TEXT_LIMIT]
         if isinstance(body, dict):
             err = body.get("error")
             if isinstance(err, dict):
-                return str(err.get("message", err))[:300]
+                return str(err.get("message", err))[:ERROR_TEXT_LIMIT]
             if isinstance(err, str):
-                return err[:300]
-        return str(body)[:300]
+                return err[:ERROR_TEXT_LIMIT]
+        return str(body)[:ERROR_TEXT_LIMIT]
 
     # ------------------------------------------------------------------ structured calls
     def _structured(
         self, prompt: Prompt, model_cls: type[P], schema: dict[str, Any], tool: str
     ) -> tuple[P, TokenUsage, int]:
+        """Ask for JSON matching ``model_cls``; on a bad reply, retry once with the errors."""
         messages = [{"role": "user", "content": prompt.user}]
         usage = TokenUsage()
         last_error = ""
@@ -192,18 +231,24 @@ class HTTPProvider(ABC):
                 last_error = _describe(exc)
                 messages = [
                     *messages,
-                    {"role": "assistant", "content": completion.text[:4000] or "(empty)"},
+                    {
+                        "role": "assistant",
+                        "content": completion.text[:MAX_ECHOED_REPLY_CHARS] or "(empty)",
+                    },
                     {"role": "user", "content": correction_message(last_error)},
                 ]
-        raise AIResponseError(f"{self.name} returned an invalid response twice: {last_error[:300]}")
+        raise AIResponseError(
+            f"{self.name} returned an invalid response twice: {last_error[:ERROR_TEXT_LIMIT]}"
+        )
 
     def review(self, request: ReviewRequest) -> AIReviewResult:
+        """Review a change. Identical requests are answered from the cache."""
         prompt = build_review_prompt(request, nonce=_stable_nonce(request.review_id))
         key = content_key(
             "review", self.name, self.model, str(self.temperature), prompt.system, prompt.user
         )
         if self.cache is not None:
-            cached = self.cache.get("ai-review", key)
+            cached = self.cache.get(REVIEW_CACHE_NAMESPACE, key)
             if cached is not None:
                 result = AIReviewResult.model_validate_json(cached)
                 return result.model_copy(update={"cached": True})
@@ -214,10 +259,11 @@ class HTTPProvider(ABC):
             payload=payload, usage=usage, model=self.model, provider=self.name, attempts=attempts
         )
         if self.cache is not None:
-            self.cache.set("ai-review", key, result.model_dump_json())
+            self.cache.set(REVIEW_CACHE_NAMESPACE, key, result.model_dump_json())
         return result
 
     def generate_fix(self, request: FixRequest) -> AIFixResult:
+        """Propose search/replace edits for one finding (never cached)."""
         prompt = build_fix_prompt(request)
         payload, usage, attempts = self._structured(prompt, AIFixPayload, FIX_SCHEMA, "submit_fix")
         return AIFixResult(
@@ -225,16 +271,21 @@ class HTTPProvider(ABC):
         )
 
     def close(self) -> None:
+        """Close the underlying HTTP connection pool."""
         self.client.close()
 
 
 def _stable_nonce(review_id: str) -> str:
-    # Deterministic per review so identical requests hit the cache; still unguessable
-    # by the code under review because review ids are random.
-    return content_key("nonce", review_id)[:16]
+    """Marker that fences repository content in the prompt (see ``ai/prompts``).
+
+    Deterministic per review so identical requests hit the cache; still unguessable by
+    the code under review because review ids are random.
+    """
+    return content_key("nonce", review_id)[:NONCE_LENGTH]
 
 
 def _describe(exc: Exception) -> str:
+    """Short, model-readable description of why a reply was rejected."""
     if isinstance(exc, ValidationError):
         return "; ".join(
             f"{'.'.join(str(p) for p in e['loc']) or '<root>'}: {e['msg']}" for e in exc.errors()
