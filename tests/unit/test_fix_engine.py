@@ -12,16 +12,10 @@ from sentinel.core.configuration.config import load_repo_config
 from sentinel.core.domain.ai import FileEdit
 from sentinel.core.domain.models import Category, Finding, FindingSource, Severity
 from sentinel.core.domain.ports import AIError, SandboxResult
-from sentinel.core.fixes.engine import (
-    ApplyError,
-    FixEngine,
-    FixOutcome,
-    apply_fix,
-    detect_test_command,
-    python_syntax,
-)
+from sentinel.core.fixes.engine import ApplyError, FixEngine, FixOutcome, apply_fix
 from sentinel.core.fixes.patch import PatchError, apply_edits, sha256, unified_diff
 from sentinel.core.fixes.scratch import scratch_copy
+from sentinel.core.fixes.validation import detect_test_command, python_syntax
 from sentinel.sandbox.runners import ProcessSandbox
 from tests.fakes import ScriptedProvider
 

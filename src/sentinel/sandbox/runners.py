@@ -19,6 +19,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 
@@ -28,18 +29,31 @@ from sentinel.core.fixes.scratch import scratch_copy
 __all__ = ["DockerSandbox", "ProcessSandbox", "scratch_copy"]
 
 MAX_OUTPUT = 20_000
+DEFAULT_IMAGE = "sentinel-sandbox:latest"
+DEFAULT_TIMEOUT_S = 120
+DOCKER_PROBE_TIMEOUT_S = 15
+NETNS_PROBE_TIMEOUT_S = 10
+CONTAINER_TMPFS = "/tmp:rw,exec,size=256m"  # noqa: S108 - tmpfs inside the container
+CONTAINER_WORKDIR = "/workspace"
+# CPU-time limit for the process sandbox: soft/hard seconds beyond the wall-clock timeout.
+CPU_SOFT_GRACE_S, CPU_HARD_GRACE_S = 5, 10
+PASSTHROUGH_ENV = ("PYTHONPATH", "NODE_PATH", "VIRTUAL_ENV")
+UNSHARE_NETWORK = ["unshare", "--user", "--map-root-user", "--net"]
 
 
 def _truncate(text: str) -> str:
+    """Cap captured output so a noisy test run cannot fill the database."""
     return text if len(text) <= MAX_OUTPUT else text[:MAX_OUTPUT] + "\n… (truncated)"
 
 
 class DockerSandbox:
+    """Runs commands in a locked-down, throwaway Docker container (the default sandbox)."""
+
     isolation = "docker"
 
     def __init__(
         self,
-        image: str = "sentinel-sandbox:latest",
+        image: str = DEFAULT_IMAGE,
         *,
         memory: str = "1g",
         cpus: str = "1.0",
@@ -53,18 +67,22 @@ class DockerSandbox:
         self.docker = docker
 
     def is_available(self) -> bool:
+        """True when the Docker CLI works and the sandbox image exists locally."""
         exe = shutil.which(self.docker)
         if exe is None:
             return False
         try:
             probe = subprocess.run(
-                [exe, "image", "inspect", self.image], capture_output=True, timeout=15
+                [exe, "image", "inspect", self.image],
+                capture_output=True,
+                timeout=DOCKER_PROBE_TIMEOUT_S,
             )
         except (OSError, subprocess.SubprocessError):
             return False
         return probe.returncode == 0
 
     def command(self, workspace: Path, command: list[str], name: str, network: bool) -> list[str]:
+        """The full ``docker run`` command line, one isolation option per pair of lines."""
         uid, gid = os.getuid(), os.getgid()
         return [
             self.docker,
@@ -84,7 +102,7 @@ class DockerSandbox:
             str(self.pids),
             "--read-only",
             "--tmpfs",
-            "/tmp:rw,exec,size=256m",  # noqa: S108 - tmpfs inside the container
+            CONTAINER_TMPFS,
             "--cap-drop",
             "ALL",
             "--security-opt",
@@ -98,16 +116,22 @@ class DockerSandbox:
             "-e",
             "CI=1",
             "-v",
-            f"{workspace.resolve()}:/workspace:rw",
+            f"{workspace.resolve()}:{CONTAINER_WORKDIR}:rw",
             "-w",
-            "/workspace",
+            CONTAINER_WORKDIR,
             self.image,
             *command,
         ]
 
     def run(
-        self, workspace: Path, command: list[str], timeout_s: int = 120, *, network: bool = False
+        self,
+        workspace: Path,
+        command: list[str],
+        timeout_s: int = DEFAULT_TIMEOUT_S,
+        *,
+        network: bool = False,
     ) -> SandboxResult:
+        """Run ``command`` with ``workspace`` mounted; the container is killed on timeout."""
         name = f"sentinel-sbx-{uuid.uuid4().hex[:12]}"
         cmd = self.command(workspace, command, name, network)
         start = time.monotonic()
@@ -135,6 +159,7 @@ class DockerSandbox:
 
 
 def _text(data: object) -> str:
+    """Captured output as text (``TimeoutExpired`` may hold bytes)."""
     if isinstance(data, bytes):
         return data.decode(errors="replace")
     return data if isinstance(data, str) else ""
@@ -142,12 +167,13 @@ def _text(data: object) -> str:
 
 @lru_cache(maxsize=1)
 def _netns_available() -> bool:
+    """True when unprivileged network namespaces work here (checked once)."""
     exe = shutil.which("unshare")
     if exe is None:
         return False
     try:
         probe = subprocess.run(
-            [exe, "--user", "--map-root-user", "--net", "true"], capture_output=True, timeout=10
+            [exe, *UNSHARE_NETWORK[1:], "true"], capture_output=True, timeout=NETNS_PROBE_TIMEOUT_S
         )
     except (OSError, subprocess.SubprocessError):
         return False
@@ -164,53 +190,32 @@ class ProcessSandbox:
         self.isolation = "process+netns" if self.netns else "process"
 
     def is_available(self) -> bool:
+        """Always available (it only needs a process)."""
         return True
 
     def run(
-        self, workspace: Path, command: list[str], timeout_s: int = 120, *, network: bool = False
+        self,
+        workspace: Path,
+        command: list[str],
+        timeout_s: int = DEFAULT_TIMEOUT_S,
+        *,
+        network: bool = False,
     ) -> SandboxResult:
+        """Run ``command`` in its own process group with resource limits and a clean env."""
         home = Path(tempfile.mkdtemp(prefix="sentinel-home-"))
-        env = {
-            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-            "HOME": str(home),
-            "LANG": "C.UTF-8",
-            "PYTHONDONTWRITEBYTECODE": "1",
-            "CI": "1",
-        }
-        for key in ("PYTHONPATH", "NODE_PATH", "VIRTUAL_ENV"):
-            if key in os.environ:
-                env[key] = os.environ[key]
-        cmd = list(command)
-        if self.netns and not network:
-            cmd = ["unshare", "--user", "--map-root-user", "--net", "--", *cmd]
-        limits = (self.memory_bytes, self.max_file_bytes, timeout_s)
-
-        def _preexec() -> None:  # pragma: no cover - runs in the child
-            import resource
-
-            os.setsid()
-            mem, fsize, cpu = limits
-            resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
-            resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
-            resource.setrlimit(resource.RLIMIT_CPU, (cpu + 5, cpu + 10))
-
+        cmd = [*UNSHARE_NETWORK, "--", *command] if self.netns and not network else list(command)
         start = time.monotonic()
-        proc = subprocess.Popen(
-            cmd,
-            cwd=workspace,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            preexec_fn=_preexec,
-        )
         try:
-            out, err = proc.communicate(timeout=timeout_s)
-            timed_out = False
-        except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
-            out, err = proc.communicate()
-            timed_out = True
+            proc = subprocess.Popen(
+                cmd,
+                cwd=workspace,
+                env=_scrubbed_env(home),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                preexec_fn=_limits_setter(self.memory_bytes, self.max_file_bytes, timeout_s),
+            )
+            out, err, timed_out = _communicate(proc, timeout_s)
         finally:
             shutil.rmtree(home, ignore_errors=True)
         return SandboxResult(
@@ -222,3 +227,43 @@ class ProcessSandbox:
             timed_out=timed_out,
             isolation=self.isolation,
         )
+
+
+def _scrubbed_env(home: Path) -> dict[str, str]:
+    """A minimal environment: no API keys or tokens from the parent process leak in."""
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(home),
+        "LANG": "C.UTF-8",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "CI": "1",
+    }
+    env.update({key: os.environ[key] for key in PASSTHROUGH_ENV if key in os.environ})
+    return env
+
+
+def _limits_setter(memory_bytes: int, max_file_bytes: int, timeout_s: int) -> Callable[[], None]:
+    """A ``preexec_fn`` that runs in the child: new session + memory/file/CPU rlimits."""
+
+    def set_limits() -> None:  # pragma: no cover - runs in the child process
+        import resource
+
+        os.setsid()
+        resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
+        resource.setrlimit(resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes))
+        resource.setrlimit(
+            resource.RLIMIT_CPU, (timeout_s + CPU_SOFT_GRACE_S, timeout_s + CPU_HARD_GRACE_S)
+        )
+
+    return set_limits
+
+
+def _communicate(proc: subprocess.Popen[str], timeout_s: int) -> tuple[str, str, bool]:
+    """Wait for the process; on timeout kill its whole process group."""
+    try:
+        out, err = proc.communicate(timeout=timeout_s)
+        return out, err, False
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        out, err = proc.communicate()
+        return out, err, True

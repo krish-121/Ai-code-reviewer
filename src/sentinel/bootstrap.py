@@ -15,7 +15,8 @@ from sentinel.analysis.static.probes import default_probes
 from sentinel.analysis.static.runner import StaticAnalysisRunner, default_analyzers
 from sentinel.core.configuration.config import RepoConfig, Settings
 from sentinel.core.domain.ports import AIConfigurationError, AIProvider, Cache, ProgressReporter
-from sentinel.core.fixes.engine import FixEngine, Sandbox, SyntaxChecker, python_syntax
+from sentinel.core.fixes.engine import FixEngine
+from sentinel.core.fixes.validation import Sandbox, SyntaxChecker, python_syntax
 from sentinel.core.review.orchestrator import ReviewOrchestrator
 from sentinel.core.verification.checks import generic_checks
 from sentinel.core.verification.engine import VerificationEngine, Verifier
