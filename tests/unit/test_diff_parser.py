@@ -1,3 +1,5 @@
+"""Unified-diff parsing: file kinds, hunks, line numbers and unsafe paths."""
+
 from __future__ import annotations
 
 import pytest

@@ -65,6 +65,8 @@ def _config_source(ts_parser: Path | None) -> str:
 
 
 class ESLintAnalyzer:
+    """Runs ESLint with a Sentinel-generated config (bug/security rules only)."""
+
     name = "eslint"
     languages = frozenset({Language.JAVASCRIPT, Language.TYPESCRIPT})
 
@@ -74,9 +76,11 @@ class ESLintAnalyzer:
         self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
+        """True when the tool is installed on this machine."""
         return find_tool("eslint") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
+        """Run the tool on ``files`` inside ``workspace`` and normalize its output."""
         exe = find_tool("eslint", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "eslint not installed"))
@@ -109,6 +113,7 @@ class ESLintAnalyzer:
 
     @staticmethod
     def parse(stdout: str, workspace: Path) -> list[Finding]:
+        """Findings from ESLint's JSON report."""
         try:
             data = json.loads(stdout or "[]")
         except json.JSONDecodeError:
@@ -147,6 +152,8 @@ TSC_HIGH = {"TS2304", "TS2552", "TS2339", "TS2551"}  # unknown names/properties
 
 
 class TscAnalyzer:
+    """Runs the TypeScript compiler in type-check mode (needs a tsconfig.json)."""
+
     name = "tsc"
     languages = frozenset({Language.TYPESCRIPT})
 
@@ -156,9 +163,11 @@ class TscAnalyzer:
         self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
+        """True when the tool is installed on this machine."""
         return find_tool("tsc") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
+        """Run the tool on ``files`` inside ``workspace`` and normalize its output."""
         exe = find_tool("tsc", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "tsc not installed"))
@@ -179,6 +188,7 @@ class TscAnalyzer:
 
     @staticmethod
     def parse(stdout: str, workspace: Path) -> list[Finding]:
+        """Findings from ``tsc`` diagnostics (``file(line,col): error TS...``)."""
         out: list[Finding] = []
         for raw in stdout.splitlines():
             m = TSC_RE.match(raw.strip())

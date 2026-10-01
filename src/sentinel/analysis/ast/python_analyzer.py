@@ -31,6 +31,7 @@ MAIN_BLOCK = "__main__"
 
 
 def module_name_for(path: str) -> str:
+    """Dotted module name for a path: ``src/app/db.py`` -> ``app.db``."""
     stem = path[:-3] if path.endswith(".py") else path
     parts = [p for p in stem.split("/") if p]
     if parts and parts[-1] == "__init__":
@@ -41,6 +42,7 @@ def module_name_for(path: str) -> str:
 
 
 def is_python_test_file(path: str) -> bool:
+    """True for pytest-style test files (``test_*.py``, ``*_test.py``, ``tests/``)."""
     base = posixpath.basename(path)
     return (
         base.startswith("test_")

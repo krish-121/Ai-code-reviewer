@@ -1,3 +1,5 @@
+"""Context engine: changed symbols, context blocks, budget and the UI subgraph."""
+
 from __future__ import annotations
 
 from sentinel.analysis.diff.parser import parse_unified_diff

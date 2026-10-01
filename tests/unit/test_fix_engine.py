@@ -1,3 +1,5 @@
+"""Fix engine: patch application, validation checks, retries and applying fixes safely."""
+
 from __future__ import annotations
 
 import shutil

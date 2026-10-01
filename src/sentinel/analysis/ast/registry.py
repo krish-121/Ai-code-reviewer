@@ -22,6 +22,11 @@ ANALYZER_VERSION = "3"
 
 
 class LanguageRegistry:
+    """Routes each file to the analyzer for its extension, with optional caching.
+
+    Implements the orchestrator's ``SymbolExtractor`` port.
+    """
+
     def __init__(self, analyzers: list[LanguageAnalyzer], cache: Cache | None = None) -> None:
         self.analyzers = analyzers
         self.cache = cache
@@ -31,12 +36,18 @@ class LanguageRegistry:
                 self._by_ext[ext] = a
 
     def analyzer_for(self, path: str) -> LanguageAnalyzer | None:
+        """The analyzer registered for this file's extension, if any."""
         return self._by_ext.get(posixpath.splitext(path.lower())[1])
 
     def supports(self, path: str) -> bool:
+        """True when some analyzer handles this file."""
         return self.analyzer_for(path) is not None
 
     def analyze(self, files: dict[str, str]) -> dict[str, FileSymbols]:
+        """Analyze many files (path -> source); unchanged files come from the cache.
+
+        Files are grouped per analyzer so batch analyzers (TypeScript) start once.
+        """
         results: dict[str, FileSymbols] = {}
         pending: dict[int, tuple[LanguageAnalyzer, dict[str, str]]] = {}
         keys: dict[str, str] = {}
@@ -68,6 +79,7 @@ class LanguageRegistry:
         return results
 
     def stats(self, results: dict[str, FileSymbols]) -> dict[str, int]:
+        """Number of analyzed files per language."""
         by_lang: dict[str, int] = defaultdict(int)
         for fs in results.values():
             by_lang[fs.language.value] += 1
@@ -77,6 +89,7 @@ class LanguageRegistry:
 def default_registry(
     search_roots: tuple[Path, ...] = (), cache: Cache | None = None
 ) -> LanguageRegistry:
+    """Python, TypeScript and JavaScript analyzers."""
     return LanguageRegistry(
         [PythonAnalyzer(), TypeScriptAnalyzer(search_roots), JavaScriptAnalyzer(search_roots)],
         cache=cache,

@@ -1,3 +1,5 @@
+"""AI providers over mocked HTTP: wire formats, retries, JSON repair, caching, prompts."""
+
 from __future__ import annotations
 
 import json

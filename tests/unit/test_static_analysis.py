@@ -1,3 +1,5 @@
+"""Static analyzers: built-in rules, tool output parsers, real tool runs when installed."""
+
 from __future__ import annotations
 
 import json

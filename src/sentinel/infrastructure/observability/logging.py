@@ -21,7 +21,10 @@ def _fields(record: logging.LogRecord) -> dict[str, Any]:
 
 
 class KeyValueFormatter(logging.Formatter):
+    """Human-readable lines: time, level, logger, message, then ``key=value`` extras."""
+
     def format(self, record: logging.LogRecord) -> str:
+        """Format one record."""
         base = f"{self.formatTime(record, '%H:%M:%S')} {record.levelname:<7} {record.name}: "
         base += record.getMessage()
         extra = " ".join(f"{k}={v}" for k, v in _fields(record).items())
@@ -32,7 +35,10 @@ class KeyValueFormatter(logging.Formatter):
 
 
 class JsonFormatter(logging.Formatter):
+    """One JSON object per line, for log collectors."""
+
     def format(self, record: logging.LogRecord) -> str:
+        """Format one record."""
         payload: dict[str, Any] = {
             "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
             "level": record.levelname.lower(),
@@ -46,6 +52,7 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure_logging(fmt: str = "text", level: int = logging.INFO) -> None:
+    """Send ``sentinel.*`` logs to stderr as ``text`` or ``json``."""
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(JsonFormatter() if fmt == "json" else KeyValueFormatter())
     root = logging.getLogger("sentinel")

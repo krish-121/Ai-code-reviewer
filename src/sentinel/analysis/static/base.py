@@ -40,6 +40,8 @@ SAFE_ENV_KEYS = (
 
 @dataclass
 class ToolResult:
+    """Exit code, output and timing of one external tool run."""
+
     returncode: int
     stdout: str
     stderr: str
@@ -68,6 +70,7 @@ def scrubbed_env(extra: dict[str, str] | None = None) -> dict[str, str]:
 
 
 def run_tool(cmd: list[str], cwd: Path, timeout_s: int, stdin: str | None = None) -> ToolResult:
+    """Run a tool with a timeout and a scrubbed environment (no API keys leak in)."""
     start = time.monotonic()
     try:
         proc = subprocess.run(
@@ -90,6 +93,7 @@ def run_tool(cmd: list[str], cwd: Path, timeout_s: int, stdin: str | None = None
 def run_record(
     tool: str, result: ToolResult | None, findings: int, detail: str = ""
 ) -> AnalysisRun:
+    """The ``AnalysisRun`` for a tool run (``unavailable`` when it did not run)."""
     if result is None:
         return AnalysisRun(tool=tool, status=ToolStatus.UNAVAILABLE, detail=detail)
     status = ToolStatus.TIMEOUT if result.timed_out else ToolStatus.OK
@@ -114,6 +118,7 @@ def static_finding(
     suggested_fix: str | None = None,
     evidence: str | None = None,
 ) -> Finding:
+    """Build a ``Finding`` for a deterministic tool, with consistent origins and evidence."""
     line = max(1, line)
     return Finding(
         category=category,
@@ -136,6 +141,7 @@ def static_finding(
 
 
 def relpath(path: str, workspace: Path) -> str:
+    """A tool's reported path, made relative to the workspace."""
     p = Path(path)
     if p.is_absolute():
         try:

@@ -20,6 +20,7 @@ NEEDS_KEY = {"claude", "gemini"}
 
 
 def missing_key_message(provider: str) -> str:
+    """A helpful error naming the environment variable that holds the key."""
     env = KEY_ENV_VARS.get(provider, (f"SENTINEL_{provider.upper()}_KEY",))[0]
     return (
         f"{provider.capitalize()} API key not configured.\n"

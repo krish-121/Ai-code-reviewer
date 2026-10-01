@@ -1,3 +1,5 @@
+"""Architecture rules (import direction), workspaces, cache, logging and metrics."""
+
 from __future__ import annotations
 
 import ast

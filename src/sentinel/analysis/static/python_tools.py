@@ -67,6 +67,8 @@ def _rule_meta(code: str) -> tuple[Category, Severity, float, list[str]]:
 
 
 class RuffAnalyzer:
+    """Runs Ruff with the rules in ``RUFF_RULES`` and reads its JSON output."""
+
     name = "ruff"
     languages = frozenset({Language.PYTHON})
 
@@ -76,9 +78,11 @@ class RuffAnalyzer:
         self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
+        """True when the tool is installed on this machine."""
         return find_tool("ruff") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
+        """Run the tool on ``files`` inside ``workspace`` and normalize its output."""
         exe = find_tool("ruff", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "ruff not installed"))
@@ -103,6 +107,7 @@ class RuffAnalyzer:
 
     @staticmethod
     def parse(stdout: str, workspace: Path) -> list[Finding]:
+        """Findings from Ruff's JSON output."""
         try:
             items = json.loads(stdout or "[]")
         except json.JSONDecodeError:
@@ -161,6 +166,8 @@ MYPY_TEXT_RE = re.compile(
 
 
 class MypyAnalyzer:
+    """Runs mypy on the changed files (isolated config for untrusted repositories)."""
+
     name = "mypy"
     languages = frozenset({Language.PYTHON})
 
@@ -170,9 +177,11 @@ class MypyAnalyzer:
         self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
+        """True when the tool is installed on this machine."""
         return find_tool("mypy") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
+        """Run the tool on ``files`` inside ``workspace`` and normalize its output."""
         exe = find_tool("mypy", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "mypy not installed"))
@@ -203,6 +212,7 @@ class MypyAnalyzer:
 
     @staticmethod
     def parse(stdout: str, workspace: Path) -> list[Finding]:
+        """Findings from mypy's JSON lines (or its text output)."""
         out: list[Finding] = []
         for raw in stdout.splitlines():
             raw = raw.strip()
@@ -268,6 +278,8 @@ _CONF = {"HIGH": 0.85, "MEDIUM": 0.65, "LOW": 0.45}
 
 
 class BanditAnalyzer:
+    """Runs Bandit (Python security linter) and reads its JSON report."""
+
     name = "bandit"
     languages = frozenset({Language.PYTHON})
 
@@ -277,9 +289,11 @@ class BanditAnalyzer:
         self.trust_workspace = trust_workspace
 
     def is_available(self) -> bool:
+        """True when the tool is installed on this machine."""
         return find_tool("bandit") is not None
 
     def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
+        """Run the tool on ``files`` inside ``workspace`` and normalize its output."""
         exe = find_tool("bandit", workspace if self.trust_workspace else None)
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "bandit not installed"))
@@ -291,6 +305,7 @@ class BanditAnalyzer:
 
     @staticmethod
     def parse(stdout: str, workspace: Path) -> list[Finding]:
+        """Findings from Bandit's JSON report."""
         start = stdout.find("{")
         try:
             data = json.loads(stdout[start:]) if start >= 0 else {}

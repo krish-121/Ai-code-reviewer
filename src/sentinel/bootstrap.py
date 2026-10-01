@@ -121,6 +121,10 @@ def build_fix_engine(
     sandbox: Sandbox | None | str = FROM_SETTINGS,
     trusted_workspace: bool = True,
 ) -> FixEngine:
+    """Build a ``FixEngine`` with the configured provider, analyzers and sandbox.
+
+    ``trusted_workspace=False`` applies the same no-repository-code rule as reviews.
+    """
     provider = create_provider(settings) if ai == FROM_SETTINGS else ai
     if provider is None or isinstance(provider, str):
         raise AIConfigurationError(

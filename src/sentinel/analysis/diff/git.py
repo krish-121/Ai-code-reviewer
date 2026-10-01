@@ -34,7 +34,7 @@ MAX_WHOLE_FILE_BYTES = 400_000
 
 
 class GitError(SentinelError, RuntimeError):
-    pass
+    """A git command failed (not a repository, unknown ref ...)."""
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -55,6 +55,7 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def is_git_repo(path: Path) -> bool:
+    """True when ``path`` is inside a git work tree."""
     try:
         _git(path, "rev-parse", "--is-inside-work-tree")
     except GitError:
@@ -63,6 +64,7 @@ def is_git_repo(path: Path) -> bool:
 
 
 def repo_root(path: Path) -> Path:
+    """The top of the git work tree containing ``path`` (or ``path`` itself)."""
     if path.is_file():
         path = path.parent
     if is_git_repo(path):
@@ -71,6 +73,7 @@ def repo_root(path: Path) -> Path:
 
 
 def head_sha(repo: Path) -> str | None:
+    """Commit id of HEAD, or None in a repository without commits."""
     try:
         return _git(repo, "rev-parse", "HEAD").strip()
     except GitError:
@@ -78,6 +81,7 @@ def head_sha(repo: Path) -> str | None:
 
 
 def staged_changeset(repo: Path) -> ChangeSet:
+    """The staged changes (``git diff --cached``)."""
     cs = parse_unified_diff(_git(repo, *DIFF_ARGS, "--cached"), source="staged")
     cs.head_ref = "INDEX"
     cs.base_ref = head_sha(repo)
@@ -86,6 +90,7 @@ def staged_changeset(repo: Path) -> ChangeSet:
 
 
 def worktree_changeset(repo: Path) -> ChangeSet:
+    """All uncommitted changes, staged or not (``git diff HEAD``)."""
     cs = parse_unified_diff(_git(repo, *DIFF_ARGS, "HEAD"), source="worktree")
     cs.base_ref = head_sha(repo)
     cs.head_ref = "WORKTREE"
@@ -94,6 +99,7 @@ def worktree_changeset(repo: Path) -> ChangeSet:
 
 
 def range_changeset(repo: Path, base: str, head: str) -> ChangeSet:
+    """Changes between two refs (``git diff base...head``); refs are validated."""
     for ref in (base, head):
         if ref.startswith("-"):
             raise GitError(f"invalid ref {ref!r}")
@@ -149,6 +155,7 @@ def path_changeset(root: Path, sub: Path | None = None) -> ChangeSet:
 
 
 def unstaged_paths(repo: Path) -> set[str]:
+    """Files with unstaged modifications."""
     return set(_git(repo, "diff", "--name-only").splitlines())
 
 
@@ -180,6 +187,7 @@ def export_tree(repo: Path, ref: str, dest: Path) -> None:
 
 
 def rev_parse(repo: Path, ref: str) -> str:
+    """Resolve a ref to a commit id (refusing anything that looks like an option)."""
     if ref.startswith("-"):
         raise GitError(f"invalid ref {ref!r}")
     return _git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}").strip()

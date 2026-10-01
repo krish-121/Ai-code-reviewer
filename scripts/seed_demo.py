@@ -57,6 +57,7 @@ class ReplayProvider:
         self.data = data
 
     def review(self, request: ReviewRequest) -> AIReviewResult:
+        """Return the scripted review findings (token usage is estimated from the prompt)."""
         payload = AIReviewPayload.model_validate({"findings": self.data["review"]})
         tokens = len(request.diff + "".join(b.code for b in request.context)) // 4
         return AIReviewResult(
@@ -67,6 +68,7 @@ class ReplayProvider:
         )
 
     def generate_fix(self, request: FixRequest) -> AIFixResult:
+        """Return the scripted SQL-injection fix."""
         return AIFixResult(
             payload=AIFixPayload.model_validate(self.data["fix"]),
             model=self.model,
@@ -76,6 +78,7 @@ class ReplayProvider:
 
 
 def main() -> None:
+    """Build the demo repository, review it, and generate + validate one fix."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--db", default=str(ROOT / ".demo" / "sentinel-demo.db"))
     parser.add_argument("--repo", default=str(ROOT / ".demo" / "sentinel-demo"))

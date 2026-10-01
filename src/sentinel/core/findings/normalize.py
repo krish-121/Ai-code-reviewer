@@ -75,6 +75,7 @@ TAG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
 
 
 def derive_tags(*texts: str) -> list[str]:
+    """Tags such as ``sql-injection`` or ``n+1`` recognised in free text."""
     blob = " ".join(t for t in texts if t)
     return [tag for tag, pattern in TAG_PATTERNS if pattern.search(blob)]
 
@@ -96,6 +97,11 @@ def _normalize_path(raw: str, known: set[str]) -> str:
 def normalize_ai_findings(
     payload: AIReviewPayload, *, provider: str, known_files: set[str]
 ) -> list[Finding]:
+    """Turn the model's findings into domain ``Finding`` objects.
+
+    Paths are matched against files that exist; tags are derived from the text; every finding starts
+    unverified with source AI.
+    """
     out: list[Finding] = []
     for raw in payload.findings:
         file = _normalize_path(raw.file, known_files)

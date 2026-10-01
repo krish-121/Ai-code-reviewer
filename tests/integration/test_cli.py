@@ -1,3 +1,5 @@
+"""The sentinel CLI end to end on a temporary git repository."""
+
 from __future__ import annotations
 
 import json

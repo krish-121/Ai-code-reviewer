@@ -1,3 +1,5 @@
+"""Database store (tenancy, results, findings) and the job queue (claim, lease, retry)."""
+
 from __future__ import annotations
 
 from datetime import timedelta

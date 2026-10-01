@@ -40,6 +40,11 @@ PATTERNS = [
 
 
 def scan_for_injection(changeset: ChangeSet) -> list[Finding]:
+    """Findings for added lines that try to instruct an AI reviewer.
+
+    Such text is reported (it is suspicious in a code base) and the prompt treats it as data, never
+    as instructions.
+    """
     findings: list[Finding] = []
     for change in changeset.files:
         for hunk in change.hunks:

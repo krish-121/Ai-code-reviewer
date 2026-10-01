@@ -1,3 +1,5 @@
+"""HTTP API: review lifecycle, fixes, tenancy, host checks and the web UI fallback."""
+
 from __future__ import annotations
 
 import sys

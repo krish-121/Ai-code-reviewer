@@ -14,6 +14,7 @@ from pathlib import Path
 
 
 def content_key(*parts: str) -> str:
+    """SHA-256 over the parts, separated so that parts cannot run together."""
     h = hashlib.sha256()
     for part in parts:
         h.update(part.encode("utf-8", errors="surrogatepass"))
@@ -22,12 +23,15 @@ def content_key(*parts: str) -> str:
 
 
 class MemoryCache:
+    """A dict-backed cache (tests, and when the cache directory is unusable)."""
+
     def __init__(self) -> None:
         self._data: dict[tuple[str, str], str] = {}
         self.hits = 0
         self.misses = 0
 
     def get(self, namespace: str, key: str) -> str | None:
+        """Cached value, or None."""
         value = self._data.get((namespace, key))
         if value is None:
             self.misses += 1
@@ -36,6 +40,7 @@ class MemoryCache:
         return value
 
     def set(self, namespace: str, key: str, value: str) -> None:
+        """Store a value."""
         self._data[(namespace, key)] = value
 
 
@@ -54,6 +59,7 @@ class DiskCache:
         return self.root / namespace / key[:2] / key
 
     def get(self, namespace: str, key: str) -> str | None:
+        """Cached value, or None (also on read errors)."""
         path = self._path(namespace, key)
         try:
             value = path.read_text(encoding="utf-8")
@@ -64,6 +70,7 @@ class DiskCache:
         return value
 
     def set(self, namespace: str, key: str, value: str) -> None:
+        """Store a value atomically (skipped when larger than ``max_entry_bytes``)."""
         if len(value) > self.max_entry_bytes:
             return
         path = self._path(namespace, key)

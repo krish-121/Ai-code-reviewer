@@ -33,10 +33,12 @@ _WORD = re.compile(r"[a-z0-9]+")
 
 
 def title_tokens(text: str) -> set[str]:
+    """Meaningful lower-case words of a title (stop words removed)."""
     return {w for w in _WORD.findall(text.lower()) if w not in STOPWORDS and len(w) > 2}
 
 
 def concept(finding: Finding) -> str:
+    """The problem a finding is about: its most specific tag, else title words."""
     tags = sorted(t for t in finding.tags if t not in GENERIC_TAGS and not t.startswith("cwe-"))
     if tags:
         return tags[0]
@@ -44,6 +46,11 @@ def concept(finding: Finding) -> str:
 
 
 def fingerprint(finding: Finding) -> str:
+    """A stable id for 'this problem in this place'.
+
+    Built from file, category, concept and enclosing symbol (or a 10-line bucket), so it survives
+    small edits and lets GitHub publishing skip duplicates.
+    """
     anchor = finding.symbol or f"L{finding.line_start // 10}"
     raw = "|".join([finding.file, finding.category.value, concept(finding), anchor])
     return hashlib.sha1(raw.encode(), usedforsecurity=False).hexdigest()[:16]
@@ -96,6 +103,7 @@ def _primary_key(f: Finding) -> tuple[int, int, int, int, float]:
 
 
 def merge(group: list[Finding]) -> Finding:
+    """Combine findings about the same problem into one, keeping all evidence and origins."""
     if len(group) == 1:
         return group[0]
     ranked = sorted(group, key=_primary_key, reverse=True)

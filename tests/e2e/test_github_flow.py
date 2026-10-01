@@ -1,6 +1,9 @@
-"""End-to-end: GitHub PR -> webhook -> review job -> analysis -> findings -> database ->
+"""End-to-end GitHub flow, from webhook to published comments.
+
+GitHub PR -> webhook -> review job -> analysis -> findings -> database ->
 GitHub comments -> API/UI endpoints. GitHub and the AI provider are faked at the HTTP /
-port boundary; everything in between is the real system."""
+port boundary; everything in between is the real system.
+"""
 
 from __future__ import annotations
 

@@ -35,6 +35,8 @@ from sentinel.core.domain.models import ChangeSet
 
 
 class LocalRequest(BaseModel):
+    """What to review in a local repository: a mode plus refs or a sub-path."""
+
     kind: str = "local"
     path: str
     mode: str = Field(default="staged", pattern="^(staged|worktree|range|path)$")
@@ -45,6 +47,8 @@ class LocalRequest(BaseModel):
 
 @dataclass
 class PreparedWorkspace:
+    """The change to review and a directory holding the matching code."""
+
     changeset: ChangeSet
     workspace: Path
     repo_root: Path
@@ -53,6 +57,11 @@ class PreparedWorkspace:
 
 @contextmanager
 def prepare_local(request: LocalRequest) -> Iterator[PreparedWorkspace]:
+    """Yield the change set and a workspace for a local review; temporary trees are removed.
+
+    Modes: ``staged``, ``worktree``, ``range`` (base...head) and ``path`` (every file under a
+    folder, reviewed as newly added).
+    """
     root = repo_root(Path(request.path).expanduser().resolve())
     tmp: Path | None = None
     try:

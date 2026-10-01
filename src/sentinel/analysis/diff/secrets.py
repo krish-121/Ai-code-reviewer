@@ -20,6 +20,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SecretRule:
+    """One kind of secret: a pattern plus how confident a match is."""
+
     id: str
     title: str
     pattern: re.Pattern[str]
@@ -109,6 +111,7 @@ _PLACEHOLDER_HINTS = (
 
 
 def shannon_entropy(value: str) -> float:
+    """Bits of entropy per character; random keys score high, words low."""
     if not value:
         return 0.0
     counts = Counter(value)
@@ -125,6 +128,8 @@ def _looks_like_placeholder(value: str) -> bool:
 
 @dataclass(frozen=True)
 class SecretMatch:
+    """A secret found on one line."""
+
     rule: SecretRule
     line: int
     start: int
@@ -133,11 +138,13 @@ class SecretMatch:
 
     @property
     def masked(self) -> str:
+        """The first characters followed by asterisks, safe to show in findings."""
         head = self.value[:4]
         return f"{head}{'*' * min(12, max(4, len(self.value) - 4))}"
 
 
 def scan_line(text: str, line_no: int) -> list[SecretMatch]:
+    """Every secret on one line (overlapping matches are reported once)."""
     matches: list[SecretMatch] = []
     taken: list[tuple[int, int]] = []
     for rule in RULES:
@@ -156,6 +163,7 @@ def scan_line(text: str, line_no: int) -> list[SecretMatch]:
 
 
 def scan_text(text: str) -> list[SecretMatch]:
+    """Every secret in a text, including multi-line private-key blocks."""
     out: list[SecretMatch] = []
     in_key_block = False
     for i, line in enumerate(text.splitlines(), start=1):
@@ -171,6 +179,7 @@ def scan_text(text: str) -> list[SecretMatch]:
 
 
 def redact_line(text: str) -> tuple[str, list[SecretMatch]]:
+    """The line with every secret replaced by a placeholder, and the matches."""
     matches = scan_line(text, 0)
     if not matches:
         return text, []

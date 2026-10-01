@@ -20,6 +20,8 @@ def verify_signature(secret: str, body: bytes, header: str | None) -> bool:
 
 @dataclass(frozen=True)
 class PullRequestEvent:
+    """The parts of a pull-request webhook a review needs."""
+
     action: str
     repo: str
     number: int

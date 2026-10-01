@@ -14,6 +14,7 @@ from sentinel.core.domain.models import (
     STAGE_LABELS,
     Finding,
     ReviewResult,
+    ReviewStats,
     RiskLevel,
     Severity,
     StageName,
@@ -64,6 +65,7 @@ class LiveProgress:
             self.live.__exit__(None, None, None)
 
     def stage_changed(self, stage: StageRecord) -> None:
+        """Redraw the stage list (or print one line when not a terminal)."""
         self.stages[stage.name] = stage.model_copy()
         if self.console.is_terminal:
             self.live.update(self._render())
@@ -92,44 +94,58 @@ class LiveProgress:
 
 
 def render_summary(console: Console, result: ReviewResult) -> None:
-    s = result.summary
-    st = s.stats
-    grid = Table.grid(padding=(0, 3))
-    grid.add_column(justify="left")
-    grid.add_column(justify="left")
-    left = Table.grid(padding=(0, 2))
-    left.add_row("Files changed", str(st.files_changed))
-    left.add_row("Files reviewed", str(st.files_reviewed))
-    left.add_row("Lines added", f"[green]+{st.lines_added}[/]")
-    left.add_row("Lines removed", f"[red]-{st.lines_removed}[/]")
-    right = Table.grid(padding=(0, 2))
-    for sev in Severity:
-        right.add_row(
-            f"{SEV_DOT[sev]} {sev.value.capitalize()}", str(st.by_severity.get(sev.value, 0))
-        )
-    for cat, n in st.by_category.items():
-        right.add_row(f"  {cat.capitalize()}", str(n))
-    grid.add_row(left, right)
-    risk = Text(f" RISK: {s.risk.value.upper()} ", style=RISK_STYLE[s.risk])
-    sections: list[RenderableType] = [risk, Text(""), grid]
+    """The summary panel: risk, counts, and what changed / was verified."""
+    summary = result.summary
+    risk = Text(f" RISK: {summary.risk.value.upper()} ", style=RISK_STYLE[summary.risk])
+    sections: list[RenderableType] = [risk, Text(""), _counts_grid(summary.stats)]
     for title, items in (
-        ("What changed", s.what_changed),
-        ("What deserves attention", s.attention),
-        ("What was verified", s.verified),
-        ("What remains uncertain", s.uncertain),
+        ("What changed", summary.what_changed),
+        ("What deserves attention", summary.attention),
+        ("What was verified", summary.verified),
+        ("What remains uncertain", summary.uncertain),
     ):
         if items:
             sections.append(Text(f"\n{title}", style="bold"))
             sections.extend(Text(f"  • {item}") for item in items)
+    console.print(
+        Panel(
+            Group(*sections),
+            title="[bold]Review summary[/]",
+            subtitle=_review_meta(result),
+            border_style="dim",
+        )
+    )
+
+
+def _counts_grid(stats: ReviewStats) -> Table:
+    """Two columns: file/line counts on the left, findings by severity and category on the right."""
+    changes = Table.grid(padding=(0, 2))
+    changes.add_row("Files changed", str(stats.files_changed))
+    changes.add_row("Files reviewed", str(stats.files_reviewed))
+    changes.add_row("Lines added", f"[green]+{stats.lines_added}[/]")
+    changes.add_row("Lines removed", f"[red]-{stats.lines_removed}[/]")
+    findings = Table.grid(padding=(0, 2))
+    for severity in Severity:
+        label = f"{SEV_DOT[severity]} {severity.value.capitalize()}"
+        findings.add_row(label, str(stats.by_severity.get(severity.value, 0)))
+    for category, count in stats.by_category.items():
+        findings.add_row(f"  {category.capitalize()}", str(count))
+    grid = Table.grid(padding=(0, 3))
+    grid.add_column(justify="left")
+    grid.add_column(justify="left")
+    grid.add_row(changes, findings)
+    return grid
+
+
+def _review_meta(result: ReviewResult) -> str:
+    """Review id, status, duration and (with AI) provider, model and token usage."""
     meta = f"{result.review_id} · {result.status.value} · {result.duration_ms} ms"
     if result.provider:
         meta += (
             f" · {result.provider}/{result.model} · {result.usage.input_tokens}+"
             f"{result.usage.output_tokens} tokens"
         )
-    console.print(
-        Panel(Group(*sections), title="[bold]Review summary[/]", subtitle=meta, border_style="dim")
-    )
+    return meta
 
 
 def _snippet(result: ReviewResult, f: Finding) -> Syntax | None:
@@ -151,6 +167,7 @@ def _snippet(result: ReviewResult, f: Finding) -> Syntax | None:
 
 
 def render_finding(console: Console, result: ReviewResult, f: Finding, *, verbose: bool) -> None:
+    """One finding: header, explanation, code snippet, and (verbose) evidence and checks."""
     ver = f.verification
     head = Text()
     head.append(f"{SEV_DOT[f.severity]} {f.severity.value.upper()}", style=SEV_STYLE[f.severity])
@@ -194,6 +211,7 @@ def render_finding(console: Console, result: ReviewResult, f: Finding, *, verbos
 def render_review(
     console: Console, result: ReviewResult, *, verbose: bool = False, show_suppressed: bool = False
 ) -> None:
+    """A whole review: summary, findings, and optionally the suppressed ones."""
     render_summary(console, result)
     if not result.findings:
         console.print("[green]No findings to report.[/]")
@@ -221,6 +239,7 @@ def render_review(
 
 
 def findings_table(findings: list[Finding], title: str) -> Table:
+    """A compact table of findings (id, severity, verification, location, title)."""
     table = Table(title=title, header_style="bold")
     table.add_column("ID", style="dim", no_wrap=True)
     table.add_column("Sev")

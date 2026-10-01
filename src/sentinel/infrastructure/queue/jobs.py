@@ -20,6 +20,12 @@ from sentinel.infrastructure.database.models import Job
 
 QUEUED, RUNNING, DONE, FAILED = "queued", "running", "done", "failed"
 
+MAX_ERROR_CHARS = 2000
+RETRY_BASE_DELAY_S = 5  # first retry after 5 s, then 10, 20 ... capped below
+MAX_RETRY_DELAY_S = 300
+CLAIM_BATCH = 5  # candidates fetched per claim attempt
+DEFAULT_LEASE_S = 300
+
 # Job kinds (``Job.kind``); the worker has one handler per kind.
 REVIEW_JOB = "review"
 PUBLISH_JOB = "publish"
@@ -34,6 +40,7 @@ def enqueue(
     max_attempts: int = 3,
     delay_s: float = 0.0,
 ) -> Job:
+    """Add a job; it becomes runnable after ``delay_s`` seconds."""
     job = Job(
         id=new_id("J"),
         kind=kind,
@@ -52,7 +59,7 @@ def claim(
     worker_id: str,
     *,
     kinds: list[str] | None = None,
-    lease_s: int = 300,
+    lease_s: int = DEFAULT_LEASE_S,
 ) -> Job | None:
     """Atomically take the oldest runnable job (or one whose lease expired)."""
     now = utcnow()
@@ -60,7 +67,7 @@ def claim(
         and_(Job.status == QUEUED, Job.run_after <= now),
         and_(Job.status == RUNNING, Job.lease_until < now),
     )
-    stmt = select(Job.id).where(runnable).order_by(Job.created_at).limit(5)
+    stmt = select(Job.id).where(runnable).order_by(Job.created_at).limit(CLAIM_BATCH)
     if kinds:
         stmt = stmt.where(Job.kind.in_(kinds))
     if session.get_bind().dialect.name == "postgresql":
@@ -88,7 +95,10 @@ def claim(
     return None
 
 
-def heartbeat(session: Session, job_id: str, worker_id: str, lease_s: int = 300) -> bool:
+def heartbeat(
+    session: Session, job_id: str, worker_id: str, lease_s: int = DEFAULT_LEASE_S
+) -> bool:
+    """Extend a running job's lease; False if this worker no longer holds it."""
     result = session.execute(
         update(Job)
         .where(Job.id == job_id, Job.worker_id == worker_id, Job.status == RUNNING)
@@ -100,6 +110,7 @@ def heartbeat(session: Session, job_id: str, worker_id: str, lease_s: int = 300)
 
 
 def complete(session: Session, job: Job) -> None:
+    """Mark a job done."""
     job.status = DONE
     job.lease_until = None
     job.updated_at = utcnow()
@@ -107,16 +118,19 @@ def complete(session: Session, job: Job) -> None:
 
 
 def fail(session: Session, job: Job, error: str, *, retry: bool = True) -> None:
-    job.last_error = error[:2000]
+    """Record a failure; requeue with exponential backoff while attempts remain."""
+    job.last_error = error[:MAX_ERROR_CHARS]
     job.lease_until = None
     job.updated_at = utcnow()
     if retry and job.attempts < job.max_attempts:
         job.status = QUEUED
-        job.run_after = utcnow() + timedelta(seconds=min(300, 5 * 2 ** (job.attempts - 1)))
+        delay = min(MAX_RETRY_DELAY_S, RETRY_BASE_DELAY_S * 2 ** (job.attempts - 1))
+        job.run_after = utcnow() + timedelta(seconds=delay)
     else:
         job.status = FAILED
     session.commit()
 
 
 def pending(session: Session) -> int:
+    """Number of queued or running jobs."""
     return len(session.scalars(select(Job.id).where(Job.status.in_([QUEUED, RUNNING]))).all())

@@ -1,3 +1,5 @@
+"""Verification engine, generic checks and probes: real claims supported, wrong ones rejected."""
+
 from __future__ import annotations
 
 from typing import Any

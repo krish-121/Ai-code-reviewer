@@ -1,5 +1,7 @@
-"""End-to-end review pipeline tests: git diff -> context -> static -> AI (scripted) ->
-verification -> findings. No network, no real AI provider."""
+"""End-to-end review pipeline tests.
+
+git diff -> context -> static -> AI (scripted) -> verification -> findings. No network, no real AI provider.
+"""
 
 from __future__ import annotations
 

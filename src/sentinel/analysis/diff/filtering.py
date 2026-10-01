@@ -157,6 +157,8 @@ MINIFIED_AVG_LINE = 400
 
 @dataclass
 class FilterOutcome:
+    """The filtered change set, findings about secrets/sensitive files, and the redaction count."""
+
     changeset: ChangeSet
     findings: list[Finding] = field(default_factory=list)
     redactions: int = 0

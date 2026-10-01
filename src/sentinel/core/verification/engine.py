@@ -38,6 +38,8 @@ STRONG_WEIGHT = 1.5
 
 @dataclass
 class VerificationContext:
+    """Everything a check may look at: the graph, sources, diff and static findings."""
+
     graph: CodeGraph
     sources: dict[str, str]
     changeset: ChangeSet
@@ -45,19 +47,29 @@ class VerificationContext:
     symbols: dict[str, FileSymbols] = field(default_factory=dict)
 
     def lines(self, path: str) -> list[str]:
+        """The lines of a file in the snapshot (empty if unknown)."""
         return self.sources.get(path, "").splitlines()
 
     def enclosing(self, finding: Finding) -> GraphNode | None:
+        """The graph node (function, method, class) containing the finding."""
         return self.graph.enclosing(finding.file, finding.line_start)
 
 
 class Verifier(Protocol):
+    """One check or probe: returns a ``VerificationCheck``, or None when not applicable."""
+
     name: str
 
-    def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None: ...
+    def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Check one finding."""
 
 
 def reachability(finding: Finding, ctx: VerificationContext) -> tuple[str, list[str]]:
+    """Whether the finding's code is reachable, and the call path from the entry point.
+
+    Returns ``(label, path)`` where label is ``entrypoint``, ``test-only``, ``unreachable`` or
+    ``unknown``.
+    """
     node = ctx.enclosing(finding)
     if node is None:
         return "unknown", []
@@ -78,10 +90,13 @@ def reachability(finding: Finding, ctx: VerificationContext) -> tuple[str, list[
 
 
 class VerificationEngine:
+    """Runs every verifier on a finding and combines their results."""
+
     def __init__(self, verifiers: Sequence[Verifier]) -> None:
         self.verifiers = list(verifiers)
 
     def verify(self, finding: Finding, ctx: VerificationContext) -> VerificationResult:
+        """Run every check (a crashing check is recorded, not raised) and decide."""
         checks: list[VerificationCheck] = []
         for v in self.verifiers:
             try:

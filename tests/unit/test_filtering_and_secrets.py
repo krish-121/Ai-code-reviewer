@@ -1,3 +1,5 @@
+"""File filtering, secret detection/redaction and prompt-injection scanning."""
+
 from __future__ import annotations
 
 import pytest

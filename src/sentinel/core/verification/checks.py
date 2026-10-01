@@ -57,9 +57,12 @@ def _exists(name: str, finding: Finding, ctx: VerificationContext) -> bool:
 
 
 class LocationCheck:
+    """Does the cited file and line exist? If not, the claim is decisively contradicted."""
+
     name = "location"
 
     def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Check the cited location against the repository snapshot."""
         if finding.file not in ctx.sources:
             if ctx.changeset.get(finding.file) is not None:
                 return VerificationCheck(
@@ -93,9 +96,12 @@ class LocationCheck:
 
 
 class ChangeRelevanceCheck:
+    """Does the finding point at lines this change touched?"""
+
     name = "change-relevance"
 
     def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Supports changed lines; neutral inside a changed function; else contradicts."""
         change = ctx.changeset.get(finding.file)
         if change is not None and change.touches(finding.line_start, finding.line_end, slack=2):
             return VerificationCheck(
@@ -132,6 +138,7 @@ class SymbolEvidenceCheck:
     name = "symbols-exist"
 
     def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Look up every symbol the explanation and evidence mention."""
         names = _mentioned(finding)
         if not names:
             return None
@@ -161,6 +168,7 @@ class CallPathCheck:
     name = "call-path"
 
     def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Compare 'a() calls b()' claims with CALLS paths in the code graph."""
         texts = [finding.explanation, *(e.text for e in finding.evidence)]
         pairs = {(a, b) for t in texts for a, b in CALL_CHAIN.findall(t)}
         pairs = {
@@ -205,9 +213,12 @@ class CallPathCheck:
 
 
 class ReachabilityCheck:
+    """Is the cited code reachable from an entry point (endpoint, CLI, main)?"""
+
     name = "reachability"
 
     def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Weigh reachability more for security findings."""
         label, path = reachability(finding, ctx)
         weight = 0.75 if finding.category is Category.SECURITY else 0.3
         if label == "entrypoint":
@@ -234,9 +245,12 @@ class ReachabilityCheck:
 
 
 class StaticCorroborationCheck:
+    """Did a deterministic tool report the same problem at the same place?"""
+
     name = "static-corroboration"
 
     def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Match static findings by file, nearby line and tag or category."""
         tags = set(finding.tags)
         hits: list[Finding] = []
         for s in ctx.static_findings:
@@ -264,6 +278,7 @@ class TestClaimCheck:
     name = "test-coverage"
 
     def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Check 'no tests cover X' claims against the tests the graph links to X."""
         if "missing-test" not in finding.tags and finding.category is not Category.TESTS:
             return None
         node = ctx.enclosing(finding)
@@ -313,6 +328,7 @@ class StyleOnlyCheck:
     name = "not-style"
 
     def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
+        """Contradict findings filed as bugs whose substance is only style."""
         if finding.category is Category.STYLE:
             return None
         substantive = [t for t in finding.tags if t not in ("missing-test",)]
@@ -345,6 +361,7 @@ def generic_checks() -> list[
     | TestClaimCheck
     | StyleOnlyCheck
 ]:
+    """The language-independent checks, in the order they run."""
     return [
         LocationCheck(),
         ChangeRelevanceCheck(),
@@ -358,6 +375,7 @@ def generic_checks() -> list[
 
 
 def enclosing_label(node: GraphNode | None) -> str:
+    """How a node is named in check details: ``search()``, ``User``, ``module level``."""
     if node is None:
         return "module level"
     return node.name if node.kind is NodeKind.CLASS else f"{node.name}()"

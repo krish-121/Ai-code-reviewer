@@ -11,10 +11,11 @@ from sentinel.core.domain.errors import SentinelError
 
 
 class PatchError(SentinelError, ValueError):
-    pass
+    """An edit cannot be applied (search text missing or not unique)."""
 
 
 def sha256(text: str) -> str:
+    """Hex digest of a file's text, used to detect changes before applying a fix."""
     return hashlib.sha256(text.encode("utf-8", errors="surrogatepass")).hexdigest()
 
 
@@ -53,6 +54,7 @@ def _closest(content: str, search: str) -> str | None:
 
 
 def unified_diff(before: dict[str, str], after: dict[str, str]) -> str:
+    """A unified diff between two versions of a set of files."""
     chunks: list[str] = []
     for path in sorted(after):
         old = before.get(path, "")

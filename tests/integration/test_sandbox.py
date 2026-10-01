@@ -1,3 +1,5 @@
+"""Sandboxes: isolation flags and a real Docker run when available."""
+
 from __future__ import annotations
 
 import os

@@ -1,3 +1,5 @@
+"""GitHub integration: signatures, event parsing, client retries, rendering, publishing."""
+
 from __future__ import annotations
 
 import hashlib
@@ -110,39 +112,52 @@ class FakeGitHub:
         self.next_id = 100
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
+        """Route a request to the handler for its path, like GitHub's REST API would."""
         self.requests.append(req)
         if self.fail_next:
             return httpx.Response(self.fail_next.pop(0), text="rate limit exceeded")
         path, method = req.url.path, req.method
         if path == "/repos/acme/shop/pulls/7" and method == "GET":
-            if "diff" in req.headers.get("accept", ""):
-                return httpx.Response(200, text=DIFF)
-            return httpx.Response(200, json=pr_payload()["pull_request"])
+            return self._pull(req)
         if path.startswith("/repos/acme/shop/tarball/"):
             return httpx.Response(200, content=self.tarball)
         if path == "/repos/acme/shop/pulls/7/comments":
             page = int(req.url.params.get("page", "1"))
             return httpx.Response(200, json=self.review_comments if page == 1 else [])
         if path == "/repos/acme/shop/issues/7/comments":
-            if method == "POST":
-                self.next_id += 1
-                comment = {"id": self.next_id, "body": json.loads(req.content)["body"]}
-                self.issue_comments.append(comment)
-                return httpx.Response(201, json=comment)
-            return httpx.Response(200, json=self.issue_comments)
+            return self._issue_comments(req)
         if path.startswith("/repos/acme/shop/issues/comments/") and method == "PATCH":
-            cid = int(path.rsplit("/", 1)[-1])
-            for c in self.issue_comments:
-                if c["id"] == cid:
-                    c["body"] = json.loads(req.content)["body"]
-            return httpx.Response(200, json={"id": cid})
+            return self._edit_issue_comment(req)
         if path == "/repos/acme/shop/pulls/7/reviews" and method == "POST":
-            body = json.loads(req.content)
-            self.reviews.append(body)
-            for c in body["comments"]:
-                self.review_comments.append({"body": c["body"], "path": c["path"]})
-            return httpx.Response(200, json={"id": len(self.reviews)})
+            return self._create_review(req)
         return httpx.Response(404, text=f"no route {method} {path}")
+
+    def _pull(self, req: httpx.Request) -> httpx.Response:
+        if "diff" in req.headers.get("accept", ""):
+            return httpx.Response(200, text=DIFF)
+        return httpx.Response(200, json=pr_payload()["pull_request"])
+
+    def _issue_comments(self, req: httpx.Request) -> httpx.Response:
+        if req.method != "POST":
+            return httpx.Response(200, json=self.issue_comments)
+        self.next_id += 1
+        comment = {"id": self.next_id, "body": json.loads(req.content)["body"]}
+        self.issue_comments.append(comment)
+        return httpx.Response(201, json=comment)
+
+    def _edit_issue_comment(self, req: httpx.Request) -> httpx.Response:
+        comment_id = int(req.url.path.rsplit("/", 1)[-1])
+        for comment in self.issue_comments:
+            if comment["id"] == comment_id:
+                comment["body"] = json.loads(req.content)["body"]
+        return httpx.Response(200, json={"id": comment_id})
+
+    def _create_review(self, req: httpx.Request) -> httpx.Response:
+        body = json.loads(req.content)
+        self.reviews.append(body)
+        for comment in body["comments"]:
+            self.review_comments.append({"body": comment["body"], "path": comment["path"]})
+        return httpx.Response(200, json={"id": len(self.reviews)})
 
     def client(self, sleeps: list[float] | None = None) -> GitHubClient:
         sink = sleeps if sleeps is not None else []

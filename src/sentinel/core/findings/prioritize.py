@@ -31,6 +31,7 @@ VERIFICATION_WEIGHT = {
 
 
 def change_relevance(finding: Finding, changeset: ChangeSet) -> tuple[float, str]:
+    """How strongly a finding relates to the change (1.0 on changed lines), and why."""
     change = changeset.get(finding.file)
     if change is None:
         if finding.in_changed_lines:
@@ -44,6 +45,7 @@ def change_relevance(finding: Finding, changeset: ChangeSet) -> tuple[float, str
 
 
 def score(finding: Finding, changeset: ChangeSet) -> PriorityScore:
+    """Priority = severity × confidence × reachability × change relevance × verification."""
     sev = SEVERITY_WEIGHT[finding.severity]
     reach_label = finding.verification.reachability if finding.verification else "unknown"
     reach = REACHABILITY_WEIGHT.get(reach_label, 0.85)
@@ -68,6 +70,12 @@ def score(finding: Finding, changeset: ChangeSet) -> PriorityScore:
 def select(
     findings: list[Finding], changeset: ChangeSet, config: RepoConfig
 ) -> tuple[list[Finding], list[Finding]]:
+    """Split findings into the ones to show and the suppressed ones.
+
+    Suppressed (with a reason): rejected by the verifier, a disabled category, below the severity or
+    confidence threshold, a pre-existing tool finding outside the change, uncertain while
+    ``surface_uncertain`` is off, or beyond ``max_findings``. Nothing is deleted.
+    """
     enabled = set(config.review.enabled_categories())
     candidates: list[Finding] = []
     suppressed: list[Finding] = []

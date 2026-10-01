@@ -1,3 +1,5 @@
+"""Settings and .sentinel.yml loading, validation and saving."""
+
 from __future__ import annotations
 
 import stat

@@ -1,3 +1,5 @@
+"""Finding normalization, fingerprints, deduplication and prioritization."""
+
 from __future__ import annotations
 
 from typing import Any

@@ -1,3 +1,5 @@
+"""Code graph construction and queries (callers, entry paths, tests)."""
+
 from __future__ import annotations
 
 import pytest

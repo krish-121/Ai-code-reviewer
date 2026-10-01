@@ -25,20 +25,28 @@ MIN_PERMISSIONS = {"contents": "read", "pull_requests": "write", "issues": "writ
 
 
 class GitHubError(SentinelError):
+    """A GitHub API call failed (``status`` is the HTTP status, if any)."""
+
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status
 
 
 class TokenProvider(Protocol):
-    def token(self, repo: str | None = None) -> str: ...
+    """Supplies a GitHub token for a repository."""
+
+    def token(self, repo: str | None = None) -> str:
+        """A token valid for ``repo``."""
 
 
 @dataclass
 class StaticToken:
+    """A personal access token (used by ``sentinel review --pr``)."""
+
     value: str
 
     def token(self, repo: str | None = None) -> str:
+        """The same token for every repository."""
         return self.value
 
 
@@ -63,12 +71,14 @@ class GitHubAppAuth:
         self._cache: dict[str | None, tuple[str, float]] = {}
 
     def app_jwt(self) -> str:
+        """A short-lived JWT signed with the App's private key (RS256)."""
         now = int(self.clock())
         payload = {"iat": now - 60, "exp": now + 540, "iss": self.app_id}
         token: str = jwt.encode(payload, self.private_key, algorithm="RS256")
         return token
 
     def token(self, repo: str | None = None) -> str:
+        """An installation token with ``MIN_PERMISSIONS``, cached until near expiry."""
         cached = self._cache.get(repo)
         if cached and cached[1] - 60 > self.clock():
             return cached[0]
@@ -94,6 +104,8 @@ class GitHubAppAuth:
 
 
 class GitHubClient:
+    """The few GitHub REST calls Sentinel needs, over ``httpx``."""
+
     def __init__(
         self,
         auth: TokenProvider,
@@ -163,10 +175,12 @@ class GitHubClient:
 
     # ------------------------------------------------------------------ reads
     def pull(self, repo: str, number: int) -> dict[str, Any]:
+        """Pull-request metadata."""
         data: dict[str, Any] = self._request("GET", f"/repos/{repo}/pulls/{number}", repo).json()
         return data
 
     def pull_diff(self, repo: str, number: int) -> str:
+        """The pull request as a unified diff."""
         return self._request(
             "GET", f"/repos/{repo}/pulls/{number}", repo, accept="application/vnd.github.v3.diff"
         ).text
@@ -186,19 +200,23 @@ class GitHubClient:
             tar.extractall(dest, members=members, filter="data")
 
     def review_comments(self, repo: str, number: int) -> list[dict[str, Any]]:
+        """All inline review comments on the pull request."""
         return self._paginate(f"/repos/{repo}/pulls/{number}/comments", repo)
 
     def issue_comments(self, repo: str, number: int) -> list[dict[str, Any]]:
+        """All conversation comments on the pull request."""
         return self._paginate(f"/repos/{repo}/issues/{number}/comments", repo)
 
     # ------------------------------------------------------------------ writes
     def create_issue_comment(self, repo: str, number: int, body: str) -> dict[str, Any]:
+        """Post a conversation comment."""
         data: dict[str, Any] = self._request(
             "POST", f"/repos/{repo}/issues/{number}/comments", repo, json={"body": body}
         ).json()
         return data
 
     def update_issue_comment(self, repo: str, comment_id: int, body: str) -> dict[str, Any]:
+        """Edit a conversation comment."""
         data: dict[str, Any] = self._request(
             "PATCH", f"/repos/{repo}/issues/comments/{comment_id}", repo, json={"body": body}
         ).json()
@@ -213,6 +231,7 @@ class GitHubClient:
         body: str,
         comments: list[dict[str, Any]],
     ) -> dict[str, Any]:
+        """Post a review with inline comments (event ``COMMENT``, never approve/block)."""
         payload = {"commit_id": commit_id, "body": body, "event": "COMMENT", "comments": comments}
         data: dict[str, Any] = self._request(
             "POST", f"/repos/{repo}/pulls/{number}/reviews", repo, json=payload

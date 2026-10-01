@@ -17,6 +17,8 @@ Labels = tuple[tuple[str, str], ...]
 
 
 class Metrics:
+    """Thread-safe in-process counters and histograms, exposed at ``/metrics``."""
+
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self.counters: dict[str, dict[Labels, float]] = defaultdict(dict)
@@ -24,18 +26,21 @@ class Metrics:
         self.help: dict[str, str] = {}
 
     def inc(self, name: str, value: float = 1.0, help: str = "", **labels: str) -> None:
+        """Add ``value`` to a counter."""
         key = tuple(sorted(labels.items()))
         with self._lock:
             self.help.setdefault(name, help)
             self.counters[name][key] = self.counters[name].get(key, 0.0) + value
 
     def observe(self, name: str, value: float, help: str = "", **labels: str) -> None:
+        """Record one measurement in a histogram."""
         key = tuple(sorted(labels.items()))
         with self._lock:
             self.help.setdefault(name, help)
             self.histograms[name].setdefault(key, []).append(value)
 
     def record_review(self, result: ReviewResult) -> None:
+        """Count a finished review: status, duration, stage timings, findings, tokens."""
         self.inc("sentinel_reviews_total", help="Reviews finished", status=result.status.value)
         self.observe("sentinel_review_duration_ms", result.duration_ms, help="Total review latency")
         for stage in result.stages:
@@ -65,10 +70,12 @@ class Metrics:
         self.inc("sentinel_ai_tokens_total", result.usage.output_tokens, direction="output")
 
     def record_fix(self, status: str, duration_ms: float) -> None:
+        """Count a fix attempt and its duration."""
         self.inc("sentinel_fix_attempts_total", help="Fix attempts by outcome", status=status)
         self.observe("sentinel_fix_duration_ms", duration_ms, help="Fix generation+validation")
 
     def render(self) -> str:
+        """Everything in the Prometheus text exposition format."""
         lines: list[str] = []
         with self._lock:
             for name, series in sorted(self.counters.items()):

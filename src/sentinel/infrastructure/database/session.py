@@ -16,6 +16,7 @@ from sentinel.infrastructure.database.models import Base
 
 
 def normalize_url(url: str) -> str:
+    """Accept ``postgres://`` URLs and select the psycopg (v3) driver."""
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
     if url.startswith("postgresql://"):
@@ -24,6 +25,8 @@ def normalize_url(url: str) -> str:
 
 
 class Database:
+    """Engine and session factory for one database URL."""
+
     def __init__(self, url: str, *, echo: bool = False) -> None:
         self.url = normalize_url(url)
         kwargs: dict[str, Any] = {"echo": echo, "future": True}
@@ -43,16 +46,20 @@ class Database:
 
     @property
     def dialect(self) -> str:
+        """``sqlite`` or ``postgresql``."""
         return self.engine.dialect.name
 
     def create_all(self) -> None:
+        """Create missing tables (no migrations yet; see PROGRESS.md)."""
         Base.metadata.create_all(self.engine)
 
     def session(self) -> Session:
+        """A new session; the caller commits and closes it."""
         return self._sessions()
 
     @contextmanager
     def transaction(self) -> Iterator[Session]:
+        """A session that commits on success, rolls back on error, and always closes."""
         session = self._sessions()
         try:
             yield session

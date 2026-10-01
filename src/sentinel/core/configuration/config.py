@@ -24,7 +24,7 @@ from sentinel.core.domain.models import Category, Language, Severity
 
 
 class ConfigError(SentinelError, ValueError):
-    pass
+    """Settings or ``.sentinel.yml`` are invalid."""
 
 
 class _Section(BaseModel):
@@ -41,6 +41,8 @@ DEFAULT_CATEGORIES = [
 
 
 class ReviewSection(_Section):
+    """``review:`` in ``.sentinel.yml``: what to look for and how much to show."""
+
     categories: list[Category] = Field(default_factory=lambda: list(DEFAULT_CATEGORIES))
     include_style: bool = False
     include_documentation: bool = False
@@ -50,6 +52,7 @@ class ReviewSection(_Section):
     max_context_chars: int = Field(default=60_000, ge=2_000)
 
     def enabled_categories(self) -> list[Category]:
+        """The categories to review, with style/documentation only when opted in."""
         cats = list(dict.fromkeys(self.categories))
         if self.include_style and Category.STYLE not in cats:
             cats.append(Category.STYLE)
@@ -59,17 +62,23 @@ class ReviewSection(_Section):
 
 
 class StaticSection(_Section):
+    """``static:`` in ``.sentinel.yml``: analyzers to skip and their timeout."""
+
     disabled: list[str] = Field(default_factory=list, description="Analyzer names to skip")
     timeout_s: int = Field(default=120, ge=5)
 
 
 class FixSection(_Section):
+    """``fix:`` in ``.sentinel.yml``: how to run the tests that validate a fix."""
+
     test_command: list[str] | None = None
     setup_command: list[str] | None = None
     timeout_s: int = Field(default=300, ge=10)
 
 
 class RepoConfig(_Section):
+    """Per-repository review configuration (``.sentinel.yml``)."""
+
     review: ReviewSection = Field(default_factory=ReviewSection)
     severity_threshold: Severity = Severity.LOW
     ignore: list[str] = Field(default_factory=list)
@@ -89,6 +98,7 @@ CONFIG_FILENAMES = (".sentinel.yml", ".sentinel.yaml")
 
 
 def load_repo_config(root: Path) -> RepoConfig:
+    """Read ``.sentinel.yml`` from the repository root (defaults when absent)."""
     for name in CONFIG_FILENAMES:
         path = root / name
         if path.is_file():
@@ -97,6 +107,7 @@ def load_repo_config(root: Path) -> RepoConfig:
 
 
 def parse_repo_config(text: str, source: str = ".sentinel.yml") -> RepoConfig:
+    """Validate YAML text as a ``RepoConfig``; unknown keys are errors."""
     try:
         raw = yaml.safe_load(text) or {}
     except yaml.YAMLError as exc:
@@ -134,6 +145,8 @@ KEY_ENV_VARS: dict[str, tuple[str, ...]] = {
 
 
 class Settings(BaseModel):
+    """Machine/user settings: provider, keys, database, sandbox, GitHub, server."""
+
     model_config = ConfigDict(extra="ignore")
 
     provider: str = "none"
@@ -173,9 +186,15 @@ class Settings(BaseModel):
 
     @property
     def resolved_model(self) -> str:
+        """The configured model, or the provider's default."""
         return self.model or DEFAULT_MODELS[self.provider]
 
     def allowed_roots(self) -> list[Path]:
+        """Directories the server may review local repositories in.
+
+        ``SENTINEL_LOCAL_ROOTS`` when set; the home directory in local mode; none in token mode
+        (multi-user servers must opt in explicitly).
+        """
         if self.local_roots:
             return [Path(p).expanduser().resolve() for p in self.local_roots.split(os.pathsep) if p]
         return [Path.home().resolve()] if self.auth_mode == "local" else []

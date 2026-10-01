@@ -17,6 +17,12 @@ from sentinel.core.domain.ports import StaticAnalysisOutput, StaticAnalyzer
 
 
 class StaticAnalysisRunner:
+    """Runs every available analyzer on the files it supports.
+
+    Implements the ``StaticRunner`` port used by the orchestrator and the fix engine. Analyzers run
+    in parallel; one that crashes is recorded as failed and the others still report.
+    """
+
     def __init__(
         self,
         analyzers: Sequence[StaticAnalyzer],
@@ -28,6 +34,7 @@ class StaticAnalysisRunner:
         self.max_workers = max_workers
 
     def run(self, workspace: Path, files: list[str]) -> tuple[list[Finding], list[AnalysisRun]]:
+        """Findings from all analyzers plus one ``AnalysisRun`` per analyzer."""
         jobs: list[tuple[StaticAnalyzer, list[str]]] = []
         runs: list[AnalysisRun] = [
             AnalysisRun(tool=name, status=ToolStatus.SKIPPED, detail="disabled in .sentinel.yml")
@@ -52,6 +59,7 @@ class StaticAnalysisRunner:
     def _safe_run(
         analyzer: StaticAnalyzer, workspace: Path, files: list[str]
     ) -> StaticAnalysisOutput:
+        """Run one analyzer; a crash becomes a ``failed`` run record instead of an exception."""
         start = time.monotonic()
         try:
             return analyzer.run(workspace, files)
@@ -72,14 +80,17 @@ def default_analyzers(
     *,
     trust_workspace: bool = True,
 ) -> list[StaticAnalyzer]:
-    """``trust_workspace=False`` for code you don't control (pull requests): tools and
-    plugins are then never loaded from the checked-out repository itself."""
-    t = trust_workspace
+    """Every analyzer Sentinel knows, in reporting order.
+
+    Pass ``trust_workspace=False`` for code you don't control (pull requests): tools and
+    plugins are then never loaded from the checked-out repository itself.
+    """
+    trust = trust_workspace
     return [
         BuiltinAnalyzer(registry),
-        RuffAnalyzer(timeout_s, trust_workspace=t),
-        MypyAnalyzer(timeout_s, trust_workspace=t),
-        BanditAnalyzer(timeout_s, trust_workspace=t),
-        ESLintAnalyzer(timeout_s, trust_workspace=t),
-        TscAnalyzer(timeout_s, trust_workspace=t),
+        RuffAnalyzer(timeout_s, trust_workspace=trust),
+        MypyAnalyzer(timeout_s, trust_workspace=trust),
+        BanditAnalyzer(timeout_s, trust_workspace=trust),
+        ESLintAnalyzer(timeout_s, trust_workspace=trust),
+        TscAnalyzer(timeout_s, trust_workspace=trust),
     ]

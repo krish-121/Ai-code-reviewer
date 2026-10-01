@@ -1,3 +1,5 @@
+"""TypeScript/JavaScript analyzer: compiler-based extraction and the regex fallback."""
+
 from __future__ import annotations
 
 import shutil
@@ -65,8 +67,8 @@ def test_compiler_extractor_structure() -> None:
     loop_call = next(c for c in fs.calls if c.callee == "db.query" and c.line == 11)
     assert loop_call.in_loop and loop_call.awaited
     assert calls[("UserService.getUser", "this.repo.find")].awaited
-    forEach_q = next(c for c in fs.calls if c.callee == "db.query" and c.line == 13)
-    assert forEach_q.in_loop  # callback of forEach counts as a loop body
+    for_each_query = next(c for c in fs.calls if c.callee == "db.query" and c.line == 13)
+    assert for_each_query.in_loop  # callback of forEach counts as a loop body
     assert ("POST /login", "login") in calls
 
     eps = {(e.method, e.route): e.handler for e in fs.endpoints}

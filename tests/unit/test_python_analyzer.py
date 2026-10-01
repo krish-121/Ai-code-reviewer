@@ -1,3 +1,5 @@
+"""Python analyzer: symbols, imports, calls, endpoints and database operations."""
+
 from __future__ import annotations
 
 from sentinel.analysis.ast.python_analyzer import (

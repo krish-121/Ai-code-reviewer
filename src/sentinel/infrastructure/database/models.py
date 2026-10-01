@@ -36,6 +36,7 @@ class UTCDateTime(TypeDecorator[datetime]):
     cache_ok = True
 
     def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        """Store as naive UTC on SQLite (which has no time zones)."""
         if value is None:
             return None
         if value.tzinfo is None:
@@ -44,12 +45,15 @@ class UTCDateTime(TypeDecorator[datetime]):
         return value.replace(tzinfo=None) if dialect.name == "sqlite" else value
 
     def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        """Always hand back timezone-aware UTC datetimes."""
         if value is not None and value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value
 
 
 class Base(DeclarativeBase):
+    """Declarative base: dict/list columns are stored as JSON."""
+
     type_annotation_map = {dict[str, Any]: JSON, list[Any]: JSON}
 
 
@@ -58,6 +62,8 @@ def _now() -> datetime:
 
 
 class User(Base):
+    """A person (or the local user) who owns repositories; API tokens are stored hashed."""
+
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -69,6 +75,8 @@ class User(Base):
 
 
 class Repository(Base):
+    """A local folder or a GitHub repository, owned by one user (the tenancy boundary)."""
+
     __tablename__ = "repositories"
     __table_args__ = (UniqueConstraint("owner_id", "full_name", name="uq_repo_owner_name"),)
 
@@ -92,6 +100,8 @@ class GithubInstallation(Base):
 
 
 class PullRequest(Base):
+    """A GitHub pull request that has been reviewed."""
+
     __tablename__ = "pull_requests"
     __table_args__ = (UniqueConstraint("repository_id", "number", name="uq_pr_repo_number"),)
 
@@ -110,6 +120,8 @@ class PullRequest(Base):
 
 
 class Review(Base):
+    """One review run: request, status, stages, summary, and snapshots for the UI."""
+
     __tablename__ = "reviews"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -149,6 +161,8 @@ class Review(Base):
 
 
 class CodeGraphSnapshot(Base):
+    """The architecture subgraph of a review (kept apart: it can be large)."""
+
     __tablename__ = "code_graph_snapshots"
 
     review_id: Mapped[str] = mapped_column(
@@ -159,6 +173,8 @@ class CodeGraphSnapshot(Base):
 
 
 class Finding(Base):
+    """A finding of a review; ``data`` holds the full domain ``Finding`` as JSON."""
+
     __tablename__ = "findings"
     __table_args__ = (Index("ix_findings_fingerprint", "fingerprint"),)
 
@@ -187,6 +203,8 @@ class Finding(Base):
 
 
 class FindingEvent(Base):
+    """History of a finding: status changes, fixes generated and applied."""
+
     __tablename__ = "finding_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -202,6 +220,8 @@ class FindingEvent(Base):
 
 
 class AnalysisRunRow(Base):
+    """One static-analysis tool run of a review."""
+
     __tablename__ = "analysis_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -214,6 +234,8 @@ class AnalysisRunRow(Base):
 
 
 class FixAttempt(Base):
+    """A generated fix: patch, edits, checks, and the file hashes it was made against."""
+
     __tablename__ = "fix_attempts"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -236,6 +258,8 @@ class FixAttempt(Base):
 
 
 class Job(Base):
+    """A queued unit of work for the worker (review, publish or fix), with a lease."""
+
     __tablename__ = "jobs"
     __table_args__ = (Index("ix_jobs_claim", "status", "run_after"),)
 
