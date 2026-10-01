@@ -293,7 +293,7 @@ def test_summary_headline_stats_and_sections() -> None:
     assert s.attention[0].startswith("[HIGH] SQL injection")
     assert any("Rejected 1" in v for v in s.verified)
     assert any("maybe" in u for u in s.uncertain)
-    assert "Not run (not installed): bandit" in s.uncertain
+    assert any(line.startswith("Not run: bandit") for line in s.uncertain)
     assert "Analyzer errors: ruff" in s.uncertain
     assert "context truncated" in s.uncertain
     assert s.stats.by_verification == {"supported": 1, "likely": 1, "rejected": 1}

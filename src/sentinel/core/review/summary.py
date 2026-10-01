@@ -164,10 +164,14 @@ def _what_is_uncertain(
         for f in surfaced
         if _status(f) in NOT_CERTAIN
     ]
-    unavailable = sorted(r.tool for r in runs if r.status == ToolStatus.UNAVAILABLE)
+    unavailable = sorted(
+        (f"{r.tool} ({r.detail})" if r.detail else r.tool)
+        for r in runs
+        if r.status == ToolStatus.UNAVAILABLE
+    )
     failed = sorted(r.tool for r in runs if r.status in TOOL_PROBLEMS)
     if unavailable:
-        lines.append(f"Not run (not installed): {', '.join(unavailable)}")
+        lines.append(f"Not run: {', '.join(unavailable)}")
     if failed:
         lines.append(f"Analyzer errors: {', '.join(failed)}")
     return lines + limitations
