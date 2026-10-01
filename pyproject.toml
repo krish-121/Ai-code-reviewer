@@ -60,6 +60,7 @@ branch = true
 omit = ["src/sentinel/apps/api/static/*"]
 
 [tool.coverage.report]
+fail_under = 80
 show_missing = true
 skip_covered = true
 exclude_also = [

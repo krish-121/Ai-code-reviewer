@@ -1,0 +1,15 @@
+# Image that proposed fixes are tested in (sentinel/sandbox/runners.py::DockerSandbox).
+#
+#   docker build -f Dockerfile.sandbox -t sentinel-sandbox .
+#
+# It holds language runtimes and test runners only: no Sentinel code and no credentials.
+# Every container started from it has no network, a read-only root filesystem, a 256 MB
+# writable /tmp, capped memory/CPU/PIDs, all Linux capabilities dropped, and runs as the
+# calling user. Because there is no network, a project's test dependencies must already be
+# in the image: extend it (FROM sentinel-sandbox) with your requirements for real projects.
+FROM python:3.11-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends nodejs npm \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --no-cache-dir "pytest>=8"
+WORKDIR /workspace

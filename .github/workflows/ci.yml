@@ -1,0 +1,86 @@
+# Every push and pull request runs every quality gate (spec §53). Nothing merges red.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python — lint, types, tests, coverage
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: sentinel
+          POSTGRES_DB: sentinel_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sentinel"
+          --health-interval 5s
+          --health-retries 10
+    env:
+      # Store, queue, API and end-to-end tests also run against PostgreSQL.
+      SENTINEL_TEST_DATABASE_URL: postgresql://sentinel:sentinel@localhost:5432/sentinel_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: |
+          pip install -e ".[dev,postgres,analyzers]"
+          npm install -g typescript@5 eslint@9 @typescript-eslint/parser@8
+      - name: Build the fix sandbox image (enables the Docker sandbox tests)
+        run: docker build -f Dockerfile.sandbox -t sentinel-sandbox:latest .
+      - name: Ruff
+        run: |
+          ruff check src tests scripts
+          ruff format --check src tests scripts
+      - name: mypy (strict)
+        run: mypy
+      - name: Tests with coverage (≥80% overall)
+        run: pytest --cov=sentinel --cov-report=term --cov-report=xml --cov-fail-under=80
+      - name: Core coverage (≥90%)
+        run: coverage report --include="*/sentinel/core/*" --fail-under=90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+
+  web:
+    name: Web UI — lint, tests, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
+      - name: Typecheck + Prettier
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t sentinel .
+      - run: docker build -f Dockerfile.sandbox -t sentinel-sandbox .

@@ -1,0 +1,47 @@
+# Local deployment: PostgreSQL + API (with the web UI) + one background worker.
+#
+#   cp .env.example .env      # add an AI provider key and, optionally, GitHub App settings
+#   docker compose up --build
+#   docker compose exec api sentinel users create you   # prints your API token
+#
+# The API listens on 127.0.0.1:8000 only. Fix *tests* need the sandbox, which the
+# containerized worker cannot start (see docs/DEPLOYMENT.md): fixes generated here are
+# checked statically and reported as "unverified" unless you run a worker on the host.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: sentinel
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      SENTINEL_DATABASE_URL: postgresql://sentinel:${POSTGRES_PASSWORD:-change-me}@postgres:5432/sentinel
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: ["sentinel", "worker"]
+    env_file: .env
+    environment:
+      SENTINEL_DATABASE_URL: postgresql://sentinel:${POSTGRES_PASSWORD:-change-me}@postgres:5432/sentinel
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
