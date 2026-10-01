@@ -14,10 +14,11 @@ from typing import Protocol, runtime_checkable
 
 from sentinel.core.domain.ai import AIFixResult, AIReviewResult, FixRequest, ReviewRequest
 from sentinel.core.domain.code import FileSymbols
+from sentinel.core.domain.errors import SentinelError
 from sentinel.core.domain.models import AnalysisRun, Finding, Language, StageName, StageRecord
 
 
-class AIError(Exception):
+class AIError(SentinelError):
     """Base class for provider failures the orchestrator knows how to degrade from."""
 
 
@@ -31,58 +32,84 @@ class AIResponseError(AIError):
 
 @runtime_checkable
 class AIProvider(Protocol):
+    """Anything that can review a change and propose a fix (Claude, Gemini, Ollama, test fakes)."""
+
     name: str
     model: str
 
-    def review(self, request: ReviewRequest) -> AIReviewResult: ...
+    def review(self, request: ReviewRequest) -> AIReviewResult:
+        """Review a change and return validated findings."""
 
-    def generate_fix(self, request: FixRequest) -> AIFixResult: ...
+    def generate_fix(self, request: FixRequest) -> AIFixResult:
+        """Propose search/replace edits that fix one finding."""
 
 
 @runtime_checkable
 class LanguageAnalyzer(Protocol):
+    """Extracts symbols, imports and calls from one source file."""
+
     language: Language
     extensions: tuple[str, ...]
 
-    def analyze(self, path: str, source: str) -> FileSymbols: ...
+    def analyze(self, path: str, source: str) -> FileSymbols:
+        """Parse ``source`` and return what it defines and uses."""
 
 
 @dataclass
 class StaticAnalysisOutput:
+    """What one static analyzer produced: its run record and its findings."""
+
     run: AnalysisRun
     findings: list[Finding] = field(default_factory=list)
 
 
 @runtime_checkable
 class StaticAnalyzer(Protocol):
+    """A deterministic tool such as Ruff, mypy, Bandit or ESLint."""
+
     name: str
     languages: frozenset[Language]
 
-    def is_available(self) -> bool: ...
+    def is_available(self) -> bool:
+        """True when the tool can run on this machine."""
 
-    def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput: ...
+    def run(self, workspace: Path, files: list[str]) -> StaticAnalysisOutput:
+        """Analyze ``files`` inside ``workspace`` and return normalized findings."""
 
 
 class Cache(Protocol):
-    """Content-addressed cache. Keys must be derived from content hashes, so an entry
-    can never be stale: changed code produces a different key."""
+    """Content-addressed cache.
 
-    def get(self, namespace: str, key: str) -> str | None: ...
+    Keys must be derived from content hashes, so an entry can never be stale: changed
+    code produces a different key.
+    """
 
-    def set(self, namespace: str, key: str, value: str) -> None: ...
+    def get(self, namespace: str, key: str) -> str | None:
+        """Cached value for ``key`` in ``namespace``, or None."""
+
+    def set(self, namespace: str, key: str, value: str) -> None:
+        """Store ``value`` under ``key`` in ``namespace``."""
 
 
 class ProgressReporter(Protocol):
-    def stage_changed(self, stage: StageRecord) -> None: ...
+    """Receives stage updates while a review runs (DB writer, terminal spinner ...)."""
+
+    def stage_changed(self, stage: StageRecord) -> None:
+        """Called every time a stage starts, finishes, fails or is skipped."""
 
 
 class NullProgress:
+    """Progress reporter that ignores every update."""
+
     def stage_changed(self, stage: StageRecord) -> None:
-        return None
+        """Ignore the update."""
+        return
 
 
 @dataclass
 class SandboxResult:
+    """Outcome of running one command inside a sandbox."""
+
     command: list[str]
     exit_code: int
     stdout: str
@@ -93,15 +120,20 @@ class SandboxResult:
 
     @property
     def ok(self) -> bool:
+        """True when the command exited 0 within its time limit."""
         return self.exit_code == 0 and not self.timed_out
 
 
 class SandboxRunner(Protocol):
+    """Runs commands in an isolated copy of a repository (Docker or a restricted process)."""
+
     isolation: str
 
-    def is_available(self) -> bool: ...
+    def is_available(self) -> bool:
+        """True when this kind of sandbox can be used here."""
 
-    def run(self, workspace: Path, command: list[str], timeout_s: int = 120) -> SandboxResult: ...
+    def run(self, workspace: Path, command: list[str], timeout_s: int = 120) -> SandboxResult:
+        """Run ``command`` in ``workspace`` and capture its output."""
 
 
 __all__ = [

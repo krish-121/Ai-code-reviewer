@@ -11,6 +11,7 @@ from __future__ import annotations
 import posixpath
 import re
 
+from sentinel.core.domain.errors import SentinelError
 from sentinel.core.domain.models import (
     ChangeSet,
     ChangeType,
@@ -39,7 +40,7 @@ EXTENSION_LANGUAGE: dict[str, Language] = {
 }
 
 
-class DiffParseError(ValueError):
+class DiffParseError(SentinelError, ValueError):
     pass
 
 

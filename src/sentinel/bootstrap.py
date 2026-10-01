@@ -97,7 +97,7 @@ def _ts_syntax(registry: LanguageRegistry) -> SyntaxChecker:
         if not path.endswith((".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts")):
             return None
         fs = registry.analyze({path: content}).get(path)
-        if fs is not None and fs.parse_error and "regex fallback" not in fs.parse_error:
+        if fs is not None and fs.failed_to_parse:
             return f"{path}: {fs.parse_error}"
         return None
 

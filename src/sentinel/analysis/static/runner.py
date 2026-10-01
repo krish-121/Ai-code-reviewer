@@ -12,7 +12,7 @@ from sentinel.analysis.diff.parser import detect_language
 from sentinel.analysis.static.builtin_security import BuiltinAnalyzer
 from sentinel.analysis.static.js_tools import ESLintAnalyzer, TscAnalyzer
 from sentinel.analysis.static.python_tools import BanditAnalyzer, MypyAnalyzer, RuffAnalyzer
-from sentinel.core.domain.models import AnalysisRun, Finding
+from sentinel.core.domain.models import AnalysisRun, Finding, ToolStatus
 from sentinel.core.domain.ports import StaticAnalysisOutput, StaticAnalyzer
 
 
@@ -30,7 +30,7 @@ class StaticAnalysisRunner:
     def run(self, workspace: Path, files: list[str]) -> tuple[list[Finding], list[AnalysisRun]]:
         jobs: list[tuple[StaticAnalyzer, list[str]]] = []
         runs: list[AnalysisRun] = [
-            AnalysisRun(tool=name, status="skipped", detail="disabled in .sentinel.yml")
+            AnalysisRun(tool=name, status=ToolStatus.SKIPPED, detail="disabled in .sentinel.yml")
             for name in self.disabled
         ]
         for analyzer in self.analyzers:
@@ -59,7 +59,7 @@ class StaticAnalysisRunner:
             return StaticAnalysisOutput(
                 AnalysisRun(
                     tool=analyzer.name,
-                    status="failed",
+                    status=ToolStatus.FAILED,
                     duration_ms=int((time.monotonic() - start) * 1000),
                     detail=f"{type(exc).__name__}: {exc}"[:300],
                 )

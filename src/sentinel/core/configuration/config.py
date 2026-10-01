@@ -19,10 +19,11 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator
 
+from sentinel.core.domain.errors import SentinelError
 from sentinel.core.domain.models import Category, Language, Severity
 
 
-class ConfigError(ValueError):
+class ConfigError(SentinelError, ValueError):
     pass
 
 

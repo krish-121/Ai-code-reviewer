@@ -25,7 +25,8 @@ from pydantic import BaseModel, Field
 
 from sentinel.core.configuration.config import RepoConfig
 from sentinel.core.domain.ai import FileEdit, FixRequest
-from sentinel.core.domain.models import AnalysisRun, Finding, Severity
+from sentinel.core.domain.errors import SentinelError
+from sentinel.core.domain.models import AnalysisRun, Finding, Severity, ToolStatus
 from sentinel.core.domain.ports import AIError, AIProvider, SandboxResult
 from sentinel.core.fixes.patch import PatchError, apply_edits, sha256, unified_diff
 from sentinel.core.fixes.scratch import scratch_copy
@@ -278,7 +279,7 @@ class FixEngine:
         new = Counter(key(f) for f in after if f.severity in serious) - Counter(
             key(f) for f in before if f.severity in serious
         )
-        tools = ", ".join(sorted(r.tool for r in runs if r.status == "ok")) or "none"
+        tools = ", ".join(sorted(r.tool for r in runs if r.status == ToolStatus.OK)) or "none"
         if new:
             listed = "; ".join(f"{k[1]} {k[2]} ({k[0]})" for k in list(new)[:5])
             return FixCheck(
@@ -333,7 +334,7 @@ class FixEngine:
         )
 
 
-class ApplyError(Exception):
+class ApplyError(SentinelError):
     pass
 
 

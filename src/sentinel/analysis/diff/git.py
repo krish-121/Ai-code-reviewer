@@ -12,6 +12,7 @@ from sentinel.analysis.diff.parser import (
     parse_unified_diff,
     whole_file_change,
 )
+from sentinel.core.domain.errors import SentinelError
 from sentinel.core.domain.models import ChangeSet, Language, SkippedFile
 
 DIFF_ARGS = ["diff", "-M", "--no-color", "--no-ext-diff", "--unified=3"]
@@ -32,7 +33,7 @@ WALK_EXCLUDE = {
 MAX_WHOLE_FILE_BYTES = 400_000
 
 
-class GitError(RuntimeError):
+class GitError(SentinelError, RuntimeError):
     pass
 
 

@@ -18,19 +18,25 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class Severity(StrEnum):
+    """How bad a finding is if it is real (independent of how sure we are)."""
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
     @property
     def rank(self) -> int:
+        """Numeric order used for sorting and comparisons (HIGH=3 ... LOW=1)."""
         return {Severity.HIGH: 3, Severity.MEDIUM: 2, Severity.LOW: 1}[self]
 
     def at_least(self, other: Severity) -> bool:
+        """True when this severity is the same as or worse than ``other``."""
         return self.rank >= other.rank
 
 
 class Category(StrEnum):
+    """What kind of problem a finding describes (spec §12)."""
+
     BUG = "bug"
     SECURITY = "security"
     PERFORMANCE = "performance"
@@ -56,6 +62,8 @@ class FindingSource(StrEnum):
 
 
 class FindingStatus(StrEnum):
+    """What the user decided about a finding."""
+
     OPEN = "open"
     ACCEPTED = "accepted"
     DISMISSED = "dismissed"
@@ -63,6 +71,8 @@ class FindingStatus(StrEnum):
 
 
 class VerificationStatus(StrEnum):
+    """The verifier's verdict on a finding (spec §14)."""
+
     SUPPORTED = "supported"
     LIKELY = "likely"
     UNCERTAIN = "uncertain"
@@ -70,6 +80,8 @@ class VerificationStatus(StrEnum):
 
 
 class ChangeType(StrEnum):
+    """How a file changed in the diff."""
+
     ADDED = "added"
     MODIFIED = "modified"
     DELETED = "deleted"
@@ -77,6 +89,8 @@ class ChangeType(StrEnum):
 
 
 class Language(StrEnum):
+    """Languages Sentinel understands; everything else is OTHER."""
+
     PYTHON = "python"
     TYPESCRIPT = "typescript"
     JAVASCRIPT = "javascript"
@@ -84,12 +98,16 @@ class Language(StrEnum):
 
 
 class LineKind(StrEnum):
+    """Whether a diff line was added, removed or is unchanged context."""
+
     ADDED = "added"
     REMOVED = "removed"
     CONTEXT = "context"
 
 
 class RiskLevel(StrEnum):
+    """Overall risk of a change, shown in the review summary."""
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -97,6 +115,8 @@ class RiskLevel(StrEnum):
 
 
 class ReviewStatus(StrEnum):
+    """Lifecycle of a review job. PARTIAL means some stages failed."""
+
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -105,6 +125,8 @@ class ReviewStatus(StrEnum):
 
 
 class StageName(StrEnum):
+    """The pipeline stages, in the order the orchestrator runs them."""
+
     PARSE_DIFF = "parse_diff"
     FILTER_FILES = "filter_files"
     BUILD_GRAPH = "build_graph"
@@ -128,6 +150,8 @@ STAGE_LABELS: dict[StageName, str] = {
 
 
 class StageStatus(StrEnum):
+    """Progress state of one pipeline stage."""
+
     PENDING = "pending"
     RUNNING = "running"
     DONE = "done"
@@ -136,10 +160,12 @@ class StageStatus(StrEnum):
 
 
 def new_id(prefix: str) -> str:
+    """Return a short random id such as ``F-1a2b3c4d5e`` (prefix + 10 hex chars)."""
     return f"{prefix}-{uuid.uuid4().hex[:10]}"
 
 
 def utcnow() -> datetime:
+    """Timezone-aware current time in UTC (one place, so tests can reason about it)."""
     return datetime.now(UTC)
 
 
@@ -151,6 +177,8 @@ class _Model(BaseModel):
 
 
 class DiffLine(_Model):
+    """One line inside a diff hunk, with its line number on each side."""
+
     kind: LineKind
     content: str
     old_lineno: int | None = None
@@ -158,6 +186,8 @@ class DiffLine(_Model):
 
 
 class Hunk(_Model):
+    """A contiguous block of changes (one ``@@ ... @@`` section of a unified diff)."""
+
     old_start: int
     old_count: int
     new_start: int
@@ -167,10 +197,13 @@ class Hunk(_Model):
 
     @property
     def new_end(self) -> int:
+        """Last line number this hunk covers in the new file."""
         return self.new_start + max(self.new_count, 1) - 1
 
 
 class FileChange(_Model):
+    """Everything the diff says about one file."""
+
     path: str
     old_path: str | None = None
     change_type: ChangeType
@@ -180,13 +213,16 @@ class FileChange(_Model):
 
     @property
     def additions(self) -> int:
+        """Number of added lines."""
         return sum(1 for h in self.hunks for ln in h.lines if ln.kind is LineKind.ADDED)
 
     @property
     def deletions(self) -> int:
+        """Number of removed lines."""
         return sum(1 for h in self.hunks for ln in h.lines if ln.kind is LineKind.REMOVED)
 
     def added_lines(self) -> set[int]:
+        """Line numbers (in the new file) of every added line."""
         return {
             ln.new_lineno
             for h in self.hunks
@@ -204,6 +240,7 @@ class FileChange(_Model):
         return any(lo <= n <= hi for n in self.added_lines())
 
     def distance_to_change(self, line: int) -> int | None:
+        """Lines between ``line`` and the nearest added line (None if nothing was added)."""
         added = self.added_lines()
         if not added:
             return None
@@ -221,11 +258,15 @@ def _to_ranges(nums: Iterable[int]) -> list[tuple[int, int]]:
 
 
 class SkippedFile(_Model):
+    """A file left out of the review, and why (binary, generated, sensitive ...)."""
+
     path: str
     reason: str
 
 
 class ChangeSet(_Model):
+    """The parsed diff under review: changed files plus the ones that were skipped."""
+
     source: str = "diff"
     base_ref: str | None = None
     head_ref: str | None = None
@@ -234,6 +275,7 @@ class ChangeSet(_Model):
     skipped: list[SkippedFile] = Field(default_factory=list)
 
     def get(self, path: str) -> FileChange | None:
+        """The change for ``path``, or None if that file is not in the diff."""
         for f in self.files:
             if f.path == path:
                 return f
@@ -241,13 +283,16 @@ class ChangeSet(_Model):
 
     @property
     def lines_added(self) -> int:
+        """Added lines across all files."""
         return sum(f.additions for f in self.files)
 
     @property
     def lines_removed(self) -> int:
+        """Removed lines across all files."""
         return sum(f.deletions for f in self.files)
 
     def reviewable(self) -> Iterator[FileChange]:
+        """Files that still exist after the change (deleted files cannot be reviewed)."""
         return (f for f in self.files if f.change_type is not ChangeType.DELETED)
 
 
@@ -255,6 +300,8 @@ class ChangeSet(_Model):
 
 
 class Evidence(_Model):
+    """One piece of support for a finding: a quote, a tool message or a verifier note."""
+
     source: str = Field(description="Who produced this evidence: ai, ruff, verifier, graph ...")
     text: str
     file: str | None = None
@@ -262,6 +309,8 @@ class Evidence(_Model):
 
 
 class CheckOutcome(StrEnum):
+    """Result of one verification check."""
+
     SUPPORTS = "supports"
     CONTRADICTS = "contradicts"
     NEUTRAL = "neutral"
@@ -269,6 +318,8 @@ class CheckOutcome(StrEnum):
 
 
 class VerificationCheck(_Model):
+    """One deterministic check the verifier ran on a finding, and what it found."""
+
     name: str
     outcome: CheckOutcome
     detail: str
@@ -280,6 +331,8 @@ class VerificationCheck(_Model):
 
 
 class VerificationResult(_Model):
+    """The verifier's overall verdict on a finding, with every check it ran."""
+
     status: VerificationStatus
     score: float = Field(ge=-1.0, le=1.0)
     checks: list[VerificationCheck] = Field(default_factory=list)
@@ -291,6 +344,8 @@ class VerificationResult(_Model):
 
 
 class PriorityScore(_Model):
+    """Why a finding is ranked where it is: the factors that were multiplied together."""
+
     score: float
     severity_weight: float
     confidence: float
@@ -300,6 +355,8 @@ class PriorityScore(_Model):
 
 
 class Finding(_Model):
+    """A single review finding — the central object of the whole system (spec §13)."""
+
     id: str = Field(default_factory=lambda: new_id("F"))
     category: Category
     severity: Severity
@@ -328,6 +385,7 @@ class Finding(_Model):
 
     @property
     def location(self) -> str:
+        """``file:line`` or ``file:start-end`` for display."""
         if self.line_end != self.line_start:
             return f"{self.file}:{self.line_start}-{self.line_end}"
         return f"{self.file}:{self.line_start}"
@@ -341,7 +399,23 @@ class Finding(_Model):
 # --------------------------------------------------------------------------- analysis runs
 
 
+class ToolStatus(StrEnum):
+    """Outcome of one static-analysis tool run (stored as plain text on ``AnalysisRun``)."""
+
+    OK = "ok"
+    UNAVAILABLE = "unavailable"
+    FAILED = "failed"
+    TIMEOUT = "timeout"
+    SKIPPED = "skipped"
+
+
+# Tool outcomes that mean "the tool should have run but did not finish properly".
+TOOL_PROBLEMS = frozenset({ToolStatus.FAILED, ToolStatus.TIMEOUT})
+
+
 class AnalysisRun(_Model):
+    """Record of one static-analysis tool run (for the UI and for debugging)."""
+
     tool: str
     status: str = Field(description="ok | unavailable | failed | timeout | skipped")
     duration_ms: int = 0
@@ -350,6 +424,8 @@ class AnalysisRun(_Model):
 
 
 class StageRecord(_Model):
+    """Timing and status of one pipeline stage; streamed to the UI as progress."""
+
     name: StageName
     status: StageStatus = StageStatus.PENDING
     started_at: datetime | None = None
@@ -359,10 +435,13 @@ class StageRecord(_Model):
 
     @property
     def label(self) -> str:
+        """Human-readable stage name, e.g. 'Building code graph'."""
         return STAGE_LABELS[self.name]
 
 
 class TokenUsage(_Model):
+    """Tokens sent to and received from the AI provider."""
+
     input_tokens: int = 0
     output_tokens: int = 0
 
@@ -377,6 +456,8 @@ class TokenUsage(_Model):
 
 
 class ReviewStats(_Model):
+    """Counts shown in the review summary."""
+
     files_changed: int = 0
     files_reviewed: int = 0
     files_skipped: int = 0
@@ -389,6 +470,8 @@ class ReviewStats(_Model):
 
 
 class ReviewSummary(_Model):
+    """The short written summary at the top of a review (spec §18)."""
+
     risk: RiskLevel = RiskLevel.NONE
     headline: str = ""
     stats: ReviewStats = Field(default_factory=ReviewStats)
@@ -399,6 +482,8 @@ class ReviewSummary(_Model):
 
 
 class ReviewResult(_Model):
+    """Everything a finished review produced. Saved to the database as-is."""
+
     review_id: str = Field(default_factory=lambda: new_id("R"))
     status: ReviewStatus = ReviewStatus.COMPLETED
     changeset: ChangeSet
@@ -423,9 +508,11 @@ class ReviewResult(_Model):
     duration_ms: int = 0
 
     def all_findings(self) -> list[Finding]:
+        """Surfaced and suppressed findings together."""
         return [*self.findings, *self.suppressed]
 
     def find(self, finding_id: str) -> Finding | None:
+        """Look a finding up by id, including ids that were merged into another finding."""
         for f in self.all_findings():
             if f.id == finding_id or finding_id in f.merged_ids:
                 return f

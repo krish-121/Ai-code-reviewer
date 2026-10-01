@@ -46,7 +46,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = ["fixtures", "cases", ".*", "node_modules", "__pycache__"]
-addopts = "-q --strict-markers"
+addopts = "--strict-markers"
 markers = [
   "postgres: requires SENTINEL_TEST_DATABASE_URL pointing at PostgreSQL",
   "docker: requires a running Docker daemon and the sandbox image",
@@ -76,7 +76,12 @@ src = ["src", "tests"]
 extend-exclude = ["demo", "tests/golden/cases", "web"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "PT", "C4", "PIE", "RET"]
+select = [
+  "E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "PT", "C4", "PIE", "RET",
+  "C90",  # cyclomatic complexity (max below)
+  "N",    # pep8 naming
+  "D",    # docstrings on public code (Google style)
+]
 ignore = [
   "S101",   # assert is fine in tests
   "S603",   # subprocess without shell=True is the safe form; inputs are controlled
@@ -86,10 +91,22 @@ ignore = [
   "PT018",  # compound asserts read fine
   "SIM905", # word lists read better as split strings
   "B008",   # FastAPI Depends() in defaults is idiomatic
+  "D105",   # magic methods (__str__, __len__ ...) are self-explanatory
+  "D107",   # __init__ is documented on the class (Google style)
 ]
 
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pep8-naming]
+# ast.NodeVisitor dispatches on method names such as visit_FunctionDef.
+extend-ignore-names = ["visit_*"]
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106", "S108", "S311", "S608", "E501"]
+"tests/**" = ["S105", "S106", "S108", "S311", "S608", "E501", "D101", "D102", "D103", "D104"]
 "src/sentinel/analysis/static/builtin_security.py" = ["S105"]
 "src/sentinel/analysis/diff/secrets.py" = ["S105"]
 "src/sentinel/apps/cli/main.py" = ["E501"]  # typer Annotated signatures

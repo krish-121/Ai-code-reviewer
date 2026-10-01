@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sentinel.bootstrap import build_fix_engine
 from sentinel.core.configuration.config import Settings, load_repo_config
+from sentinel.core.domain.errors import SentinelError
 from sentinel.core.domain.models import FindingStatus, utcnow
 from sentinel.core.fixes.engine import FixEngine, FixOutcome, apply_fix
 from sentinel.infrastructure.database.models import Finding as FindingRow
@@ -18,6 +19,10 @@ from sentinel.infrastructure.database.store import Store
 from sentinel.services.reviews import GitHubFactory, GitHubRequest
 
 EngineFactory = Callable[[Path, bool], FixEngine]
+
+
+class FixNotApplicableError(SentinelError, RuntimeError):
+    """The fix cannot be written to disk here (e.g. the review was of a GitHub PR)."""
 
 
 class FixService:
@@ -113,7 +118,7 @@ class FixService:
             review = s.get_one(Review, row.review_id)
             local_path = review.repository.local_path
             if review.request.get("kind") == "github" or not local_path:
-                raise RuntimeError(
+                raise FixNotApplicableError(
                     "fixes for GitHub pull requests are applied by pushing the patch; "
                     "download it instead"
                 )

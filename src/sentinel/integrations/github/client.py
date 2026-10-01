@@ -18,11 +18,13 @@ from typing import Any, Protocol
 import httpx
 import jwt
 
+from sentinel.core.domain.errors import SentinelError
+
 API_VERSION = "2022-11-28"
 MIN_PERMISSIONS = {"contents": "read", "pull_requests": "write", "issues": "write"}
 
 
-class GitHubError(Exception):
+class GitHubError(SentinelError):
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status

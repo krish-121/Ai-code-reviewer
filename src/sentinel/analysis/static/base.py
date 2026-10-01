@@ -21,6 +21,7 @@ from sentinel.core.domain.models import (
     Finding,
     FindingSource,
     Severity,
+    ToolStatus,
 )
 
 SAFE_ENV_KEYS = (
@@ -90,8 +91,8 @@ def run_record(
     tool: str, result: ToolResult | None, findings: int, detail: str = ""
 ) -> AnalysisRun:
     if result is None:
-        return AnalysisRun(tool=tool, status="unavailable", detail=detail)
-    status = "timeout" if result.timed_out else "ok"
+        return AnalysisRun(tool=tool, status=ToolStatus.UNAVAILABLE, detail=detail)
+    status = ToolStatus.TIMEOUT if result.timed_out else ToolStatus.OK
     return AnalysisRun(
         tool=tool, status=status, duration_ms=result.duration_ms, findings=findings, detail=detail
     )

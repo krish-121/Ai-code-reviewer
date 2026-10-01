@@ -21,13 +21,20 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from sentinel.core.domain.code import CallSite, FileSymbols, ImportRef, Symbol, SymbolKind
+from sentinel.core.domain.code import (
+    REGEX_FALLBACK_NOTE,
+    CallSite,
+    FileSymbols,
+    ImportRef,
+    Symbol,
+    SymbolKind,
+)
 from sentinel.core.domain.models import Language
 
 EXTRACTOR = Path(__file__).with_name("ts_extract.js")
 TS_EXTENSIONS = (".ts", ".tsx", ".mts", ".cts")
 JS_EXTENSIONS = (".js", ".jsx", ".mjs", ".cjs")
-FALLBACK_NOTE = "regex fallback (TypeScript compiler unavailable)"
+FALLBACK_NOTE = f"{REGEX_FALLBACK_NOTE} (TypeScript compiler unavailable)"
 
 
 @lru_cache(maxsize=8)

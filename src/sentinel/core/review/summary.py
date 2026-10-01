@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 
 from sentinel.core.domain.models import (
+    TOOL_PROBLEMS,
     AnalysisRun,
     ChangeSet,
     ChangeType,
@@ -13,6 +14,7 @@ from sentinel.core.domain.models import (
     ReviewSummary,
     RiskLevel,
     Severity,
+    ToolStatus,
     VerificationStatus,
 )
 
@@ -110,8 +112,8 @@ def build_summary(
         for f in surfaced
         if _status(f) in (VerificationStatus.UNCERTAIN, VerificationStatus.LIKELY)
     ]
-    unavailable = sorted(r.tool for r in runs if r.status == "unavailable")
-    failed = sorted(r.tool for r in runs if r.status in ("failed", "timeout"))
+    unavailable = sorted(r.tool for r in runs if r.status == ToolStatus.UNAVAILABLE)
+    failed = sorted(r.tool for r in runs if r.status in TOOL_PROBLEMS)
     if unavailable:
         uncertain.append(f"Not run (not installed): {', '.join(unavailable)}")
     if failed:

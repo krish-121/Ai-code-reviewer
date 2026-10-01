@@ -13,8 +13,13 @@ from pydantic import BaseModel, Field
 
 from sentinel.core.domain.models import Language
 
+# Marks a FileSymbols produced by the regex fallback instead of a real parser.
+REGEX_FALLBACK_NOTE = "regex fallback"
+
 
 class SymbolKind(StrEnum):
+    """Kinds of symbols an analyzer can report."""
+
     MODULE = "module"
     CLASS = "class"
     FUNCTION = "function"
@@ -24,6 +29,8 @@ class SymbolKind(StrEnum):
 
 
 class Symbol(BaseModel):
+    """A class, function, method, variable or test defined in a file."""
+
     name: str
     qualified_name: str = Field(description="Dotted path within the file, e.g. 'UserRepo.find'")
     kind: SymbolKind
@@ -38,6 +45,8 @@ class Symbol(BaseModel):
 
 
 class ImportRef(BaseModel):
+    """One import statement."""
+
     module: str = Field(description="Module specifier as written: 'app.db', './db', 'react'")
     names: list[str] = Field(default_factory=list, description="Imported names ('*' for all)")
     aliases: dict[str, str] = Field(default_factory=dict, description="local alias -> name")
@@ -46,6 +55,8 @@ class ImportRef(BaseModel):
 
 
 class CallSite(BaseModel):
+    """One call expression, recorded with its enclosing symbol."""
+
     caller: str = Field(description="Qualified name of the calling symbol or '<module>'")
     callee: str = Field(description="Callee expression as written, e.g. 'self.repo.find'")
     line: int
@@ -54,6 +65,8 @@ class CallSite(BaseModel):
 
 
 class EndpointRef(BaseModel):
+    """An HTTP route declared in the file (FastAPI/Flask decorator, Express call ...)."""
+
     method: str
     route: str
     handler: str
@@ -61,6 +74,8 @@ class EndpointRef(BaseModel):
 
 
 class DbOperation(BaseModel):
+    """A database read or write found in a function."""
+
     function: str
     operation: str = Field(description="read | write | unknown")
     line: int
@@ -69,6 +84,8 @@ class DbOperation(BaseModel):
 
 
 class FileSymbols(BaseModel):
+    """Everything a language analyzer extracted from one file."""
+
     path: str
     language: Language
     module_name: str = ""
@@ -80,6 +97,16 @@ class FileSymbols(BaseModel):
     is_test_file: bool = False
     parse_error: str | None = None
     loc: int = 0
+
+    @property
+    def used_regex_fallback(self) -> bool:
+        """True when the file was read with the regex fallback (less structure, no error)."""
+        return bool(self.parse_error and REGEX_FALLBACK_NOTE in self.parse_error)
+
+    @property
+    def failed_to_parse(self) -> bool:
+        """True when the file could not be parsed at all."""
+        return bool(self.parse_error) and not self.used_regex_fallback
 
     def symbol_at(self, line: int) -> Symbol | None:
         """Innermost function/method/class whose span contains ``line``."""

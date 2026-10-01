@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 
 
 class NodeKind(StrEnum):
+    """What a graph node represents."""
+
     FILE = "file"
     MODULE = "module"
     CLASS = "class"
@@ -28,6 +30,8 @@ class NodeKind(StrEnum):
 
 
 class EdgeKind(StrEnum):
+    """How two graph nodes are related."""
+
     IMPORTS = "imports"
     CALLS = "calls"
     DEFINES = "defines"
@@ -43,6 +47,8 @@ CODE_KINDS = frozenset({NodeKind.FUNCTION, NodeKind.METHOD, NodeKind.TEST, NodeK
 
 
 class GraphNode(BaseModel):
+    """A file, symbol, endpoint or data store in the code graph."""
+
     id: str
     kind: NodeKind
     name: str
@@ -52,6 +58,7 @@ class GraphNode(BaseModel):
     meta: dict[str, str] = Field(default_factory=dict)
 
     def contains(self, file: str, line: int) -> bool:
+        """True when ``file:line`` falls inside this node's source span."""
         return (
             self.file == file
             and self.line_start is not None
@@ -61,6 +68,8 @@ class GraphNode(BaseModel):
 
 
 class GraphEdge(BaseModel):
+    """A directed relationship, e.g. ``search() --calls--> search_products()``."""
+
     source: str
     target: str
     kind: EdgeKind
@@ -68,10 +77,17 @@ class GraphEdge(BaseModel):
 
 
 def node_id(kind: NodeKind, file: str | None, name: str) -> str:
+    """Build the stable id used for a node, e.g. ``function:app/db.py::search``."""
     return f"{kind.value}:{file or ''}::{name}"
 
 
 class CodeGraph:
+    """Directed graph of code relationships with the queries the reviewer needs.
+
+    Built by ``sentinel.analysis.graph.builder``; queried by the context engine and the verifier.
+    Edges are indexed in both directions so 'who calls X' is as cheap as 'what does X call'.
+    """
+
     def __init__(self) -> None:
         self._nodes: dict[str, GraphNode] = {}
         self._out: dict[str, list[GraphEdge]] = {}
@@ -80,6 +96,7 @@ class CodeGraph:
 
     # ------------------------------------------------------------------ building
     def add_node(self, node: GraphNode) -> GraphNode:
+        """Add a node, or return the existing node with the same id."""
         existing = self._nodes.get(node.id)
         if existing is not None:
             return existing
@@ -89,6 +106,7 @@ class CodeGraph:
         return node
 
     def add_edge(self, source: str, target: str, kind: EdgeKind, line: int | None = None) -> None:
+        """Add an edge between two known nodes. Self-loops and duplicates are ignored."""
         if source not in self._nodes or target not in self._nodes or source == target:
             return
         key = (source, target, kind)
@@ -108,33 +126,42 @@ class CodeGraph:
 
     @property
     def nodes(self) -> list[GraphNode]:
+        """All nodes, in insertion order."""
         return list(self._nodes.values())
 
     @property
     def edges(self) -> list[GraphEdge]:
+        """All edges."""
         return [e for edges in self._out.values() for e in edges]
 
     def node(self, node_id: str) -> GraphNode | None:
+        """The node with this id, or None."""
         return self._nodes.get(node_id)
 
     def out_edges(self, node_id: str, kinds: Iterable[EdgeKind] | None = None) -> list[GraphEdge]:
+        """Edges leaving ``node_id``, optionally only of the given kinds."""
         allowed = set(kinds) if kinds is not None else None
         return [e for e in self._out.get(node_id, []) if allowed is None or e.kind in allowed]
 
     def in_edges(self, node_id: str, kinds: Iterable[EdgeKind] | None = None) -> list[GraphEdge]:
+        """Edges arriving at ``node_id``, optionally only of the given kinds."""
         allowed = set(kinds) if kinds is not None else None
         return [e for e in self._in.get(node_id, []) if allowed is None or e.kind in allowed]
 
     def callers(self, node_id: str) -> list[GraphNode]:
+        """Nodes that call ``node_id``."""
         return [self._nodes[e.source] for e in self.in_edges(node_id, [EdgeKind.CALLS])]
 
     def callees(self, node_id: str) -> list[GraphNode]:
+        """Nodes that ``node_id`` calls."""
         return [self._nodes[e.target] for e in self.out_edges(node_id, [EdgeKind.CALLS])]
 
     def nodes_in_file(self, path: str) -> list[GraphNode]:
+        """Every node defined in ``path``."""
         return [n for n in self._nodes.values() if n.file == path]
 
     def find_by_name(self, name: str) -> list[GraphNode]:
+        """Code nodes whose name (or last dotted part) matches ``name``."""
         short = name.split(".")[-1].rstrip("()")
         return [
             n
@@ -152,6 +179,7 @@ class CodeGraph:
         return min(candidates, key=lambda n: (n.line_end or 0) - (n.line_start or 0))
 
     def is_entrypoint(self, node: GraphNode) -> bool:
+        """True for endpoints, tests, exported symbols and names such as ``main``."""
         if node.kind in (NodeKind.ENDPOINT, NodeKind.TEST):
             return True
         if node.meta.get("entrypoint") == "true" or node.meta.get("exported") == "true":
@@ -238,6 +266,7 @@ class CodeGraph:
         return list(found.values())
 
     def neighborhood(self, node_ids: Iterable[str], depth: int = 1) -> set[str]:
+        """Ids within ``depth`` hops of ``node_ids`` (ignoring DEFINES edges)."""
         keep = {n for n in node_ids if n in self._nodes}
         frontier = set(keep)
         for _ in range(depth):
@@ -255,6 +284,7 @@ class CodeGraph:
         return keep
 
     def subgraph(self, node_ids: Iterable[str]) -> CodeGraph:
+        """A new graph containing only ``node_ids`` and the edges between them."""
         keep = set(node_ids)
         sub = CodeGraph()
         for nid in keep:
@@ -268,6 +298,7 @@ class CodeGraph:
 
     # ------------------------------------------------------------------ serialization
     def to_dict(self) -> dict[str, object]:
+        """JSON-ready form, stored with the review for the architecture view."""
         return {
             "nodes": [n.model_dump(mode="json") for n in self._nodes.values()],
             "edges": [e.model_dump(mode="json") for e in self.edges],
@@ -275,6 +306,7 @@ class CodeGraph:
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> CodeGraph:
+        """Rebuild a graph from ``to_dict`` output."""
         graph = cls()
         nodes = data.get("nodes", [])
         edges = data.get("edges", [])

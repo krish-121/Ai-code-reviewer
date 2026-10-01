@@ -19,7 +19,14 @@ from sentinel.analysis.ast.python_analyzer import DB_EXEC_METHODS, expr_name
 from sentinel.analysis.ast.registry import LanguageRegistry
 from sentinel.analysis.static.base import static_finding
 from sentinel.core.domain.code import FileSymbols
-from sentinel.core.domain.models import AnalysisRun, Category, Finding, Language, Severity
+from sentinel.core.domain.models import (
+    AnalysisRun,
+    Category,
+    Finding,
+    Language,
+    Severity,
+    ToolStatus,
+)
 from sentinel.core.domain.ports import StaticAnalysisOutput
 
 TOOL = "sentinel"
@@ -663,7 +670,7 @@ class BuiltinAnalyzer:
                 findings.extend(symbols_db_in_loop(fs))
         run = AnalysisRun(
             tool=self.name,
-            status="ok",
+            status=ToolStatus.OK,
             findings=len(findings),
             duration_ms=int((time.monotonic() - start) * 1000),
         )

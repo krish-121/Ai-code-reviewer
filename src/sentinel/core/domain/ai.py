@@ -18,6 +18,8 @@ class _Strict(BaseModel):
 
 
 class AIFinding(_Strict):
+    """One finding exactly as the model must return it."""
+
     category: Category
     severity: Severity
     confidence: float = Field(ge=0.0, le=1.0)
@@ -36,16 +38,22 @@ class AIFinding(_Strict):
 
 
 class AIReviewPayload(_Strict):
+    """The complete JSON object the model returns for a review."""
+
     findings: list[AIFinding] = Field(default_factory=list, max_length=50)
 
 
 class FileEdit(_Strict):
+    """A search/replace edit the model proposes for a fix."""
+
     file: str = Field(min_length=1)
     search: str = Field(description="Exact existing text to replace (must occur exactly once)")
     replace: str
 
 
 class AIFixPayload(_Strict):
+    """The complete JSON object the model returns for a fix."""
+
     summary: str = Field(min_length=1, max_length=2000)
     edits: list[FileEdit] = Field(min_length=1, max_length=10)
 
@@ -66,6 +74,8 @@ class ContextBlock(BaseModel):
 
 
 class StaticHint(BaseModel):
+    """A static-analysis result passed to the model as a hint."""
+
     tool: str
     rule: str | None = None
     file: str
@@ -74,6 +84,8 @@ class StaticHint(BaseModel):
 
 
 class ReviewRequest(BaseModel):
+    """Everything a provider needs to review a change. Built by the orchestrator."""
+
     review_id: str
     repository: str
     title: str | None = None
@@ -87,6 +99,8 @@ class ReviewRequest(BaseModel):
 
 
 class FixRequest(BaseModel):
+    """Everything a provider needs to propose a fix for one finding."""
+
     finding_title: str
     finding_explanation: str
     category: Category
@@ -101,6 +115,8 @@ class FixRequest(BaseModel):
 
 
 class AIReviewResult(BaseModel):
+    """A validated review payload plus usage and provider metadata."""
+
     payload: AIReviewPayload
     usage: TokenUsage = Field(default_factory=TokenUsage)
     model: str
@@ -110,6 +126,8 @@ class AIReviewResult(BaseModel):
 
 
 class AIFixResult(BaseModel):
+    """A validated fix payload plus usage and provider metadata."""
+
     payload: AIFixPayload
     usage: TokenUsage = Field(default_factory=TokenUsage)
     model: str

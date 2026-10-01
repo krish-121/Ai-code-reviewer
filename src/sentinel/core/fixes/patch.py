@@ -7,9 +7,10 @@ import hashlib
 import posixpath
 
 from sentinel.core.domain.ai import FileEdit
+from sentinel.core.domain.errors import SentinelError
 
 
-class PatchError(ValueError):
+class PatchError(SentinelError, ValueError):
     pass
 
 
