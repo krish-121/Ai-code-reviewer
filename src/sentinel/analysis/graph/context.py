@@ -64,7 +64,7 @@ class ContextEngine:
         max_callers: int = 4,
         max_callees: int = 6,
         max_tests: int = 3,
-        max_graph_nodes: int = 80,
+        max_graph_nodes: int = 48,
     ) -> None:
         self.graph = graph
         self.sources = sources
@@ -387,23 +387,31 @@ class ContextEngine:
 
     # ------------------------------------------------------------------ UI graph
     def ui_subgraph(self, changed_ids: set[str]) -> CodeGraph:
+        """The changed symbols, their direct neighbours and the paths that reach them."""
         focus = {nid for nid in changed_ids if (n := self.graph.node(nid)) and n.kind in CODE_KINDS}
+        flow = [EdgeKind.CALLS, EdgeKind.ROUTES, EdgeKind.READS, EdgeKind.WRITES, EdgeKind.TESTS]
+        paths: set[str] = set()
+        for nid in focus:
+            for n in self.graph.path_from_entrypoint(nid) or []:
+                paths.add(n.id)
+        neighbours: set[str] = set()
+        for nid in focus:
+            neighbours.update(e.target for e in self.graph.out_edges(nid, flow))
+            neighbours.update(e.source for e in self.graph.in_edges(nid, flow))
         keep: list[str] = list(focus)
-        ring1 = self.graph.neighborhood(focus, depth=1) - focus
-        for nid in changed_ids:
-            path = self.graph.path_from_entrypoint(nid)
-            for n in path or []:
-                if n.id not in focus:
-                    ring1.add(n.id)
-        ring2 = self.graph.neighborhood(ring1 | focus, depth=1) - ring1 - focus
-        for ring in (ring1, ring2):
-            for nid in sorted(ring, key=lambda i: _rank(self.graph.node(i))):
+        for group in (paths, neighbours):
+            for nid in sorted(group - set(keep), key=lambda i: _rank(self.graph.node(i))):
                 node = self.graph.node(nid)
-                if node is None or node.kind is NodeKind.FILE:
+                if node is None or node.kind in (NodeKind.FILE, NodeKind.MODULE):
                     continue
                 if len(keep) >= self.max_graph_nodes:
                     break
                 keep.append(nid)
+        # Endpoints that route to anything kept, so every entry point is visible.
+        for nid in list(keep):
+            for e in self.graph.in_edges(nid, [EdgeKind.ROUTES]):
+                if e.source not in keep:
+                    keep.append(e.source)
         sub = self.graph.subgraph(keep)
         for nid in focus:
             n = sub.node(nid)

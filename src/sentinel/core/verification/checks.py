@@ -150,7 +150,7 @@ class SymbolEvidenceCheck:
             name=self.name,
             outcome=CheckOutcome.CONTRADICTS,
             weight=1.5 if ratio >= 0.5 else 0.75,
-            decisive=ratio == 1.0 and len(missing) >= 2,
+            decisive=len(missing) >= 2,
             detail=f"evidence mentions {shown}, which do not exist in the repository",
         )
 
