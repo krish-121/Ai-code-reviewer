@@ -1,9 +1,12 @@
 import { useEffect } from "react";
 
-import { api } from "../lib/api";
+import { api, ApiError, hasSavedToken } from "../lib/api";
 import { navigate, usePath, useQuery, useTheme, type Theme } from "../lib/hooks";
 import { ReviewPage } from "../pages/ReviewPage";
 import { ReviewsPage } from "../pages/ReviewsPage";
+import { SignIn } from "./SignIn";
+
+const UNAUTHORIZED = 401;
 
 function Logo() {
   return (
@@ -24,6 +27,8 @@ export function App() {
   const path = usePath();
   const [theme, setTheme] = useTheme();
   const health = useQuery("health", api.health);
+  const me = useQuery("me", api.me);
+  const needsSignIn = me.error instanceof ApiError && me.error.status === UNAUTHORIZED;
 
   const reviewMatch = /^\/reviews\/([^/]+)(?:\/findings\/([^/]+))?/.exec(path);
   useEffect(() => {
@@ -83,7 +88,9 @@ export function App() {
         </div>
       </header>
       <main className="main">
-        {reviewMatch ? (
+        {needsSignIn ? (
+          <SignIn invalid={hasSavedToken()} />
+        ) : reviewMatch ? (
           <ReviewPage reviewId={reviewMatch[1] ?? ""} findingId={reviewMatch[2] ?? null} />
         ) : (
           <ReviewsPage />

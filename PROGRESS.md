@@ -117,7 +117,8 @@ Full write-ups go in `docs/DESIGN_DECISIONS.md` (step 7). Short version:
   Token mode issues per-user bearer tokens; every query is scoped by user.
 - Local repositories can only be reviewed from directories listed in `SENTINEL_LOCAL_ROOTS`
   (defaults to the home directory).
-- At most 15 findings per review are shown by default (`max_findings` in `.sentinel.yml`);
+- At most 10 findings per review are shown by default (`review.max_findings` in `.sentinel.yml`;
+  the demo repository raises it to 15);
   lower-priority ones are kept as "suppressed", not deleted.
 - The demo seeding script writes to `.demo/` in the repo (git-ignored). The weaker process
   sandbox is opt-in only (`--allow-process-sandbox`).

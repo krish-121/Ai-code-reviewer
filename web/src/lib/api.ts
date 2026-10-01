@@ -14,6 +14,7 @@ import type {
   Stage,
   ReviewStatus,
 } from "./types";
+import { parseServerSentEvents, type ServerSentEvent } from "./sse";
 
 export class ApiError extends Error {
   constructor(
@@ -24,18 +25,39 @@ export class ApiError extends Error {
   }
 }
 
+const TOKEN_KEY = "sentinel.token";
+
+/** The API token saved by the sign-in form (token auth mode only). */
 function token(): string | null {
   try {
-    return window.localStorage.getItem("sentinel.token");
+    return window.localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json" };
+/** True when the browser holds an API token from an earlier sign-in. */
+export function hasSavedToken(): boolean {
+  return Boolean(token());
+}
+
+/** Remember (or, with null, forget) the API token for later requests. */
+export function saveToken(value: string | null): void {
+  try {
+    if (value) window.localStorage.setItem(TOKEN_KEY, value);
+    else window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* storage unavailable: the user signs in again next time */
+  }
+}
+
+function authHeaders(): Record<string, string> {
   const t = token();
-  if (t) headers["Authorization"] = `Bearer ${t}`;
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json", ...authHeaders() };
   if (method !== "GET") headers["X-Sentinel-Client"] = "web";
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const res = await fetch(path, {
@@ -66,6 +88,7 @@ export interface NewReview {
 
 export const api = {
   health: () => request<Health>("GET", "/api/health"),
+  me: () => request<{ id: string; name: string; is_admin: boolean }>("GET", "/api/me"),
   reviews: () => request<ReviewItem[]>("GET", "/api/reviews?limit=100"),
   review: (id: string) => request<ReviewDetail>("GET", `/api/reviews/${id}`),
   findings: (id: string) => request<Finding[]>("GET", `/api/reviews/${id}/findings`),
@@ -84,7 +107,6 @@ export const api = {
   fix: (id: string) => request<FixAttempt>("GET", `/api/fixes/${id}`),
   applyFix: (id: string) => request<{ applied: string[] }>("POST", `/api/fixes/${id}/apply`),
   rejectFix: (id: string) => request<{ status: string }>("POST", `/api/fixes/${id}/reject`),
-  patchUrl: (id: string) => `/api/fixes/${id}/patch`,
 };
 
 export interface ProgressEvent {
@@ -92,21 +114,43 @@ export interface ProgressEvent {
   stages: Stage[];
 }
 
-/** Subscribe to live pipeline progress (Server-Sent Events). Returns an unsubscribe fn. */
+/**
+ * Subscribe to live pipeline progress (Server-Sent Events read with fetch, so the
+ * Authorization header is sent). Returns an unsubscribe function.
+ */
 export function subscribeProgress(
   reviewId: string,
   onProgress: (e: ProgressEvent) => void,
   onDone: (status: ReviewStatus) => void,
 ): () => void {
-  const source = new EventSource(`/api/reviews/${reviewId}/events`);
-  source.addEventListener("progress", (ev) => {
-    onProgress(JSON.parse((ev as MessageEvent<string>).data) as ProgressEvent);
+  const controller = new AbortController();
+  const handle = (event: ServerSentEvent) => {
+    if (event.event === "progress") onProgress(JSON.parse(event.data) as ProgressEvent);
+    if (event.event === "done") onDone((JSON.parse(event.data) as { status: ReviewStatus }).status);
+  };
+  void readEvents(`/api/reviews/${reviewId}/events`, controller.signal, handle).catch(() => {
+    /* aborted or connection lost: the page falls back to its regular refresh */
   });
-  source.addEventListener("done", (ev) => {
-    const data = JSON.parse((ev as MessageEvent<string>).data) as { status: ReviewStatus };
-    source.close();
-    onDone(data.status);
+  return () => controller.abort();
+}
+
+async function readEvents(
+  path: string,
+  signal: AbortSignal,
+  onEvent: (event: ServerSentEvent) => void,
+): Promise<void> {
+  const res = await fetch(path, {
+    headers: { Accept: "text/event-stream", ...authHeaders() },
+    signal,
   });
-  source.onerror = () => source.close();
-  return () => source.close();
+  if (!res.ok || !res.body) return;
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    const parsed = parseServerSentEvents(buffer + value);
+    buffer = parsed.rest;
+    parsed.events.forEach(onEvent);
+  }
 }

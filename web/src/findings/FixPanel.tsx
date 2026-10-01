@@ -124,9 +124,12 @@ export function FixPanel({
               </button>
             ) : null}
             {data.patch ? (
-              <a className="btn" href={api.patchUrl(fixId)} download>
+              <button
+                className="btn"
+                onClick={() => downloadText(`${fixId}.patch`, data.patch ?? "")}
+              >
                 Download patch
-              </a>
+              </button>
             ) : null}
             {data.status !== "applied" && data.status !== "rejected" ? (
               <button
@@ -143,4 +146,14 @@ export function FixPanel({
       {error ? <ErrorNote error={error} /> : null}
     </section>
   );
+}
+
+/** Save text as a file in the browser (the patch is already loaded; no extra request). */
+function downloadText(filename: string, text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/x-diff" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }

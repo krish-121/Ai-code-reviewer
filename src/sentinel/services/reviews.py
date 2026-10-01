@@ -123,8 +123,15 @@ class ReviewService:
                 jobs.enqueue(s, jobs.REVIEW_JOB, {"review_id": review.id})
             return review.id
 
-    def create_github(self, event: PullRequestEvent) -> str:
-        """Create and queue a review for a pull-request event (called by the webhook)."""
+    def create_github(
+        self, event: PullRequestEvent, *, enqueue: bool = True, publish: bool = True
+    ) -> str:
+        """Create a review for a pull-request event.
+
+        The webhook queues it for a worker and publishes the results to the PR. The CLI
+        (``sentinel review --pr``) runs it itself and never posts anything
+        (``enqueue=False, publish=False``).
+        """
         with self.db.transaction() as s:
             store = Store(s)
             owner = store.installation_owner(event.installation_id)
@@ -148,20 +155,23 @@ class ReviewService:
                     "number": event.number,
                     "head_sha": event.head_sha,
                     "installation_id": event.installation_id,
+                    "publish": publish,
                 },
                 source=GITHUB_SOURCE,
                 title=f"#{event.number} {event.title}",
                 pull_request=pr,
             )
-            jobs.enqueue(s, jobs.REVIEW_JOB, {"review_id": review.id})
+            if enqueue:
+                jobs.enqueue(s, jobs.REVIEW_JOB, {"review_id": review.id})
             return review.id
 
     # ------------------------------------------------------------------ running
     def run(self, review_id: str, progress: ProgressReporter | None = None) -> ReviewResult:
         """Run a created review to the end and save the result.
 
-        GitHub reviews also queue a ``publish`` job. If anything raises, the review is
-        marked failed and the exception is re-raised (the worker then retries the job).
+        GitHub reviews also queue a ``publish`` job (unless created with ``publish=False``).
+        If anything raises, the review is marked failed and the exception is re-raised (the
+        worker then retries the job).
         """
         with self.db.transaction() as s:
             review = s.get_one(Review, review_id)
@@ -179,7 +189,7 @@ class ReviewService:
         with self.db.transaction() as s:
             review = s.get_one(Review, review_id)
             Store(s).save_result(review, result)
-            if request.get("kind") == GITHUB_KIND:
+            if request.get("kind") == GITHUB_KIND and request.get("publish", True):
                 jobs.enqueue(
                     s, jobs.PUBLISH_JOB, {"review_id": review_id}, max_attempts=PUBLISH_ATTEMPTS
                 )

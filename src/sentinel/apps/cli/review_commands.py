@@ -167,7 +167,7 @@ def _review_pull_request(
         draft=False,
     )
     service = ReviewService(db, settings, ai_factory=ai_factory_for(no_ai), github_factory=factory)
-    review_id = service.create_github(event)
+    review_id = service.create_github(event, enqueue=False, publish=False)
     with LiveProgress(console) as progress:
         return service.run(review_id, progress)
 

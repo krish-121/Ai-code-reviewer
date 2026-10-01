@@ -240,3 +240,24 @@ def test_webhook_edge_cases(tmp_path: Path) -> None:
         headers={"X-GitHub-Event": "pull_request", "X-Hub-Signature-256": sign(SECRET, junk)},
     )
     assert r.status_code == 400
+
+
+def test_cli_pull_request_reviews_are_never_queued_or_published(tmp_path: Path) -> None:
+    # Arrange
+    from sentinel.infrastructure.database.models import Review
+    from sentinel.infrastructure.queue import jobs
+    from sentinel.integrations.github.webhooks import parse_pull_request_event
+
+    settings = Settings(database_url=f"sqlite:///{tmp_path}/cli.db")
+    db = Database(settings.database_url)
+    db.create_all()
+    event = parse_pull_request_event("pull_request", pr_payload())
+    assert event is not None
+
+    # Act: what `sentinel review --pr` does before running the review itself
+    review_id = ReviewService(db, settings).create_github(event, enqueue=False, publish=False)
+
+    # Assert: no job a worker could pick up, and the review is marked "do not publish"
+    with db.transaction() as session:
+        assert jobs.pending(session) == 0
+        assert session.get_one(Review, review_id).request["publish"] is False
