@@ -164,7 +164,7 @@ def test_missing_api_key_message(env: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert bad.exit_code == 2 and "unknown provider" in bad.output
 
 
-def test_config_commands(env: Path) -> None:
+def test_config_set_masks_secrets_and_rejects_unknown_keys(env: Path) -> None:
     assert runner.invoke(app, ["config", "set", "provider", "gemini"]).exit_code == 0
     secret = runner.invoke(app, ["config", "set", "gemini_api_key", "g-123"])
     assert secret.exit_code == 0 and "g-123" not in secret.output
@@ -176,7 +176,7 @@ def test_config_commands(env: Path) -> None:
     assert "include_style" in (env / ".sentinel.yml").read_text()
 
 
-def test_misc_commands(env: Path) -> None:
+def test_version_graph_and_user_admin_commands(env: Path) -> None:
     assert "sentinel 0.1.0" in runner.invoke(app, ["--version"]).output
     graph = runner.invoke(app, ["graph", ".", "--symbol", "search_products"])
     assert graph.exit_code == 0 and "callers: search" in graph.output

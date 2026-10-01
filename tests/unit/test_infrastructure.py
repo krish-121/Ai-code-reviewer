@@ -192,7 +192,7 @@ def test_list_files_and_collect_sources(repo: Path, tmp_path: Path) -> None:
 # ----------------------------------------------------------------- caches
 
 
-def test_caches(tmp_path: Path) -> None:
+def test_memory_and_disk_caches_store_values_by_content_key(tmp_path: Path) -> None:
     key = content_key("a", "b")
     assert key == content_key("a", "b") != content_key("ab", "")
     mem = MemoryCache()

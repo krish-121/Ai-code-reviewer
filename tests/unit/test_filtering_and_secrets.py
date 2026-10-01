@@ -50,7 +50,7 @@ def test_env_templates_are_not_sensitive() -> None:
         ("generated/models.py", "ignored by .sentinel.yml"),
     ],
 )
-def test_skip_reasons(path: str, reason: str) -> None:
+def test_unreviewable_files_are_skipped_with_a_reason(path: str, reason: str) -> None:
     out = filter_changeset(_cs((path, "content\n")), ignore=["generated/"])
     assert out.changeset.files == []
     assert out.changeset.skipped[0].reason == reason
@@ -129,7 +129,7 @@ diff --git a/cfg.py b/cfg.py
         "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
     ],
 )
-def test_scanner_detects(line: str) -> None:
+def test_secret_scanner_detects_known_formats(line: str) -> None:
     assert scan_line(line, 1), line
 
 
@@ -163,7 +163,7 @@ def test_scan_text_skips_key_body() -> None:
     assert [m.rule.id for m in matches] == ["private-key"]
 
 
-def test_entropy() -> None:
+def test_shannon_entropy_values() -> None:
     assert shannon_entropy("") == 0.0
     assert shannon_entropy("aaaa") == 0.0
     assert shannon_entropy("abcd") == 2.0

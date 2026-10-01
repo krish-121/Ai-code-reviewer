@@ -72,7 +72,7 @@ def test_symbols_and_spans() -> None:
     assert by_qn["items"].line_start == 21
 
 
-def test_imports() -> None:
+def test_imports_record_modules_names_and_aliases() -> None:
     fs = analyze()
     imps = {(i.module, i.level): i for i in fs.imports}
     assert imps[("app.db", 0)].aliases == {"database": "app.db"}
@@ -92,7 +92,7 @@ def test_calls_loops_and_await() -> None:
     assert not calls[("<module>", "os.environ.get")].in_loop
 
 
-def test_endpoints() -> None:
+def test_route_decorators_become_endpoints() -> None:
     fs = analyze()
     eps = {(e.method, e.route): e.handler for e in fs.endpoints}
     assert eps == {

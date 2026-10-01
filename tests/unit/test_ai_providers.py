@@ -150,7 +150,7 @@ def test_ollama_response_and_wire_format() -> None:
     assert body["format"]["type"] == "object"
 
 
-def test_generate_fix() -> None:
+def test_generate_fix_uses_the_fix_tool() -> None:
     # The model may answer with a text block instead of the tool call; both are accepted.
     s = Script(ok(claude_body(FIX, as_text=True)))
     fix_req = FixRequest(
@@ -345,7 +345,7 @@ def test_schema_is_self_contained() -> None:
 # ----------------------------------------------------------------- factory
 
 
-def test_factory() -> None:
+def test_factory_builds_the_configured_provider() -> None:
     assert create_provider(Settings(provider="none")) is None
     with pytest.raises(AIConfigurationError, match="SENTINEL_CLAUDE_KEY"):
         create_provider(Settings(provider="claude"))

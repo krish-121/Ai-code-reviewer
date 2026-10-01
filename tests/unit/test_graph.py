@@ -70,7 +70,7 @@ def test_serialization_roundtrip() -> None:
         CodeGraph.from_dict({"nodes": "nope"})
 
 
-def test_graph_primitives() -> None:
+def test_graph_ignores_duplicate_nodes_and_edges() -> None:
     g = CodeGraph()
     a = g.add_node(
         GraphNode(id="a", kind=NodeKind.FUNCTION, name="a", file="x.py", line_start=1, line_end=5)

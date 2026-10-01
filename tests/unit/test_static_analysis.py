@@ -80,7 +80,7 @@ def checksum(blob):
     assert r["sentinel/weak-hash"] == [13]
 
 
-def test_async_rules() -> None:
+def test_async_rules_flag_blocking_calls_and_missing_awaits() -> None:
     src = """\
 import time, asyncio, requests
 async def notify(user):
@@ -104,7 +104,7 @@ class Svc:
     assert r["sentinel/missing-await"] == [7, 16]
 
 
-def test_performance_rules() -> None:
+def test_performance_rules_flag_n_plus_one_and_quadratic_loops() -> None:
     src = """\
 def orders(conn, ids):
     for i in ids:
@@ -167,7 +167,7 @@ def test_dynamic_sql_kind_helpers() -> None:
 # ----------------------------------------------------------------- builtin JS rules
 
 
-def test_js_rules() -> None:
+def test_js_rules_flag_injection_and_xss() -> None:
     src = """\
 // db.query(`SELECT ${x}`) in a comment is ignored
 await db.query(`SELECT * FROM users WHERE id = ${id}`);
@@ -200,7 +200,7 @@ def test_builtin_run_includes_js_db_in_loop(tmp_path: Path) -> None:
 # ----------------------------------------------------------------- tool output parsing
 
 
-def test_ruff_parse() -> None:
+def test_ruff_output_becomes_categorized_findings() -> None:
     out = json.dumps(
         [
             {
@@ -277,7 +277,7 @@ def test_mypy_parse_json_and_text() -> None:
     ]
 
 
-def test_bandit_parse() -> None:
+def test_bandit_output_becomes_findings_with_cwe_tags() -> None:
     data = {
         "results": [
             {
@@ -327,7 +327,7 @@ def test_eslint_parse_and_config() -> None:
     assert "@typescript-eslint" in _config_source(Path("/x/@typescript-eslint/parser"))
 
 
-def test_tsc_parse() -> None:
+def test_tsc_diagnostics_become_findings() -> None:
     out = (
         "src/a.ts(3,7): error TS2304: Cannot find name 'foo'.\n"
         "src/b.ts(1,1): error TS2345: Argument of type 'string' is not assignable.\n"
@@ -435,7 +435,7 @@ def test_default_analyzers_names() -> None:
     assert names == ["sentinel", "ruff", "mypy", "bandit", "eslint", "tsc"]
 
 
-def test_base_helpers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tool_environment_is_scrubbed_and_paths_are_relative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SENTINEL_CLAUDE_KEY", "secret")
     assert "SENTINEL_CLAUDE_KEY" not in scrubbed_env()
     assert relpath("/repo/a/b.py", Path("/repo")) == "a/b.py"

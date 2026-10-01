@@ -70,7 +70,7 @@ def _result() -> ReviewResult:
     )
 
 
-def test_normalize_url() -> None:
+def test_database_urls_use_the_psycopg_driver() -> None:
     assert normalize_url("postgres://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
     assert normalize_url("postgresql://h/db") == "postgresql+psycopg://h/db"
     assert normalize_url("sqlite:///x.db") == "sqlite:///x.db"

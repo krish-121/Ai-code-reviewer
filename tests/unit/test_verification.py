@@ -106,7 +106,7 @@ def outcome(check: VerificationCheck | None) -> str | None:
 # ----------------------------------------------------------------- generic checks
 
 
-def test_location_check() -> None:
+def test_location_check_rejects_missing_files_and_lines() -> None:
     c = ctx()
     assert outcome(LocationCheck().check(finding(), c)) == "supports"
     missing = LocationCheck().check(finding(file="nope.py"), c)
@@ -120,7 +120,7 @@ def test_location_check() -> None:
     assert outcome(LocationCheck().check(finding(file="gone.py"), ctx(deleted))) == "neutral"
 
 
-def test_change_relevance() -> None:
+def test_change_relevance_prefers_changed_lines() -> None:
     c = ctx()
     assert outcome(ChangeRelevanceCheck().check(finding(), c)) == "supports"
     assert outcome(ChangeRelevanceCheck().check(finding(line_start=8, line_end=8), c)) == "neutral"
@@ -129,7 +129,7 @@ def test_change_relevance() -> None:
     )
 
 
-def test_symbol_evidence() -> None:
+def test_symbol_evidence_rejects_hallucinated_symbols() -> None:
     c = ctx()
     ok = finding(explanation="`find_user()` uses `connect`")
     assert outcome(SymbolEvidenceCheck().check(ok, c)) == "supports"
@@ -142,7 +142,7 @@ def test_symbol_evidence() -> None:
     assert SymbolEvidenceCheck().check(finding(explanation="plain words only"), c) is None
 
 
-def test_call_path_check() -> None:
+def test_call_path_check_compares_claims_with_the_graph() -> None:
     c = ctx()
     real = finding(evidence=[Evidence(source="ai", text="login() calls authenticate()")])
     assert outcome(CallPathCheck().check(real, c)) == "supports"
@@ -159,7 +159,7 @@ def test_call_path_check() -> None:
     assert CallPathCheck().check(unknown, c) is None
 
 
-def test_reachability() -> None:
+def test_reachability_from_entry_points() -> None:
     c = ctx()
     label, path = reachability(finding(), c)
     assert label == "entrypoint" and path[0] == "POST /login"
@@ -172,7 +172,7 @@ def test_reachability() -> None:
     assert ReachabilityCheck().check(module_level, c) is None
 
 
-def test_static_corroboration() -> None:
+def test_static_corroboration_requires_matching_tags() -> None:
     static = finding(
         source=FindingSource.STATIC_ANALYZER,
         origins=["ruff:S608"],
@@ -193,7 +193,7 @@ def test_static_corroboration() -> None:
     assert StaticCorroborationCheck().check(finding(title="N+1 query in loop"), c) is None
 
 
-def test_test_claim_check() -> None:
+def test_missing_test_claims_are_checked_against_the_graph() -> None:
     c = ctx()
     claim = finding(category=Category.TESTS, title="find_user has no tests")
     assert outcome(TestClaimCheck().check(claim, c)) == "supports"
@@ -214,7 +214,7 @@ def test_test_claim_check() -> None:
     assert TestClaimCheck().check(finding(title="SQL injection"), c) is None
 
 
-def test_style_only_check() -> None:
+def test_style_remarks_filed_as_bugs_are_rejected() -> None:
     c = ctx()
     res = StyleOnlyCheck().check(finding(category=Category.BUG, title="Rename variable cur"), c)
     assert res is not None and res.decisive
@@ -226,7 +226,7 @@ def test_style_only_check() -> None:
     assert StyleOnlyCheck().check(finding(title="SQL injection, also naming"), c) is None
 
 
-def test_enclosing_label() -> None:
+def test_enclosing_label_names_functions_and_module_level() -> None:
     c = ctx()
     assert enclosing_label(c.graph.enclosing("app/db.py", 11)) == "find_user()"
     assert enclosing_label(None) == "module level"
@@ -308,7 +308,7 @@ def test_sql_probe_variants() -> None:
         ("const x = 1;", None),
     ],
 )
-def test_sql_probe_js(line: str, expected: str | None) -> None:
+def test_sql_probe_on_javascript_queries(line: str, expected: str | None) -> None:
     c = ctx(src__q_ts=f"export async function q(id) {{\n  {line}\n}}\n")
     res = SqlInjectionProbe().check(
         finding(title="SQL injection", file="src/q.ts", line_start=2, line_end=2), c
@@ -316,7 +316,7 @@ def test_sql_probe_js(line: str, expected: str | None) -> None:
     assert outcome(res) == expected
 
 
-def test_n_plus_one_probe() -> None:
+def test_n_plus_one_probe_requires_a_query_inside_a_loop() -> None:
     c = ctx()
     p = NPlusOneProbe()
     res = p.check(
@@ -330,7 +330,7 @@ def test_n_plus_one_probe() -> None:
     assert p.check(finding(title="SQL injection"), c) is None
 
 
-def test_async_probe() -> None:
+def test_async_probe_confirms_blocking_calls_and_missing_awaits() -> None:
     c = ctx(app__a_py=ASYNC_SRC)
     p = AsyncProbe()
     blocking = finding(
@@ -348,7 +348,7 @@ def test_async_probe() -> None:
     assert p.check(finding(title="missing await", file="src/x.ts"), c) is None
 
 
-def test_quadratic_probe() -> None:
+def test_quadratic_probe_requires_pairwise_nested_loops() -> None:
     c = ctx(app__a_py=ASYNC_SRC)
     p = QuadraticProbe()
     assert (
@@ -367,7 +367,7 @@ def test_quadratic_probe() -> None:
     )
 
 
-def test_secret_probe() -> None:
+def test_secret_probe_tells_literals_from_environment_reads() -> None:
     c = ctx(app__a_py=ASYNC_SRC)
     p = SecretProbe()
     assert (
@@ -385,7 +385,7 @@ def test_secret_probe() -> None:
     assert res is not None and res.decisive
 
 
-def test_error_handling_probe() -> None:
+def test_error_handling_probe_finds_silent_handlers() -> None:
     c = ctx(app__a_py=ASYNC_SRC)
     p = ErrorHandlingProbe()
     assert (
@@ -427,7 +427,7 @@ def open_panel(request):
 """
 
 
-def test_auth_probe() -> None:
+def test_auth_probe_checks_order_and_missing_authorization() -> None:
     c = ctx(app__admin_py=AUTH_SRC)
     p = AuthOrderProbe()
     before = finding(

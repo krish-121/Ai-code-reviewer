@@ -153,12 +153,12 @@ diff --git a/../../etc/passwd b/../../etc/passwd
 
 
 @pytest.mark.parametrize("bad", ["/etc/passwd", "../x", "a/../../x", "C:/win", "a\x00b", "."])
-def test_safe_path_rejects(bad: str) -> None:
+def test_safe_path_rejects_absolute_and_escaping_paths(bad: str) -> None:
     with pytest.raises(UnsafePathError):
         safe_path(bad)
 
 
-def test_safe_path_normalizes() -> None:
+def test_safe_path_normalizes_separators_and_dots() -> None:
     assert safe_path("a/./b//c.py") == "a/b/c.py"
     assert safe_path("a\\b.py") == "a/b.py"
 
@@ -171,7 +171,7 @@ def test_quoted_unicode_path() -> None:
     assert parse_unified_diff(text).files[0].path == "café.py"
 
 
-def test_language_detection() -> None:
+def test_language_is_detected_from_extension() -> None:
     assert detect_language("a/B.TSX") is Language.TYPESCRIPT
     assert detect_language("x.mjs") is Language.JAVASCRIPT
     assert detect_language("README.md") is Language.OTHER

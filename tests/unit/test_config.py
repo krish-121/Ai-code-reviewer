@@ -18,7 +18,7 @@ from sentinel.core.configuration.config import (
 from sentinel.core.domain.models import Category, Language, Severity
 
 
-def test_defaults() -> None:
+def test_default_repo_config_excludes_style() -> None:
     cfg = RepoConfig()
     assert Category.STYLE not in cfg.review.enabled_categories()
     assert cfg.severity_threshold is Severity.LOW

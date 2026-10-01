@@ -295,7 +295,7 @@ def _result(*findings: Finding) -> ReviewResult:
     )
 
 
-def test_render_comments() -> None:
+def test_rendered_comments_carry_markers_paths_and_links() -> None:
     body = finding_comment(_finding(), "https://sentinel/reviews/R-1")
     assert "SQL injection" in body and "<!-- sentinel:fp=fp1 -->" in body
     assert "`GET /search`" in body and "Suggested fix" in body

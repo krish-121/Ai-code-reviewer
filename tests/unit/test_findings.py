@@ -81,7 +81,7 @@ def verified(finding: Finding, status: VerificationStatus, reach: str = "entrypo
         ("pickle deserialization of user data", "deserialization"),
     ],
 )
-def test_derive_tags(text: str, tag: str) -> None:
+def test_tags_are_derived_from_finding_text(text: str, tag: str) -> None:
     assert tag in derive_tags(text)
 
 
@@ -252,7 +252,7 @@ def test_select_reasons() -> None:
 # ----------------------------------------------------------------- summary
 
 
-def test_risk_levels() -> None:
+def test_risk_needs_confirmed_findings_to_be_high() -> None:
     assert compute_risk([]) is RiskLevel.NONE
     assert compute_risk([verified(f(), VerificationStatus.SUPPORTED)]) is RiskLevel.HIGH
     assert compute_risk([verified(f(), VerificationStatus.UNCERTAIN)]) is RiskLevel.MEDIUM
@@ -264,7 +264,7 @@ def test_risk_levels() -> None:
     )
 
 
-def test_summary_sections() -> None:
+def test_summary_headline_stats_and_sections() -> None:
     surfaced = [
         verified(f(), VerificationStatus.SUPPORTED),
         verified(f(title="maybe", severity=Severity.MEDIUM), VerificationStatus.LIKELY),
