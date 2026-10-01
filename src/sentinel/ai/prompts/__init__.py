@@ -4,6 +4,10 @@ Repository content is *untrusted data*. It is wrapped in tags carrying a per-req
 random nonce, any attempt to close those tags from inside the content is neutralized,
 and the model is told explicitly never to follow instructions found there. As a final
 guard the whole prompt passes through the secret redactor before it leaves the process.
+
+Used by every provider (``ai/providers/base.py``): ``build_review_prompt`` for reviews,
+``build_fix_prompt`` for fixes, ``correction_message`` for the one retry after an
+invalid reply.
 """
 
 from __future__ import annotations
@@ -85,72 +89,59 @@ Respond with a single JSON object matching this JSON Schema and nothing else:
 
 INJECTION_TAG_RE = re.compile(r"</?\s*untrusted", re.I)
 ZWSP_LT = "<\u200b"  # breaks a tag without changing how the text reads
+NONCE_BYTES = 8
+CHARS_PER_TOKEN = 4  # rough estimate, good enough for budgeting and benchmarks
+MAX_ERROR_ECHO_CHARS = 1500
+COMPACT_JSON = (",", ":")
 
 
 @dataclass(frozen=True)
 class Prompt:
+    """A system prompt plus a user message, and the nonce used to fence repository data."""
+
     system: str
     user: str
     nonce: str
 
     @property
     def estimated_tokens(self) -> int:
-        return (len(self.system) + len(self.user)) // 4
+        """Approximate prompt size in tokens."""
+        return (len(self.system) + len(self.user)) // CHARS_PER_TOKEN
 
 
 def _neutralize(text: str) -> str:
+    """Break anything in repository text that looks like our fencing tags."""
     return INJECTION_TAG_RE.sub(lambda m: m.group(0).replace("<", ZWSP_LT), text)
 
 
 def _wrap(tag: str, nonce: str, body: str) -> str:
+    """Fence untrusted ``body`` in ``<untrusted_{tag} nonce=...>`` tags."""
     open_tag = f'<untrusted_{tag} nonce="{nonce}">'
     close_tag = f'</untrusted_{tag} nonce="{nonce}">'
     return f"{open_tag}\n{_neutralize(body)}\n{close_tag}"
 
 
 def build_review_prompt(request: ReviewRequest, nonce: str | None = None) -> Prompt:
-    nonce = nonce or secrets.token_hex(8)
-    categories = ", ".join(c.value for c in request.categories)
+    """The review prompt: rules + JSON schema (system), then the diff, context and hints."""
+    nonce = nonce or secrets.token_hex(NONCE_BYTES)
     system = SYSTEM_REVIEW.format(
-        categories=categories,
+        categories=", ".join(c.value for c in request.categories),
         max_findings=request.max_findings,
         nonce=nonce,
-        schema=json.dumps(REVIEW_SCHEMA, separators=(",", ":")),
-    )
-    guide = "\n".join(
-        f"- {c.value}: {CATEGORY_GUIDE[c]}" for c in request.categories if c in CATEGORY_GUIDE
-    )
-    context_parts: list[str] = []
-    for block in request.context:
-        header = f"### [{block.kind}] {block.file}:{block.line_start}-{block.line_end}"
-        if block.symbol:
-            header += f" `{block.symbol}`"
-        if block.reason:
-            header += f" — {block.reason}"
-        context_parts.append(f"{header}\n{block.code}")
-    static = "\n".join(
-        f"- {h.file}:{h.line} [{h.tool}{':' + h.rule if h.rule else ''}] {h.message}"
-        for h in request.static_findings
+        schema=json.dumps(REVIEW_SCHEMA, separators=COMPACT_JSON),
     )
     sections = [
-        "<review_request>",
-        f"repository: {request.repository}",
-        f"title: {request.title or '(none)'}",
-        f"changed files: {', '.join(request.changed_files)}",
-        f"languages: {', '.join(request.languages) or 'unknown'}",
-        "categories to review:",
-        guide,
-        "</review_request>",
+        *_request_header(request),
         "",
         "The change (unified diff, secrets redacted):",
         _wrap("diff", nonce, request.diff),
         "",
         "Surrounding code chosen by static analysis (numbered lines; `N | code`):",
-        _wrap("context", nonce, "\n\n".join(context_parts) or "(no additional context)"),
+        _wrap("context", nonce, _context_text(request) or "(no additional context)"),
         "",
         "Deterministic static-analysis results for the changed files (already verified; "
         "you may reference them, do not simply repeat them):",
-        static or "(none)",
+        _static_hints_text(request) or "(none)",
         "",
         "Return the JSON object now.",
     ]
@@ -158,9 +149,45 @@ def build_review_prompt(request: ReviewRequest, nonce: str | None = None) -> Pro
     return Prompt(system=system, user=user, nonce=nonce)
 
 
+def _request_header(request: ReviewRequest) -> list[str]:
+    """What is being reviewed, and the categories to look for."""
+    guide = [f"- {c.value}: {CATEGORY_GUIDE[c]}" for c in request.categories if c in CATEGORY_GUIDE]
+    return [
+        "<review_request>",
+        f"repository: {request.repository}",
+        f"title: {request.title or '(none)'}",
+        f"changed files: {', '.join(request.changed_files)}",
+        f"languages: {', '.join(request.languages) or 'unknown'}",
+        "categories to review:",
+        "\n".join(guide),
+        "</review_request>",
+    ]
+
+
+def _context_text(request: ReviewRequest) -> str:
+    """Each context block with a header saying what it is and why it was included."""
+    parts: list[str] = []
+    for block in request.context:
+        header = f"### [{block.kind}] {block.file}:{block.line_start}-{block.line_end}"
+        if block.symbol:
+            header += f" `{block.symbol}`"
+        if block.reason:
+            header += f" — {block.reason}"
+        parts.append(f"{header}\n{block.code}")
+    return "\n\n".join(parts)
+
+
+def _static_hints_text(request: ReviewRequest) -> str:
+    return "\n".join(
+        f"- {h.file}:{h.line} [{h.tool}{':' + h.rule if h.rule else ''}] {h.message}"
+        for h in request.static_findings
+    )
+
+
 def build_fix_prompt(request: FixRequest, nonce: str | None = None) -> Prompt:
-    nonce = nonce or secrets.token_hex(8)
-    system = SYSTEM_FIX.format(nonce=nonce, schema=json.dumps(FIX_SCHEMA, separators=(",", ":")))
+    """The fix prompt: the problem, the current file contents, and earlier failures."""
+    nonce = nonce or secrets.token_hex(NONCE_BYTES)
+    system = SYSTEM_FIX.format(nonce=nonce, schema=json.dumps(FIX_SCHEMA, separators=COMPACT_JSON))
     files = "\n\n".join(
         f"### {path}\n{_wrap('file', nonce, content)}" for path, content in request.files.items()
     )
@@ -188,9 +215,10 @@ def build_fix_prompt(request: FixRequest, nonce: str | None = None) -> Prompt:
 
 
 def correction_message(error: str) -> str:
+    """The follow-up message sent when a reply was not valid JSON for the schema."""
     return (
         "Your previous response could not be used: "
-        f"{error[:1500]}\n"
+        f"{error[:MAX_ERROR_ECHO_CHARS]}\n"
         "Respond again with ONLY a JSON object that matches the schema exactly "
         "(no markdown fences, no commentary, no extra keys)."
     )
