@@ -1,4 +1,9 @@
-"""Background worker: claims jobs from the database queue and runs them."""
+"""Background worker: claims jobs from the database queue and runs them.
+
+Started by ``sentinel worker`` (or inside ``sentinel serve``). Each job kind maps to one
+service call: ``review`` -> ``ReviewService.run``, ``publish`` -> ``ReviewService.publish``,
+``fix`` -> ``FixService.run``. A heartbeat thread keeps the job's lease alive while it runs.
+"""
 
 from __future__ import annotations
 
@@ -19,8 +24,15 @@ from sentinel.services.reviews import ReviewService
 
 log = logging.getLogger("sentinel.worker")
 
+DEFAULT_POLL_S = 1.0
+DEFAULT_LEASE_S = 300
+MIN_HEARTBEAT_S = 5.0
+HEARTBEATS_PER_LEASE = 3
+
 
 class Worker:
+    """Polls the queue and runs one job at a time."""
+
     def __init__(
         self,
         db: Database,
@@ -28,8 +40,8 @@ class Worker:
         fixes: FixService,
         *,
         worker_id: str | None = None,
-        poll_s: float = 1.0,
-        lease_s: int = 300,
+        poll_s: float = DEFAULT_POLL_S,
+        lease_s: int = DEFAULT_LEASE_S,
     ) -> None:
         self.db = db
         self.reviews = reviews
@@ -38,9 +50,9 @@ class Worker:
         self.poll_s = poll_s
         self.lease_s = lease_s
         self.handlers: dict[str, Callable[[Job], None]] = {
-            "review": self._review,
-            "publish": self._publish,
-            "fix": self._fix,
+            jobs.REVIEW_JOB: self._review,
+            jobs.PUBLISH_JOB: self._publish,
+            jobs.FIX_JOB: self._fix,
         }
 
     def _review(self, job: Job) -> None:
@@ -95,12 +107,14 @@ class Worker:
         return True
 
     def _heartbeat(self, job_id: str, stop: threading.Event) -> None:
-        interval = max(5.0, self.lease_s / 3)
+        """Extend the lease every third of its length until ``stop`` is set."""
+        interval = max(MIN_HEARTBEAT_S, self.lease_s / HEARTBEATS_PER_LEASE)
         while not stop.wait(interval):
             with self.db.session() as s:
                 jobs.heartbeat(s, job_id, self.worker_id, self.lease_s)
 
     def run_forever(self, stop: threading.Event | None = None) -> None:
+        """Process jobs until ``stop`` is set (or forever)."""
         stop = stop or threading.Event()
         log.info("worker started", extra={"worker": self.worker_id})
         while not stop.is_set():

@@ -33,7 +33,6 @@ from sentinel.infrastructure.queue import jobs
 
 router = APIRouter(prefix="/api", tags=["findings"])
 
-FIX_JOB = "fix"
 REJECTED = "rejected"
 
 
@@ -66,7 +65,7 @@ def request_fix(finding_id: str, session: SessionDep, user: UserDep) -> dict[str
     """Queue fix generation for a finding and return the fix id."""
     store = Store(session)
     fix = store.create_fix(finding_or_404(store, user, finding_id))
-    jobs.enqueue(session, FIX_JOB, {"fix_id": fix.id}, max_attempts=1)
+    jobs.enqueue(session, jobs.FIX_JOB, {"fix_id": fix.id}, max_attempts=1)
     return {"id": fix.id}
 
 

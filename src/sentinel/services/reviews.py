@@ -16,8 +16,9 @@ from pathlib import Path
 from typing import Any
 
 from sentinel.analysis.diff.parser import parse_unified_diff
-from sentinel.bootstrap import build_orchestrator
+from sentinel.bootstrap import FROM_SETTINGS, build_orchestrator
 from sentinel.core.configuration.config import Settings, load_repo_config
+from sentinel.core.domain.errors import SentinelError
 from sentinel.core.domain.models import ReviewResult, StageRecord, utcnow
 from sentinel.core.domain.ports import AIProvider, ProgressReporter
 from sentinel.infrastructure.database.models import Review, User
@@ -31,8 +32,18 @@ from sentinel.services.workspaces import LocalRequest, prepare_local
 
 log = logging.getLogger("sentinel.services")
 
+# Returns the provider to use: an AIProvider, None (no AI), or FROM_SETTINGS.
 AIFactory = Callable[[], AIProvider | None | str]
+# Returns a GitHub client for an App installation id (None: token auth).
 GitHubFactory = Callable[[int | None], GitHubClient]
+GITHUB_KIND = "github"
+GITHUB_SOURCE = "github_pr"
+LOCAL_USER = "local"
+PUBLISH_ATTEMPTS = 6
+
+
+class IntegrationNotConfiguredError(SentinelError, RuntimeError):
+    """The GitHub integration is needed but no token or App credentials are set."""
 
 
 class DBProgress:
@@ -45,6 +56,7 @@ class DBProgress:
         self.stages: dict[str, StageRecord] = {}
 
     def stage_changed(self, stage: StageRecord) -> None:
+        """Write the new stage list to the review row (and forward to ``also``)."""
         self.stages[stage.name.value] = stage.model_copy()
         with self.db.transaction() as s:
             review = s.get(Review, self.review_id)
@@ -56,6 +68,8 @@ class DBProgress:
 
 @dataclass
 class GitHubRequest:
+    """What a GitHub review needs to fetch its pull request (stored on the review row)."""
+
     repo: str
     number: int
     head_sha: str
@@ -63,6 +77,7 @@ class GitHubRequest:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> GitHubRequest:
+        """Read the request back from ``Review.request``."""
         return cls(
             repo=str(data["repo"]),
             number=int(data["number"]),
@@ -72,6 +87,8 @@ class GitHubRequest:
 
 
 class ReviewService:
+    """Create, run and publish reviews (the use cases behind CLI, API and worker)."""
+
     def __init__(
         self,
         db: Database,
@@ -83,17 +100,18 @@ class ReviewService:
     ) -> None:
         self.db = db
         self.settings = settings
-        self.ai_factory = ai_factory or (lambda: "auto")
+        self.ai_factory = ai_factory or (lambda: FROM_SETTINGS)
         self.github_factory = github_factory
         self.public_url = public_url.rstrip("/") if public_url else None
 
     # ------------------------------------------------------------------ creation
     def create_local(self, user_id: str, request: LocalRequest, *, enqueue: bool) -> str:
+        """Create a review of a local repository; queue it for the worker if ``enqueue``."""
         path = str(Path(request.path).expanduser().resolve())
         request = request.model_copy(update={"path": path})
         with self.db.transaction() as s:
             store = Store(s)
-            user = store.local_user() if user_id == "local" else s.get_one(User, user_id)
+            user = store.local_user() if user_id == LOCAL_USER else s.get_one(User, user_id)
             repo = store.repository(user, Path(path).name, kind="local", local_path=path)
             review = store.create_review(
                 repo,
@@ -102,15 +120,16 @@ class ReviewService:
                 title=_local_title(request),
             )
             if enqueue:
-                jobs.enqueue(s, "review", {"review_id": review.id})
+                jobs.enqueue(s, jobs.REVIEW_JOB, {"review_id": review.id})
             return review.id
 
     def create_github(self, event: PullRequestEvent) -> str:
+        """Create and queue a review for a pull-request event (called by the webhook)."""
         with self.db.transaction() as s:
             store = Store(s)
             owner = store.installation_owner(event.installation_id)
             repo = store.repository(
-                owner, event.repo, kind="github", installation_id=event.installation_id
+                owner, event.repo, kind=GITHUB_KIND, installation_id=event.installation_id
             )
             pr = store.pull_request(
                 repo,
@@ -124,27 +143,32 @@ class ReviewService:
             review = store.create_review(
                 repo,
                 request={
-                    "kind": "github",
+                    "kind": GITHUB_KIND,
                     "repo": event.repo,
                     "number": event.number,
                     "head_sha": event.head_sha,
                     "installation_id": event.installation_id,
                 },
-                source="github_pr",
+                source=GITHUB_SOURCE,
                 title=f"#{event.number} {event.title}",
                 pull_request=pr,
             )
-            jobs.enqueue(s, "review", {"review_id": review.id})
+            jobs.enqueue(s, jobs.REVIEW_JOB, {"review_id": review.id})
             return review.id
 
     # ------------------------------------------------------------------ running
     def run(self, review_id: str, progress: ProgressReporter | None = None) -> ReviewResult:
+        """Run a created review to the end and save the result.
+
+        GitHub reviews also queue a ``publish`` job. If anything raises, the review is
+        marked failed and the exception is re-raised (the worker then retries the job).
+        """
         with self.db.transaction() as s:
             review = s.get_one(Review, review_id)
             request = dict(review.request)
         reporter = DBProgress(self.db, review_id, progress)
         try:
-            if request.get("kind") == "github":
+            if request.get("kind") == GITHUB_KIND:
                 result = self._run_github(review_id, GitHubRequest.from_dict(request), reporter)
             else:
                 result = self._run_local(review_id, LocalRequest(**request), reporter)
@@ -155,12 +179,11 @@ class ReviewService:
         with self.db.transaction() as s:
             review = s.get_one(Review, review_id)
             Store(s).save_result(review, result)
-            if request.get("kind") == "github":
-                jobs.enqueue(s, "publish", {"review_id": review_id}, max_attempts=6)
+            if request.get("kind") == GITHUB_KIND:
+                jobs.enqueue(
+                    s, jobs.PUBLISH_JOB, {"review_id": review_id}, max_attempts=PUBLISH_ATTEMPTS
+                )
         return result
-
-    def _ai(self) -> AIProvider | None | str:
-        return self.ai_factory()
 
     def _run_local(
         self, review_id: str, request: LocalRequest, progress: ProgressReporter
@@ -168,7 +191,11 @@ class ReviewService:
         with prepare_local(request) as ws:
             config = load_repo_config(ws.workspace)
             orchestrator = build_orchestrator(
-                self.settings, config, workspace=ws.workspace, ai=self._ai(), progress=progress
+                self.settings,
+                config,
+                workspace=ws.workspace,
+                ai=self.ai_factory(),
+                progress=progress,
             )
             return orchestrator.review(
                 ws.changeset, ws.workspace, repository=ws.repository, review_id=review_id
@@ -177,13 +204,14 @@ class ReviewService:
     def _run_github(
         self, review_id: str, request: GitHubRequest, progress: ProgressReporter
     ) -> ReviewResult:
+        """Fetch the PR diff and a snapshot of its head commit, then review it as untrusted."""
         if self.github_factory is None:
-            raise RuntimeError("GitHub integration is not configured")
+            raise IntegrationNotConfiguredError("GitHub integration is not configured")
         client = self.github_factory(request.installation_id)
         pr = client.pull(request.repo, request.number)
         head_sha = request.head_sha or str((pr.get("head") or {}).get("sha", ""))
         changeset = parse_unified_diff(
-            client.pull_diff(request.repo, request.number), source="github_pr"
+            client.pull_diff(request.repo, request.number), source=GITHUB_SOURCE
         )
         changeset.title = f"#{request.number} {pr.get('title', '')}".strip()
         changeset.base_ref = (pr.get("base") or {}).get("sha")
@@ -196,7 +224,7 @@ class ReviewService:
                 self.settings,
                 config,
                 workspace=workspace,
-                ai=self._ai(),
+                ai=self.ai_factory(),
                 progress=progress,
                 trusted_workspace=False,
             )
@@ -208,8 +236,9 @@ class ReviewService:
 
     # ------------------------------------------------------------------ publishing
     def publish(self, review_id: str) -> PublishResult:
+        """Post (or update) the review's comments on its pull request."""
         if self.github_factory is None:
-            raise RuntimeError("GitHub integration is not configured")
+            raise IntegrationNotConfiguredError("GitHub integration is not configured")
         with self.db.transaction() as s:
             review = s.get_one(Review, review_id)
             request = GitHubRequest.from_dict(review.request)
@@ -234,6 +263,7 @@ class ReviewService:
 
 
 def _local_title(request: LocalRequest) -> str:
+    """Human-readable title such as 'Staged changes in shop'."""
     name = Path(request.path).name
     return {
         "staged": f"Staged changes in {name}",

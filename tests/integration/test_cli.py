@@ -143,7 +143,7 @@ def test_fix_command_with_scripted_provider(env: Path, monkeypatch: pytest.Monke
         kw["sandbox"] = None
         return real(settings, repo_config, **kw)
 
-    monkeypatch.setattr("sentinel.apps.cli.main.build_fix_engine", fake_engine)
+    monkeypatch.setattr("sentinel.apps.cli.fix_command.build_fix_engine", fake_engine)
     res = runner.invoke(app, ["fix", fid, "--apply", "--yes"])
     assert res.exit_code == 0, res.output
     assert "Patch validated" in res.output and "Applied to app/db.py" in res.output

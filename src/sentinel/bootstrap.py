@@ -28,13 +28,18 @@ from sentinel.integrations.github.client import (
 )
 from sentinel.sandbox.runners import DockerSandbox, ProcessSandbox
 
+# Pass as ``ai=`` / ``sandbox=`` to build the component from settings (the default).
+FROM_SETTINGS = "auto"
+
 
 def default_verifier() -> VerificationEngine:
+    """The verifier with every generic check and every deterministic probe."""
     verifiers: list[Verifier] = [*generic_checks(), *default_probes()]
     return VerificationEngine(verifiers)
 
 
 def make_cache(settings: Settings | None) -> Cache:
+    """A disk cache in ``settings.cache_dir``, or an in-memory one if that is unusable."""
     if settings is None:
         return MemoryCache()
     try:
@@ -49,13 +54,15 @@ def build_orchestrator(
     repo_config: RepoConfig,
     *,
     workspace: Path,
-    ai: AIProvider | None | str = "auto",
+    ai: AIProvider | None | str = FROM_SETTINGS,
     progress: ProgressReporter | None = None,
     cache: Cache | None = None,
     registry: LanguageRegistry | None = None,
     trusted_workspace: bool = True,
 ) -> ReviewOrchestrator:
-    """``ai="auto"`` creates the provider from settings; pass None to skip AI review.
+    """Build a ready-to-run review orchestrator.
+
+    ``ai=FROM_SETTINGS`` creates the provider from settings; pass None to skip AI review.
 
     ``trusted_workspace=False`` (pull requests from GitHub) guarantees that nothing
     shipped inside the reviewed repository is executed: no project-local linters, no
@@ -64,7 +71,7 @@ def build_orchestrator(
     cache = cache if cache is not None else make_cache(settings)
     roots = (workspace,) if trusted_workspace else ()
     registry = registry or default_registry(search_roots=roots, cache=cache)
-    provider = create_provider(settings, cache=cache) if ai == "auto" else ai
+    provider = create_provider(settings, cache=cache) if ai == FROM_SETTINGS else ai
     runner = StaticAnalysisRunner(
         default_analyzers(
             registry, timeout_s=repo_config.static.timeout_s, trust_workspace=trusted_workspace
@@ -109,11 +116,11 @@ def build_fix_engine(
     repo_config: RepoConfig,
     *,
     workspace: Path,
-    ai: AIProvider | None | str = "auto",
-    sandbox: Sandbox | None | str = "auto",
+    ai: AIProvider | None | str = FROM_SETTINGS,
+    sandbox: Sandbox | None | str = FROM_SETTINGS,
     trusted_workspace: bool = True,
 ) -> FixEngine:
-    provider = create_provider(settings) if ai == "auto" else ai
+    provider = create_provider(settings) if ai == FROM_SETTINGS else ai
     if provider is None or isinstance(provider, str):
         raise AIConfigurationError(
             "Generating fixes needs an AI provider. Configure one with `sentinel config set "
@@ -128,7 +135,7 @@ def build_fix_engine(
     return FixEngine(
         provider,
         static_runner=runner,
-        sandbox=build_sandbox(settings) if sandbox == "auto" else sandbox,  # type: ignore[arg-type]
+        sandbox=build_sandbox(settings) if sandbox == FROM_SETTINGS else sandbox,  # type: ignore[arg-type]
         config=repo_config,
         syntax_checkers=[python_syntax, _ts_syntax(registry)],
     )

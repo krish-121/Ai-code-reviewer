@@ -16,7 +16,12 @@ from sentinel.infrastructure.database.models import Finding as FindingRow
 from sentinel.infrastructure.database.models import FixAttempt, Review
 from sentinel.infrastructure.database.session import Database
 from sentinel.infrastructure.database.store import Store
-from sentinel.services.reviews import GitHubFactory, GitHubRequest
+from sentinel.services.reviews import (
+    GITHUB_KIND,
+    GitHubFactory,
+    GitHubRequest,
+    IntegrationNotConfiguredError,
+)
 
 EngineFactory = Callable[[Path, bool], FixEngine]
 
@@ -26,6 +31,8 @@ class FixNotApplicableError(SentinelError, RuntimeError):
 
 
 class FixService:
+    """Generate, validate, store and apply fixes for findings."""
+
     def __init__(
         self,
         db: Database,
@@ -44,6 +51,7 @@ class FixService:
         )
 
     def run(self, fix_id: str) -> FixOutcome:
+        """Generate and validate a queued fix; failures are stored, not raised."""
         with self.db.transaction() as s:
             fix = s.get_one(FixAttempt, fix_id)
             row = s.get_one(FindingRow, fix.finding_id)
@@ -54,9 +62,9 @@ class FixService:
             fix.status = "running"
         tmp: Path | None = None
         try:
-            if request.get("kind") == "github":
+            if request.get("kind") == GITHUB_KIND:
                 if self.github_factory is None:
-                    raise RuntimeError("GitHub integration is not configured")
+                    raise IntegrationNotConfiguredError("GitHub integration is not configured")
                 gh = GitHubRequest.from_dict(request)
                 tmp = Path(tempfile.mkdtemp(prefix="sentinel-fix-"))
                 self.github_factory(gh.installation_id).download_tree(gh.repo, gh.head_sha, tmp)
@@ -71,10 +79,11 @@ class FixService:
         finally:
             if tmp is not None:
                 shutil.rmtree(tmp, ignore_errors=True)
-        self._save(fix_id, outcome)
+        self.save_outcome(fix_id, outcome)
         return outcome
 
-    def _save(self, fix_id: str, outcome: FixOutcome) -> None:
+    def save_outcome(self, fix_id: str, outcome: FixOutcome) -> None:
+        """Store a fix outcome on its ``FixAttempt`` row and log it in the finding's history."""
         with self.db.transaction() as s:
             fix = s.get_one(FixAttempt, fix_id)
             fix.status = outcome.status
@@ -94,6 +103,7 @@ class FixService:
 
     @staticmethod
     def outcome_of(fix: FixAttempt) -> FixOutcome:
+        """Rebuild the ``FixOutcome`` from a stored row (needed to apply it later)."""
         known = ("validated", "unverified", "failed", "error")
         return FixOutcome.model_validate(
             {
@@ -112,12 +122,13 @@ class FixService:
         )
 
     def apply(self, fix_id: str) -> list[str]:
+        """Write a fix into the local repository; returns the files written."""
         with self.db.transaction() as s:
             fix = s.get_one(FixAttempt, fix_id)
             row = s.get_one(FindingRow, fix.finding_id)
             review = s.get_one(Review, row.review_id)
             local_path = review.repository.local_path
-            if review.request.get("kind") == "github" or not local_path:
+            if review.request.get("kind") == GITHUB_KIND or not local_path:
                 raise FixNotApplicableError(
                     "fixes for GitHub pull requests are applied by pushing the patch; "
                     "download it instead"

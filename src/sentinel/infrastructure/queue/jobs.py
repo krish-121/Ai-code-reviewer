@@ -20,6 +20,11 @@ from sentinel.infrastructure.database.models import Job
 
 QUEUED, RUNNING, DONE, FAILED = "queued", "running", "done", "failed"
 
+# Job kinds (``Job.kind``); the worker has one handler per kind.
+REVIEW_JOB = "review"
+PUBLISH_JOB = "publish"
+FIX_JOB = "fix"
+
 
 def enqueue(
     session: Session,
