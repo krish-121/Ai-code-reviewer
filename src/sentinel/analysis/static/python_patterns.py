@@ -3,7 +3,7 @@
 Shared by two callers that must agree with each other:
 
 - ``python_rules.py`` (Sentinel's own static rules) uses them to *report* problems;
-- ``probes.py`` (verification probes) uses them to *confirm or refute* an AI claim,
+- ``probes/`` (verification probes) uses them to *confirm or refute* an AI claim,
   e.g. "is the SQL on line 34 really built from a string?".
 """
 
