@@ -33,7 +33,16 @@ from sentinel.core.domain.models import (
     VerificationStatus,
 )
 
-STRONG_WEIGHT = 1.5
+STRONG_WEIGHT = 1.5  # a supporting check at least this heavy counts as strong evidence
+SUPPORTED_MIN_SCORE = 0.45
+LIKELY_MIN_SCORE = 0.2
+UNCERTAIN_MIN_SCORE = -0.25  # at or below this, the evidence contradicts the claim
+# Final confidence = blend of the model's own confidence and the evidence score.
+MODEL_CONFIDENCE_SHARE = 0.55
+SUPPORTED_MIN_CONFIDENCE = 0.8
+REJECTED_MAX_CONFIDENCE = 0.2
+MAX_CONFIDENCE = 0.99  # never claim certainty
+DETERMINISTIC_WEIGHT = 2.0
 
 
 @dataclass
@@ -127,17 +136,17 @@ class VerificationEngine:
         if decisive:
             status = VerificationStatus.REJECTED
             summary = decisive[0].detail
-        elif score >= 0.45 and strong:
+        elif score >= SUPPORTED_MIN_SCORE and strong:
             status = VerificationStatus.SUPPORTED
             summary = next(
                 c.detail
                 for c in active
                 if c.outcome is CheckOutcome.SUPPORTS and c.weight >= STRONG_WEIGHT
             )
-        elif score >= 0.2:
+        elif score >= LIKELY_MIN_SCORE:
             status = VerificationStatus.LIKELY
             summary = "evidence is consistent with the claim but not independently confirmed"
-        elif score > -0.25:
+        elif score > UNCERTAIN_MIN_SCORE:
             status = VerificationStatus.UNCERTAIN
             summary = "not enough deterministic evidence either way"
         else:
@@ -168,7 +177,7 @@ class VerificationEngine:
                     name="deterministic-rule",
                     outcome=CheckOutcome.SUPPORTS,
                     detail=f"reported by deterministic analysis ({tools})",
-                    weight=2.0,
+                    weight=DETERMINISTIC_WEIGHT,
                 )
             ],
             summary=f"deterministic rule {finding.rule_id or tools}",
@@ -183,11 +192,14 @@ def apply_verification(finding: Finding, result: VerificationResult) -> None:
     if finding.is_deterministic:
         return
     evidence_strength = (result.score + 1) / 2  # [0, 1]
-    blended = 0.55 * finding.confidence + 0.45 * evidence_strength
+    blended = (
+        MODEL_CONFIDENCE_SHARE * finding.confidence
+        + (1 - MODEL_CONFIDENCE_SHARE) * evidence_strength
+    )
     if result.status is VerificationStatus.SUPPORTED:
-        blended = max(blended, 0.8)
+        blended = max(blended, SUPPORTED_MIN_CONFIDENCE)
         if finding.source is FindingSource.AI:
             finding.source = FindingSource.VERIFIED
     elif result.status is VerificationStatus.REJECTED:
-        blended = min(blended, 0.2)
-    finding.confidence = round(max(0.0, min(0.99, blended)), 3)
+        blended = min(blended, REJECTED_MAX_CONFIDENCE)
+    finding.confidence = round(max(0.0, min(MAX_CONFIDENCE, blended)), 3)
