@@ -82,15 +82,26 @@ issue detected · ✓ test gap detected · ✓ false positive rejected · ✓ fi
 
 ## Installation
 
-Requires Python 3.11+ and git. Node.js with the `typescript` package gives full TypeScript
-structure (otherwise a labelled regex fallback is used). Docker is needed to validate fixes
-by running tests.
+Runs on Linux and macOS. **On Windows, use WSL 2** (Ubuntu): the sandbox code uses
+POSIX-only calls. You need:
+
+- Python 3.11+ and git
+- Node.js 22 with the `typescript` package — full TypeScript structure (otherwise a
+  labelled regex fallback is used), and needed to change the web UI
+- Docker — to validate fixes by running their tests in the sandbox
+- PostgreSQL 16 — optional; SQLite is the default
 
 ```bash
-git clone <this repository> sentinel && cd sentinel
-pip install -e ".[analyzers]"          # + ".[postgres]" for PostgreSQL
+git clone <this repository> sentinel && cd sentinel     # or unzip the project archive
+python3 -m venv .venv && source .venv/bin/activate
+pip install -U pip && pip install -e ".[dev,analyzers]" # + ",postgres" for PostgreSQL
+npm install -g typescript@5
 docker build -f Dockerfile.sandbox -t sentinel-sandbox .   # for fix validation
+cd web && npm install && cd ..   # only to change the UI; the built UI is already included
 ```
+
+Check the setup with `pytest` (see [Testing](#testing)) and `python scripts/seed_demo.py`.
+Before changing code, read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Team server with PostgreSQL, API, UI and workers: `docker compose up` — see
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
@@ -206,6 +217,7 @@ Full table: [ARCHITECTURE.md §10](docs/ARCHITECTURE.md#10-security-boundaries).
 | [GITHUB_APP.md](docs/GITHUB_APP.md) · [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Running it for a team |
 | [BENCHMARKS.md](docs/BENCHMARKS.md) | Measured latency and memory by repository size |
 | [PROGRESS.md](PROGRESS.md) | Build status, assumptions, what is verified only with mocks, open questions |
+| [CONTRIBUTING.md](CONTRIBUTING.md) · [SPEC.md](docs/SPEC.md) | Code-quality standard and pre-commit checks · the original product spec |
 
 ## Project status
 

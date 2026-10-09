@@ -1,7 +1,7 @@
 # Sentinel — build progress
 
 Living log of what is built, what was decided, and what still needs a human eye.
-Spec: `project (1).md` (sections referenced as §N). Last updated: 2026-10-02.
+Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-02.
 
 ## Steps
 
