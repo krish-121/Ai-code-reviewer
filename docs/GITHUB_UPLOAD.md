@@ -34,6 +34,14 @@ Sentinel's Stripe detector and redaction, and is too short to be a usable provid
 The existing end-to-end test verifies the finding appears and the value never reaches
 the model. Original history stays local; push the normal main branch, not all backups.
 
+## Real hosted verification
+
+[GitHub Actions run](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39141482827) passed on `8eb6c44679cb9e0f7ff41c60a5bdd7f93d766864`:
+Python/PostgreSQL 544 passed with 1 skip, frontend 21 passed with type/format/build,
+and Docker/Compose validation succeeded. The first run exposed one frontend test
+formatting issue; the follow-up code run is green. CI uses controlled external-service
+fixtures. This is hosted acceptance of the repository, not a live GitHub App review.
+
 ## What still connects the bot
 
 1. A separate disposable project provides a safe real pull request with a deliberate bug.

@@ -320,6 +320,7 @@ snippet, verification checks with `--details`. `--format json` prints the
 ## The pull-request path
 
 The source repository is [krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer).
+[Hosted CI](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39141482827) has passed Python/PostgreSQL, frontend and Docker/Compose checks.
 Pushing Sentinel's implementation there hosts the code and triggers CI. It does not
 install the reviewing bot. Actual automatic reviews need an App installation, a signed
 webhook delivery and a running Sentinel worker. Those live integration checks remain

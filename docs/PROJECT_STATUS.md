@@ -24,6 +24,14 @@ all seven real Docker tests ran against the normal image; overall/core coverage
 below preserves the earlier PostgreSQL, browser and deployment evidence with its
 original scope.
 
+**Source hosting and hosted CI are verified.** The public source repository is
+[krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer).
+[The real hosted run](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39141482827) passed all three jobs on `8eb6c44`:
+Python/PostgreSQL (**544 passed, 1 skip**), frontend (**21 passed**, type/format/build),
+and Docker/Compose acceptance. The local publication check passed 518 with 27 PostgreSQL
+skips. Hosted CI uses controlled provider/GitHub fixtures; a real reviewing App, signed
+delivery and comments on an actual pull request are still pending.
+
 ## What was inspected
 
 The starting checkout is `D:/sentinel-final-v2/sentinel`. Its complete non-VCS/non-dependency
@@ -115,7 +123,7 @@ ordinary package-manager notices and the existing warning about the non-secret
 | Security (§40) | Filtering/redaction, untrusted inputs, confined Apply, tenant checks and sandbox regressions. Trusted fix-worker daemon authority remains an operator boundary. |
 | Observability/performance (§41–42) | Structured stage logs, metrics, updated synthetic size benchmarks. Sustained load and production capacity unmeasured. |
 | Documentation (§48–52) | README, architecture, decisions, walkthrough and 14-day guide updated with current paths/limits. |
-| CI/demo/release (§53–55) | Workflow and demo source exist; local commands/Compose tested. Hosted CI and public demo/release are unverified. |
+| CI/demo/release (§53–55) | Source is on GitHub; actual hosted Python/PostgreSQL, frontend and Docker/Compose jobs passed. Public demo/release remains unverified. |
 
 The frontend tool list in §31 is recommended. Keeping React/TypeScript served by FastAPI
 is a documented design choice, not a missing Next.js folder. Compiler-grade dynamic flow,
@@ -131,7 +139,7 @@ a passing baseline completed every normal gate without bypasses.
    alarms, missed bugs and fix quality. The live Gemini and DeepSeek examples establish
    connectivity and specific behavior, not general accuracy. Ollama and Claude remain
    optional choices; installing them is not required for this setup.
-2. **Real GitHub acceptance and hosted CI.** The source destination is
+2. **Real GitHub App acceptance.** Source hosting and hosted CI passed. The source is at
    [krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer); inspect
    its Actions checks after each push. Create a disposable test repository and App, link the installation,
    observe signed delivery -> review -> comments, then check redelivery and a second push.

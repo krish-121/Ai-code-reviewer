@@ -5,6 +5,12 @@ Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections ref
 
 ## GitHub source publication - 18 October 2026
 
+- Final code run: [all three hosted CI jobs passed](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39141482827) on `8eb6c44`.
+  Python/PostgreSQL: 544 passed, 1 skipped; frontend: 21 tests plus type/format/build;
+  Docker/Compose acceptance passed. These hosted tests use controlled AI/GitHub fixtures,
+  not a live reviewing App. The real pull-request bot workflow is the next GitHub milestone.
+
+
 - Source destination: [krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer).
   The existing CI workflow runs on main pushes. Actual GitHub App installation,
   signed live deliveries and automatic comments remain separate acceptance work.
