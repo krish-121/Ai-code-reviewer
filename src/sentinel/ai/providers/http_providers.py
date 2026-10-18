@@ -8,7 +8,7 @@ from typing import Any
 from sentinel.ai.providers.base import Completion, HTTPProvider
 from sentinel.ai.schemas import strip_nullable
 from sentinel.core.domain.models import TokenUsage
-from sentinel.core.domain.ports import AIResponseError
+from sentinel.core.domain.ports import AIBlockedError, AIResponseError
 
 
 class ClaudeProvider(HTTPProvider):
@@ -88,12 +88,17 @@ class GeminiProvider(HTTPProvider):
         data = self._post(f"/v1beta/models/{self.model}:generateContent", payload, headers)
         feedback = data.get("promptFeedback") or {}
         if feedback.get("blockReason"):
-            raise AIResponseError(f"gemini blocked the prompt: {feedback['blockReason']}")
+            raise AIBlockedError(f"gemini blocked the prompt: {feedback['blockReason']}")
         candidates = data.get("candidates") or []
         if not candidates:
             raise AIResponseError("gemini returned no candidates")
+        reason = candidates[0].get("finishReason")
+        if reason in {"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"}:
+            raise AIBlockedError(f"gemini blocked the answer: {reason}")
+        if reason == "MAX_TOKENS":
+            raise AIResponseError("gemini answer exceeded the output token limit (MAX_TOKENS)")
         parts = (candidates[0].get("content") or {}).get("parts") or []
-        text = "".join(p.get("text", "") for p in parts)
+        text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
         if not text:
             reason = candidates[0].get("finishReason", "unknown")
             raise AIResponseError(f"gemini returned an empty answer (finishReason={reason})")

@@ -15,6 +15,7 @@ import typer
 from sentinel import __version__
 from sentinel.apps.cli import (
     config_commands,
+    database_commands,
     finding_commands,
     fix_command,
     review_commands,
@@ -34,6 +35,10 @@ config_app = typer.Typer(help="Show or change settings.", no_args_is_help=False)
 users_app = typer.Typer(help="Manage API users (token auth mode).", no_args_is_help=True)
 app.add_typer(config_app, name="config")
 app.add_typer(users_app, name="users")
+database_app = typer.Typer(help="Inspect or upgrade the database schema.", no_args_is_help=True)
+app.add_typer(database_app, name="db")
+database_app.command("status")(database_commands.database_status)
+database_app.command("upgrade")(database_commands.database_upgrade)
 
 # Reviewing
 app.command()(review_commands.review)

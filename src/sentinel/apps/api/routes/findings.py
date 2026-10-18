@@ -27,6 +27,8 @@ from sentinel.apps.api.serializers import (
     is_local,
 )
 from sentinel.core.domain.errors import SentinelError
+from sentinel.core.fixes.safety import check_fix_finding
+from sentinel.core.paths import RepositoryPathError
 from sentinel.infrastructure.database.models import Finding as FindingRow
 from sentinel.infrastructure.database.store import Store
 from sentinel.infrastructure.queue import jobs
@@ -64,7 +66,12 @@ def update_finding(
 def request_fix(finding_id: str, session: SessionDep, user: UserDep) -> dict[str, str]:
     """Queue fix generation for a finding and return the fix id."""
     store = Store(session)
-    fix = store.create_fix(finding_or_404(store, user, finding_id))
+    row = finding_or_404(store, user, finding_id)
+    try:
+        check_fix_finding(store.domain_finding(row))
+    except RepositoryPathError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    fix = store.create_fix(row)
     jobs.enqueue(session, jobs.FIX_JOB, {"fix_id": fix.id}, max_attempts=1)
     return {"id": fix.id}
 

@@ -210,7 +210,7 @@ def test_missing_test_claims_are_checked_against_the_graph() -> None:
         "--- a/tests/test_services.py\n+++ b/tests/test_services.py\n@@ -5 +5 @@\n-x\n+y\n"
     )
     res = TestClaimCheck().check(covered, ctx(with_test_change))
-    assert res is not None and res.decisive
+    assert res is not None and not res.decisive and outcome(res) == "neutral"
     assert TestClaimCheck().check(finding(title="SQL injection"), c) is None
 
 
@@ -339,7 +339,7 @@ def test_async_probe_confirms_blocking_calls_and_missing_awaits() -> None:
     assert outcome(p.check(blocking, c)) == "supports"
     not_async = blocking.model_copy(update={"line_start": 9, "line_end": 9})
     res = p.check(not_async, c)
-    assert res is not None and res.decisive
+    assert res is not None and not res.decisive and outcome(res) == "neutral"
     missing = finding(title="notify() is never awaited", file="app/a.py", line_start=6, line_end=6)
     assert outcome(p.check(missing, c)) == "supports"
     awaited = missing.model_copy(update={"line_start": 7, "line_end": 7})

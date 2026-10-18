@@ -18,7 +18,7 @@ from sentinel.apps.cli.common import (
     load_cli_settings,
     open_database,
 )
-from sentinel.bootstrap import github_factory
+from sentinel.bootstrap import build_sandbox, github_factory
 from sentinel.core.configuration.config import Settings
 from sentinel.core.review.orchestrator import SOURCE_EXTENSIONS
 from sentinel.infrastructure.database.models import User
@@ -64,13 +64,27 @@ def serve(
     uvicorn.run(application, host=host, port=port, log_level="warning")
 
 
-def worker() -> None:
+def worker(
+    kind: Annotated[
+        list[str] | None, typer.Option("--kind", help="Job kind; repeat to select several.")
+    ] = None,
+    require_sandbox: Annotated[
+        bool,
+        typer.Option("--require-sandbox", help="Refuse startup without the Docker fix sandbox."),
+    ] = False,
+) -> None:
     """Run a background worker that processes queued reviews, fixes and GitHub publishing."""
     from sentinel.apps.worker.main import Worker
 
     settings = load_cli_settings()
     configure_logging(settings.log_format)
-    Worker(*_services(settings)).run_forever()
+    if kind is not None and (not kind or set(kind) - {"review", "publish", "fix"}):
+        raise typer.BadParameter("worker kinds must be review, publish or fix", param_hint="--kind")
+    if require_sandbox:
+        sandbox = build_sandbox(settings)
+        if sandbox is None or sandbox.isolation != "docker":
+            raise fail("Docker fix sandbox is unavailable; build the image and check daemon access")
+    Worker(*_services(settings), kinds=kind).run_forever()
 
 
 def users_create(

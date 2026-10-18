@@ -16,18 +16,27 @@ port, never this class.
 from __future__ import annotations
 
 import json
+import math
 import random
 import re
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from sentinel.ai.prompts import Prompt, build_fix_prompt, build_review_prompt, correction_message
+from sentinel.ai.prompts import (
+    Prompt,
+    build_fix_prompt,
+    build_review_prompt,
+    correction_message,
+    response_echo,
+)
 from sentinel.ai.schemas import FIX_SCHEMA, REVIEW_SCHEMA
 from sentinel.core.domain.ai import (
     AIFixPayload,
@@ -38,7 +47,16 @@ from sentinel.core.domain.ai import (
     ReviewRequest,
 )
 from sentinel.core.domain.models import TokenUsage
-from sentinel.core.domain.ports import AIConfigurationError, AIError, AIResponseError, Cache
+from sentinel.core.domain.ports import (
+    AIBlockedError,
+    AIConfigurationError,
+    AIConnectionError,
+    AIError,
+    AIRateLimitError,
+    AIResponseError,
+    AIUnavailableError,
+    Cache,
+)
 from sentinel.infrastructure.storage.cache import content_key
 
 RETRYABLE_STATUS = {408, 409, 425, 429, 500, 502, 503, 504, 529}
@@ -112,6 +130,7 @@ class HTTPProvider(ABC):
         sleep: Callable[[float], None] = time.sleep,
         cache: Cache | None = None,
         backoff_base_s: float = 1.0,
+        trust_env: bool = True,
     ) -> None:
         self.model = model
         self.api_key = api_key
@@ -126,6 +145,7 @@ class HTTPProvider(ABC):
             timeout=httpx.Timeout(timeout_s, connect=min(CONNECT_TIMEOUT_S, timeout_s)),
             transport=transport,
             headers={"user-agent": USER_AGENT},
+            trust_env=trust_env,
         )
         self.calls = 0
 
@@ -149,7 +169,7 @@ class HTTPProvider(ABC):
             except httpx.TimeoutException as exc:
                 timeouts += 1
                 if timeouts >= MAX_TIMEOUTS:
-                    raise AIError(
+                    raise AIUnavailableError(
                         f"{self.name} request timed out twice; try again or raise SENTINEL_TIMEOUT"
                     ) from exc
                 continue
@@ -165,10 +185,8 @@ class HTTPProvider(ABC):
     def _transport_error(self, exc: httpx.HTTPError) -> AIError:
         """Map a network failure to the error type the caller can act on."""
         if isinstance(exc, httpx.ConnectError):
-            return AIConfigurationError(
-                f"cannot reach {self.name} at {self.client.base_url}: {exc}"
-            )
-        return AIError(f"{self.name} transport error: {exc}")
+            return AIConnectionError(f"cannot reach {self.name} at {self.client.base_url}: {exc}")
+        return AIUnavailableError(f"{self.name} transport error: {exc}")
 
     def _json_body(self, response: httpx.Response) -> Any:
         try:
@@ -179,22 +197,29 @@ class HTTPProvider(ABC):
     def _http_error(self, response: httpx.Response, attempts: int) -> AIError:
         """The error for a final (non-retried) HTTP failure."""
         message = self._error_message(response)
+        if self.api_key:
+            pattern = rf"(?<![\w-]){re.escape(self.api_key)}(?![\w-])"
+            message = re.sub(pattern, "[redacted]", message)
         if response.status_code in AUTH_FAILURE_STATUS:
+            if not self.api_key:
+                return AIConfigurationError(
+                    f"{self.name} access denied (HTTP {response.status_code}): {message}"
+                )
             return AIConfigurationError(
                 f"{self.name} rejected the API key (HTTP {response.status_code}): {message}"
             )
         if response.status_code == RATE_LIMITED:
-            return AIError(f"{self.name} rate limit persisted after {attempts} attempts")
+            return AIRateLimitError(
+                f"{self.name} rate limit persisted after {attempts} attempts",
+                retry_after_s=_retry_after_seconds(response),
+            )
         return ProviderHTTPError(response.status_code, message)
 
     def _backoff(self, attempt: int, resp: httpx.Response) -> float:
         """Seconds to wait: the server's ``Retry-After``, else exponential backoff with jitter."""
-        retry_after = resp.headers.get("retry-after")
+        retry_after = _retry_after_seconds(resp)
         if retry_after:
-            try:
-                return min(float(retry_after), MAX_RETRY_AFTER_S)
-            except ValueError:
-                pass
+            return min(retry_after, MAX_RETRY_AFTER_S)
         base: float = self.backoff_base_s * (2 ** (attempt - 1))
         return min(base + random.uniform(0, base / 2), MAX_BACKOFF_S)  # noqa: S311 - jitter, not crypto
 
@@ -222,20 +247,34 @@ class HTTPProvider(ABC):
         usage = TokenUsage()
         last_error = ""
         for attempt in (1, 2):
-            completion = self._complete(prompt.system, messages, schema, tool)
-            usage = usage + completion.usage
+            reply = "(invalid provider envelope)"
             try:
+                completion = self._complete(prompt.system, messages, schema, tool)
+                usage = usage + completion.usage
+                reply = completion.text
                 data = extract_json(completion.text)
                 return model_cls.model_validate(data), usage, attempt
-            except (json.JSONDecodeError, ValidationError) as exc:
+            except AIBlockedError:
+                raise
+            except (
+                AIResponseError,
+                json.JSONDecodeError,
+                ValidationError,
+                KeyError,
+                TypeError,
+                AttributeError,
+                ValueError,
+            ) as exc:
                 last_error = _describe(exc)
                 messages = [
                     *messages,
                     {
                         "role": "assistant",
-                        "content": completion.text[:MAX_ECHOED_REPLY_CHARS] or "(empty)",
+                        "content": response_echo(
+                            reply[:MAX_ECHOED_REPLY_CHARS] or "(empty)", prompt.nonce
+                        ),
                     },
-                    {"role": "user", "content": correction_message(last_error)},
+                    {"role": "user", "content": correction_message(last_error, prompt.nonce)},
                 ]
         raise AIResponseError(
             f"{self.name} returned an invalid response twice: {last_error[:ERROR_TEXT_LIMIT]}"
@@ -244,8 +283,15 @@ class HTTPProvider(ABC):
     def review(self, request: ReviewRequest) -> AIReviewResult:
         """Review a change. Identical requests are answered from the cache."""
         prompt = build_review_prompt(request, nonce=_stable_nonce(request.review_id))
+        semantic = build_review_prompt(request, nonce="CACHE_KEY_ONLY")
         key = content_key(
-            "review", self.name, self.model, str(self.temperature), prompt.system, prompt.user
+            "review-v2",
+            self.name,
+            self.model,
+            str(self.temperature),
+            str(self.max_tokens),
+            semantic.system,
+            semantic.user,
         )
         if self.cache is not None:
             cached = self.cache.get(REVIEW_CACHE_NAMESPACE, key)
@@ -282,6 +328,22 @@ def _stable_nonce(review_id: str) -> str:
     the code under review because review ids are random.
     """
     return content_key("nonce", review_id)[:NONCE_LENGTH]
+
+
+def _retry_after_seconds(response: httpx.Response) -> float:
+    """Interpret seconds or an HTTP date; malformed/non-finite values never reach sleep."""
+    value = response.headers.get("retry-after", "")
+    try:
+        seconds = float(value)
+    except ValueError:
+        try:
+            deadline = parsedate_to_datetime(value)
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=UTC)
+            seconds = (deadline - datetime.now(UTC)).total_seconds()
+        except (ValueError, TypeError, OverflowError):
+            return 0.0
+    return max(0.0, seconds) if math.isfinite(seconds) else 0.0
 
 
 def _describe(exc: Exception) -> str:

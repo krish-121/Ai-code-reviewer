@@ -17,6 +17,7 @@ from rich.markup import escape
 from sentinel.bootstrap import FROM_SETTINGS
 from sentinel.core.configuration.config import ConfigError, Settings, load_settings
 from sentinel.core.domain.ports import AIProvider
+from sentinel.infrastructure.database.schema import SchemaError
 from sentinel.infrastructure.database.session import Database
 from sentinel.services.reviews import AIFactory
 
@@ -46,14 +47,18 @@ def load_cli_settings(**overrides: Any) -> Settings:
 def open_database(settings: Settings) -> Database:
     """Connect to the configured database and create tables if needed."""
     db = Database(settings.database_url)
-    db.create_all()
+    try:
+        db.create_all()
+    except SchemaError as exc:
+        db.engine.dispose()
+        raise fail(str(exc)) from exc
     return db
 
 
 def ai_factory_for(no_ai: bool) -> AIFactory:
     """Provider factory for ``--no-ai`` (no provider) or the configured provider."""
 
-    def factory() -> AIProvider | None | str:
+    def factory() -> AIProvider | str | None:
         return None if no_ai else FROM_SETTINGS
 
     return factory

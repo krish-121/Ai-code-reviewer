@@ -193,6 +193,7 @@ class ContextEngine:
             *self._caller_blocks(node, changed_ids),
             *self._callee_blocks(node, changed_ids),
             *self._test_blocks(node),
+            *self._variable_blocks(node, changed_ids),
         ]
         path = self.graph.path_from_entrypoint(node.id)
         if path and len(path) > 1:
@@ -201,7 +202,9 @@ class ContextEngine:
             candidates.append(self._note_block("endpoint", node, route, "nearest entry point"))
         data = self._data_access(node)
         if data:
-            candidates.append(self._note_block("data", node, data, "data stores touched"))
+            candidates.append(
+                self._note_block("data", node, data, "variables and data stores touched")
+            )
         return candidates
 
     def _code_block(
@@ -257,6 +260,33 @@ class ContextEngine:
                     ),
                 )
             )
+        return out
+
+    def _variable_blocks(self, node: GraphNode, changed_ids: set[str]) -> list[_Candidate]:
+        """Include variable definitions, or the consumers of a changed variable."""
+        out: list[_Candidate] = []
+        accesses = (EdgeKind.READS, EdgeKind.WRITES)
+        edges = (
+            self.graph.in_edges(node.id, accesses)
+            if node.kind is NodeKind.VARIABLE
+            else self.graph.out_edges(node.id, accesses)
+        )
+        for edge in edges:
+            other_id = edge.source if node.kind is NodeKind.VARIABLE else edge.target
+            other = self.graph.node(other_id)
+            if other is None or other.id in changed_ids or other.file is None:
+                continue
+            if node.kind is not NodeKind.VARIABLE and other.kind is not NodeKind.VARIABLE:
+                continue
+            lo, hi = self._symbol_window(other, [edge.line or 1], cap=CALLEE_WINDOW_LINES)
+            reason = (
+                f"{edge.kind.value} {node.name}"
+                if node.kind is NodeKind.VARIABLE
+                else (f"{node.name} {edge.kind.value} this variable")
+            )
+            out.append(self._code_block(TIER_CALLEE, "dependency", other, lo, hi, reason))
+            if len(out) >= self.max_callees:
+                break
         return out
 
     def _caller_blocks(self, node: GraphNode, changed_ids: set[str]) -> list[_Candidate]:
@@ -379,7 +409,7 @@ def _remember(found: dict[str, ChangedSymbol], node: GraphNode, path: str) -> Ch
 
 def _label(node: GraphNode) -> str:
     """How a node is written in a call path: ``search()``, ``GET /search``, ``User``."""
-    if node.kind in (NodeKind.ENDPOINT, NodeKind.DATABASE, NodeKind.CLASS):
+    if node.kind in (NodeKind.ENDPOINT, NodeKind.DATABASE, NodeKind.CLASS, NodeKind.VARIABLE):
         return node.name
     return f"{node.name}()"
 

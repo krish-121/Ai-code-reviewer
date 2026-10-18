@@ -20,7 +20,7 @@ with a pointer to the code that implements it. The first twelve are the question
 14. [Why treat pull-request workspaces as untrusted?](#14-why-treat-pull-request-workspaces-as-untrusted)
 15. [Why Server-Sent Events for progress?](#15-why-server-sent-events-for-progress)
 16. [Why a React SPA bundled with esbuild (not Next.js)?](#16-why-a-react-spa-bundled-with-esbuild-not-nextjs)
-17. [Why `create_all()` instead of migrations (for now)?](#17-why-create_all-instead-of-migrations-for-now)
+17. [Why versioned migrations?](#17-why-versioned-migrations)
 18. [Why content-addressed caching?](#18-why-content-addressed-caching)
 19. [Why suppress instead of delete?](#19-why-suppress-instead-of-delete)
 
@@ -211,13 +211,22 @@ Firecracker micro-VMs; a remote CI runner.
 **Decision.** Docker containers with no network, a read-only root filesystem, a small
 writable `/tmp`, memory/CPU/PID limits, all capabilities dropped, no new privileges, the
 caller's UID, a scratch copy of the repository and a hard timeout
-([`DockerSandbox`](../src/sentinel/sandbox/runners.py)). A weaker process sandbox exists for
-machines without Docker but must be explicitly enabled and reports its isolation level
-honestly; without any sandbox, tests are simply skipped and the fix is "unverified".
+([`DockerSandbox`](../src/sentinel/sandbox/runners.py)). A weaker process runner remains
+available for explicitly requested diagnostics, but fix validation refuses it. Both
+generated-code analysis and tests require Docker. Without Docker these checks are skipped
+and the fix is "unverified"; passing tests alone never establishes resolution.
 
 **Trade-offs.** Strong isolation with a tool developers already have. Containers share the
 host kernel (a micro-VM would isolate better), and with no network the image must already
 contain the project's test dependencies — for real projects, extend `Dockerfile.sandbox`.
+
+**Containerized workers.** Compose separates review/publication jobs from a fix-only worker
+that controls Docker. Its copy transport sends a bounded, link-free scratch archive to an
+installed launcher and private tmpfs instead of binding worker paths on the daemon host.
+The API and review worker have no daemon access. This fixes path translation and limits
+the credential boundary, but socket access still gives the trusted fix worker authority
+over that engine's host. A dedicated engine/VM is the deployment boundary, not the worker's
+non-root UID. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## 11. Why not review the entire repository?
 
@@ -316,18 +325,20 @@ ready-made components and no server-side rendering (not needed for an authentica
 Components are plain React, so moving to Next.js later is mostly routing and bundling.
 Listed as *NEEDS REVIEW* in [PROGRESS.md](../PROGRESS.md).
 
-## 17. Why `create_all()` instead of migrations (for now)?
+## 17. Why versioned migrations?
 
-**Problem.** The schema needs to exist on first start.
+**Problem.** Fresh installs and upgrades must preserve existing review and job data.
 
-**Alternatives.** Alembic migrations from day one.
+**Alternatives.** Continuing to call the latest ORM metadata's `create_all()` cannot
+provide a schema-upgrade history or safely recognize legacy installations.
 
-**Decision.** `Database.create_all()` creates missing tables
-([`session.py`](../src/sentinel/infrastructure/database/session.py)).
+**Decision.** Packaged Alembic revisions initialize fresh databases. Existing databases
+upgrade explicitly, with locked transactions and validated legacy adoption.
+See [DATABASE_MIGRATIONS.md](DATABASE_MIGRATIONS.md).
 
-**Trade-offs.** Simplest possible setup for a new install; but schema *changes* on an
-existing database need a migration tool. Adding Alembic is the first step before running
-this with data you want to keep (NEEDS REVIEW in [PROGRESS.md](../PROGRESS.md)).
+**Trade-offs.** Operators must back up and stop application processes for upgrades. Unknown
+or custom legacy schemas are refused rather than guessed, and future revisions need
+data-preservation and rollback tests on both database backends.
 
 ## 18. Why content-addressed caching?
 
@@ -357,3 +368,108 @@ change"). The UI and CLI can show them on request.
 
 **Trade-offs.** Full transparency (you can see what the AI claimed and why Sentinel
 disagreed) at the cost of storing a few more rows per review.
+
+## 20. Why lexical variable dependencies and independent graph views?
+
+**Problem.** A changed constant needs its unchanged consumers as context. Matching names
+alone confuses globals with locals. Sharing mutable graph nodes lets a UI view change
+analysis state by marking its nodes as changed.
+
+**Alternatives.** Ignore variables; connect every matching name; execute repository code
+to observe values; build a complete compiler/taint engine; maintain one mutable graph.
+
+**Decision.** Use Python's symbol table and TypeScript's lexical binder for bounded
+module-variable reads/writes and known import bindings. The virtual TypeScript host reads
+no project config, plugins or files. Independent UI projections copy node metadata, break
+budget ties deterministically and respect their node limit. Endpoint identity includes file
+and handler. Bump the symbol-cache version when the extractor contract changes.
+
+**Trade-offs.** Some extra parser work and graph nodes; incomplete local/class/dynamic
+relationships. A missing edge does not prove safety. Copying small projected graphs costs
+memory but keeps presentation separate from analysis without another framework.
+See [GRAPH_ANALYSIS.md](GRAPH_ANALYSIS.md).
+
+## 21. Why require validation before Apply?
+
+**Problem.** An incomplete fix was labelled unverified but could still be written through
+the UI, API and CLI. That contradicted the validated-fix workflow and our documentation.
+
+**Alternatives.** Permit an override with a warning; disable only the UI button; require
+the same validated status at the application boundary and every delivery surface.
+
+**Decision.** The core writer refuses every nonvalidated outcome before opening files.
+The API advertises Apply only for validated local patches; the UI also checks that status.
+CLI `--apply` exits with a clear failure when validation is incomplete. Download and review
+remain available. No force flag bypasses validation.
+
+**Trade-offs.** A missing tool or broken project baseline can prevent Apply. Complete the
+checks, fix the baseline or inspect the downloaded proposal separately. This is deliberate:
+a warning cannot supply evidence that tests and analysis never produced.
+
+## 22. Why separate structured-report and test-log budgets?
+
+**Problem.** The demo's valid analyzer JSON exceeded the 20 KB test-log display limit.
+Truncating it made validation fail even though the container completed successfully.
+
+**Alternatives.** Remove output caps; truncate findings silently; compress every report;
+or keep separate finite budgets for machine-readable reports and human-facing logs.
+
+**Decision.** Trusted container analysis explicitly requests a 1 MiB output allowance and
+shared 2 MiB pipe capture. Normal test commands retain their smaller limits. The caller
+cannot request an unlimited budget. Truncated reports remain incomplete, with a useful
+reason. The packaged demo now includes TypeScript configuration so that compiler can run.
+
+**Trade-offs.** More bounded memory per concurrent analysis, and very large reports can
+still exceed the budget. They must be reported incomplete, rather than losing diagnostics
+while claiming success. Existing baseline diagnostics are compared, not silently removed;
+project dependencies still belong in a trusted sandbox image.
+
+## 23. Why a separate OpenCode bridge for quota fallback?
+
+**Problem.** Gemini's free quota is limited. The direct OpenCode free API candidate
+was blocked, while official OpenCode produced real free DeepSeek responses in Docker.
+
+**Decision.** Keep the existing AIProvider interface and use an opt-in decorator that
+switches from Gemini only on an explicit quota/rate-limit error. A small authenticated
+HTTP bridge runs official `opencode run` inside Docker. Sentinel uses plain httpx,
+without a vendor SDK or Docker access in review/API workers. Only the tested free
+DeepSeek ID is accepted; GLM is excluded after service failures. Requests are bounded,
+temporary sessions are discarded, and actual model/fallback reasons are persisted.
+
+**Alternatives.** Spoof the free API client; pass a user's paid account to OpenCode;
+give every worker a Docker socket; require local Ollama; or host a full OpenCode
+server exposing file/shell/configuration APIs. The narrow bridge preserves the current
+deployment boundary and the user's zero-purchase constraint without those changes.
+
+**Tool policy.** Denying every tool triggered a misleading free-tier rejection. The
+working official CLI retains approval-required tools, automatically rejects requests
+without an interactive user, and the bridge rejects tool-bearing results. A live
+diagnostic confirmed rejection and no file creation. No host project, vendor key or
+Docker socket enters the bridge. Its local bearer token is not a vendor credential.
+
+**Trade-offs.** An extra service and image need Docker running. Standard OpenCode adds
+prompt/token overhead. One active request, time/output limits and free-service outages
+can make a review partial; this is reported honestly. Cooldown is best-effort cache
+state, not quota accounting. A fallback sends redacted source to another online service,
+so users must opt in. Existing schema, verification and validated-only Apply remain.
+See [FREE_AI_FALLBACK.md](FREE_AI_FALLBACK.md) for the source and operating steps.
+
+## 24. Why save Docker copy transport for the local WSL setup?
+
+**Problem.** The normal sandbox image was missing, and earlier fix checks relied on
+temporary image/transport overrides. Windows Docker Desktop and Ubuntu do not always
+resolve a bind-mounted path in the same way.
+
+**Alternatives.** Require a fresh environment override each terminal, depend on matching
+host paths, or persist the existing filtered-copy transport through normal settings.
+
+**Decision.** Build `sentinel-sandbox:latest` from the trusted Dockerfile and allow
+`sentinel config set sandbox_transport copy`. The settings writer validates the value
+and preserves existing private settings. Validation runs on temporary container copies
+without a project bind mount, network access, vendor keys or Docker socket. Apply remains
+a separate validated-only operation on the original files.
+
+**Trade-offs.** Copying has bounded archive/workspace overhead. Extra project dependencies
+must already exist in a trusted image. Docker Desktop must be running. This is a local
+WSL setup choice, not a replacement for the dedicated worker boundary in Compose.
+The real Gemini fix/Apply acceptance is recorded in [LIVE_FIX_WORKFLOW.md](LIVE_FIX_WORKFLOW.md).

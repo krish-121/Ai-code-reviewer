@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
 
 from sentinel.analysis.ast.registry import default_registry
 from sentinel.analysis.graph.builder import GraphBuildResult, build_graph
@@ -29,6 +30,8 @@ def fresh_database_url(backend: str, tmp_path: Path) -> str:
         pytest.skip("set SENTINEL_TEST_DATABASE_URL to run against PostgreSQL")
     database = Database(POSTGRES_URL)
     Base.metadata.drop_all(database.engine)
+    with database.engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
     database.engine.dispose()
     return POSTGRES_URL
 

@@ -23,6 +23,9 @@ class PipelineState:
     result: ReviewResult
     workspace: Path
     repository: str
+    baseline: Path | None = None
+    baseline_error: str | None = None
+    baseline_files: int = 0
     # filter stage: findings about the diff itself (secrets, sensitive files, injection)
     filter_findings: list[Finding] = field(default_factory=list)
     # build-graph stage

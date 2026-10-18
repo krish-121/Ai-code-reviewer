@@ -6,13 +6,16 @@ Plan on 1–2 hours a day. Every day has the same shape:
 - **Goal** — what you should be able to explain at the end of the day.
 - **Read** — files and functions, in reading order (links go to the code).
 - **Run** — commands that show the code working; most are single test files.
-- **Try** — a small change to make and then undo (`git stash` or `git checkout .`).
+- **Try** — a small change in a disposable copy, then undo only that exercise's changes.
+  Keep existing development work; do not reset the entire working tree.
 - **Check yourself** — questions to answer out loud, without looking.
 
-Set up once:
+For Windows/WSL prerequisites, complete commands and the distinction between offline,
+Ollama and GitHub testing, start with [LOCAL_SETUP_AND_GITHUB.md](LOCAL_SETUP_AND_GITHUB.md).
+The guide below assumes that environment is activated. Set up once:
 
 ```bash
-pip install -e ".[dev,postgres,analyzers]"
+pip install -c requirements.lock -e ".[dev,postgres,analyzers]"
 python demo/build_demo_repo.py /tmp/demo          # the demo repository with planted bugs
 python scripts/seed_demo.py                       # a stored demo review (scripted AI replay)
 SENTINEL_DATABASE_URL=sqlite:///.demo/sentinel-demo.db sentinel serve   # http://127.0.0.1:8000
@@ -158,6 +161,11 @@ it is reported and redacted.
 3. Why is `loop_depth` reset when entering a function body?
 
 ## Day 6 — The code graph
+
+Current exercise: follow [GRAPH_ANALYSIS.md](GRAPH_ANALYSIS.md), then run
+`pytest tests/unit/test_graph_dependencies.py -v`. Explain the difference between reading
+a global and reading a local with the same name; why endpoints include file/handler identity;
+and why marking a projected node as changed must not mutate the full graph.
 
 **Goal.** Explain how the graph is built and which questions it answers.
 
@@ -307,6 +315,13 @@ assertion protects the marker that makes updates idempotent.
 
 ## Day 11 — Database and jobs
 
+Current additions: read [DATABASE_MIGRATIONS.md](DATABASE_MIGRATIONS.md), then trace
+`schema.initialize` versus `schema.upgrade` in
+[`schema.py`](../src/sentinel/infrastructure/database/schema.py). Run
+`pytest tests/integration/test_migrations.py tests/unit/test_validation_worker.py -v`.
+Explain why startup refuses an old populated schema, why adoption is explicit, how leases
+fence stale workers, and why fix jobs go to a different worker in Compose.
+
 **Goal.** Explain the schema, tenancy, and how the job queue survives crashes without Redis.
 
 **Read.**
@@ -355,7 +370,7 @@ and served.
 
 **Run.**
 ```bash
-cd web && npm install && npm run lint && npm test && npm run build
+cd web && npm ci && npm run lint && npm test && npm run build
 ```
 Then reload the running `sentinel serve` page.
 
@@ -368,6 +383,12 @@ Then reload the running `sentinel serve` page.
 3. Why is the built UI committed inside the Python package?
 
 ## Day 13 — Sandbox and fix engine
+
+Read [MULTI_FILE_FIXES.md](MULTI_FILE_FIXES.md) and the scratch-transfer section of
+[DEPLOYMENT.md](DEPLOYMENT.md). Run `pytest tests/unit/test_multi_file_fixes.py
+tests/unit/test_sandbox_transfer.py -v`. Explain a fail-before/pass-after regression test,
+why missing validators cannot prove a patch safe, which worker receives Docker access,
+and what ordinary-error rollback does not guarantee about power loss.
 
 **Goal.** Explain how a fix is generated, validated and applied without ever running
 untrusted code on the host.

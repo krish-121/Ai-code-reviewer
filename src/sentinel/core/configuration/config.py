@@ -11,10 +11,13 @@ Two separate concerns:
 
 from __future__ import annotations
 
+import json
 import os
+import tempfile
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator
@@ -72,7 +75,25 @@ class FixSection(_Section):
     """``fix:`` in ``.sentinel.yml``: how to run the tests that validate a fix."""
 
     test_command: list[str] | None = None
+    regression_command: list[str] | None = Field(
+        default=None, description="Docker command for new tests; {files} expands to their paths"
+    )
+    context_files: list[str] = Field(default_factory=list, max_length=20)
+    max_files: int = Field(default=8, ge=1, le=20)
+    max_context_chars: int = Field(default=60_000, ge=2_000)
     setup_command: list[str] | None = None
+
+    @field_validator("setup_command")
+    @classmethod
+    def reject_setup(cls, value: list[str] | None) -> None:
+        """Dependency setup is intentionally restricted to the trusted sandbox image."""
+        if value is not None:
+            raise ValueError(
+                "setup_command is unsupported; install dependencies "
+                "in a custom trusted sandbox image"
+            )
+        return
+
     timeout_s: int = Field(default=300, ge=10)
 
 
@@ -129,13 +150,14 @@ def parse_repo_config(text: str, source: str = ".sentinel.yml") -> RepoConfig:
 
 # --------------------------------------------------------------------------- runtime settings
 
-PROVIDERS = ("claude", "gemini", "ollama", "none")
+PROVIDERS = ("claude", "gemini", "ollama", "opencode", "none")
 
 DEFAULT_MODELS = {
     "claude": "claude-sonnet-5-5",
-    "gemini": "gemini-2.5-flash",
+    "gemini": "gemini-3.8-flash",
     "ollama": "qwen2.5-coder:7b",
     "none": "none",
+    "opencode": "deepseek-v4.1-flash-free",
 }
 
 KEY_ENV_VARS: dict[str, tuple[str, ...]] = {
@@ -155,6 +177,10 @@ class Settings(BaseModel):
     max_tokens: int = Field(default=4096, ge=256)
     timeout_s: float = Field(default=90.0, gt=0)
     max_retries: int = Field(default=3, ge=0, le=8)
+    free_fallback: bool = False
+    fallback_cooldown_s: float = Field(default=300.0, gt=0, le=86_400)
+    opencode_url: str = "http://127.0.0.1:4097"
+    opencode_token: SecretStr | None = None
     claude_api_key: SecretStr | None = None
     gemini_api_key: SecretStr | None = None
     ollama_url: str = "http://localhost:11434"
@@ -162,6 +188,7 @@ class Settings(BaseModel):
     cache_dir: Path = Path.home() / ".cache" / "sentinel"
     sandbox: str = Field(default="docker", description="docker | process")
     sandbox_image: str = "sentinel-sandbox:latest"
+    sandbox_transport: Literal["bind", "copy"] = "bind"
     allow_process_sandbox: bool = False
     github_token: SecretStr | None = None
     github_app_id: str | None = None
@@ -189,6 +216,22 @@ class Settings(BaseModel):
         """The configured model, or the provider's default."""
         return self.model or DEFAULT_MODELS[self.provider]
 
+    @field_validator("opencode_url")
+    @classmethod
+    def _opencode_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname not in {"127.0.0.1", "localhost", "::1", "opencode-bridge"}
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+        ):
+            raise ValueError("opencode_url must name the local or Compose OpenCode bridge")
+        return value.rstrip("/")
+
     def allowed_roots(self) -> list[Path]:
         """Directories the server may review local repositories in.
 
@@ -200,8 +243,12 @@ class Settings(BaseModel):
         return [Path.home().resolve()] if self.auth_mode == "local" else []
 
     def api_key_for(self, provider: str) -> str | None:
-        """The API key configured for ``provider``, if any."""
-        secret = {"claude": self.claude_api_key, "gemini": self.gemini_api_key}.get(provider)
+        """The provider credential; OpenCode uses a separate local bridge token."""
+        secret = {
+            "claude": self.claude_api_key,
+            "gemini": self.gemini_api_key,
+            "opencode": self.opencode_token,
+        }.get(provider)
         return secret.get_secret_value() if secret else None
 
 
@@ -218,11 +265,16 @@ _ENV_MAP = {
     "SENTINEL_TEMPERATURE": "temperature",
     "SENTINEL_MAX_TOKENS": "max_tokens",
     "SENTINEL_TIMEOUT": "timeout_s",
+    "SENTINEL_FREE_FALLBACK": "free_fallback",
+    "SENTINEL_OPENCODE_URL": "opencode_url",
+    "SENTINEL_OPENCODE_TOKEN": "opencode_token",
+    "SENTINEL_FALLBACK_COOLDOWN": "fallback_cooldown_s",
     "SENTINEL_OLLAMA_URL": "ollama_url",
     "SENTINEL_DATABASE_URL": "database_url",
     "SENTINEL_CACHE_DIR": "cache_dir",
     "SENTINEL_SANDBOX": "sandbox",
     "SENTINEL_SANDBOX_IMAGE": "sandbox_image",
+    "SENTINEL_SANDBOX_TRANSPORT": "sandbox_transport",
     "SENTINEL_ALLOW_PROCESS_SANDBOX": "allow_process_sandbox",
     "SENTINEL_GITHUB_TOKEN": "github_token",
     "SENTINEL_GITHUB_APP_ID": "github_app_id",
@@ -287,15 +339,20 @@ _WRITABLE_KEYS = {
     "model",
     "temperature",
     "max_tokens",
+    "free_fallback",
+    "fallback_cooldown_s",
+    "opencode_url",
+    "opencode_token",
     "claude_api_key",
     "gemini_api_key",
     "ollama_url",
     "database_url",
     "sandbox",
     "sandbox_image",
+    "sandbox_transport",
     "github_token",
 }
-SECRET_KEYS = {"claude_api_key", "gemini_api_key", "github_token"}
+SECRET_KEYS = {"claude_api_key", "gemini_api_key", "github_token", "opencode_token"}
 
 
 def save_user_setting(key: str, value: str, path: Path | None = None) -> Path:
@@ -310,10 +367,18 @@ def save_user_setting(key: str, value: str, path: Path | None = None) -> Path:
     Settings.model_validate(current)  # validate before writing
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [f"{k} = {_toml_value(v)}" for k, v in sorted(current.items())]
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines) + "\n")
-    os.chmod(path, 0o600)
+    content = "\n".join(lines) + "\n"
+    Settings.model_validate(tomllib.loads(content))
+    fd, temporary = tempfile.mkstemp(prefix=".sentinel-config-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
     return path
 
 
@@ -323,5 +388,4 @@ def _toml_value(v: Any) -> str:
         return "true" if v else "false"
     if isinstance(v, int | float):
         return str(v)
-    escaped = str(v).replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
+    return json.dumps(str(v), ensure_ascii=False)

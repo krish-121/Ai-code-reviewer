@@ -291,10 +291,9 @@ class TestClaimCheck:
             names = ", ".join(t.name for t in touched[:3])
             return VerificationCheck(
                 name=self.name,
-                outcome=CheckOutcome.CONTRADICTS,
-                weight=2.0,
-                decisive=True,
-                detail=f"this change updates tests that exercise `{node.name}`: {names}",
+                outcome=CheckOutcome.NEUTRAL,
+                detail=f"updated tests call `{node.name}` ({names}); "
+                "assertions and edge-case coverage are unproven",
             )
         if tests:
             names = ", ".join(t.name for t in tests[:3])

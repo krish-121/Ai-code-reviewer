@@ -45,8 +45,9 @@ def overlay(src: Path, dest: Path) -> None:
 
 
 def build(target: Path) -> Path:
-    if target.exists():
-        shutil.rmtree(target)
+    # Exclusive creation also refuses symlinks and closes the exists/delete race.
+    if target.exists() or target.is_symlink():
+        raise FileExistsError(f"Refusing to replace existing destination: {target}")
     target.mkdir(parents=True)
     git(target, "init", "-q", "-b", "main")
     overlay(HERE / "base", target)

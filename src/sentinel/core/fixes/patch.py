@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import difflib
 import hashlib
-import posixpath
+from collections.abc import Collection
 
 from sentinel.core.domain.ai import FileEdit
 from sentinel.core.domain.errors import SentinelError
+from sentinel.core.paths import relative_file
 
 
 class PatchError(SentinelError, ValueError):
@@ -19,12 +20,18 @@ def sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="surrogatepass")).hexdigest()
 
 
-def apply_edits(files: dict[str, str], edits: list[FileEdit]) -> dict[str, str]:
+def apply_edits(
+    files: dict[str, str], edits: list[FileEdit], allowed_new_files: Collection[str] = ()
+) -> dict[str, str]:
     """Return the new content of every edited file. Every ``search`` must match once."""
     new = dict(files)
     touched: set[str] = set()
     for i, edit in enumerate(edits, start=1):
-        path = posixpath.normpath(edit.file)
+        path = relative_file(edit.file)
+        if edit.operation == "create":
+            new[path] = _create(edit, path, new, allowed_new_files, i)
+            touched.add(path)
+            continue
         if path not in new:
             raise PatchError(f"edit {i}: {edit.file} was not one of the files provided")
         if "[REDACTED:" in edit.search:
@@ -44,7 +51,19 @@ def apply_edits(files: dict[str, str], edits: list[FileEdit]) -> dict[str, str]:
             )
         new[path] = new[path].replace(edit.search, edit.replace, 1)
         touched.add(path)
+    if not touched or all(p in files and new[p] == files[p] for p in touched):
+        raise PatchError("patch makes no changes")
     return {p: new[p] for p in touched}
+
+
+def _create(
+    edit: FileEdit, path: str, files: dict[str, str], allowed: Collection[str], i: int
+) -> str:
+    if path not in allowed or path in files:
+        raise PatchError(f"edit {i}: {path} is not an allowed absent new file")
+    if edit.search or not edit.replace.strip():
+        raise PatchError(f"edit {i}: create requires empty search and nonempty content")
+    return edit.replace
 
 
 def _closest(content: str, search: str) -> str | None:
@@ -61,10 +80,11 @@ def unified_diff(before: dict[str, str], after: dict[str, str]) -> str:
         diff = difflib.unified_diff(
             old.splitlines(keepends=True),
             after[path].splitlines(keepends=True),
-            fromfile=f"a/{path}",
+            fromfile=f"a/{path}" if path in before else "/dev/null",
             tofile=f"b/{path}",
         )
         text = "".join(diff)
         if text:
-            chunks.append(f"diff --git a/{path} b/{path}\n{text}")
+            mode = "new file mode 100644\n" if path not in before else ""
+            chunks.append(f"diff --git a/{path} b/{path}\n{mode}{text}")
     return "".join(chunks)

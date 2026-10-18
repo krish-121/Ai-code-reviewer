@@ -16,11 +16,13 @@ from sentinel.analysis.diff.filtering import (
     GENERATED_DIRS,
     GENERATED_SUFFIXES,
     sensitive_file_reason,
+    source_exclusion_reason,
 )
-from sentinel.analysis.diff.git import GitError, list_files
+from sentinel.analysis.diff.git import list_files
 from sentinel.analysis.diff.secrets import redact_text
 from sentinel.analysis.graph.context import ContextBundle
-from sentinel.core.domain.models import ChangeSet, Finding
+from sentinel.core.domain.models import ChangeSet, Finding, Language
+from sentinel.core.paths import RepositoryPathError, read_repository_text
 
 MAX_FILE_BYTES = 400_000
 DEFAULT_MAX_FILES = 2_000
@@ -36,6 +38,7 @@ class RepoSnapshot:
     sources: dict[str, str]
     truncated: bool = False
     skipped: list[str] = field(default_factory=list)
+    unreadable: list[str] = field(default_factory=list)
 
     @property
     def total_bytes(self) -> int:
@@ -50,6 +53,8 @@ def collect_sources(
     *,
     max_files: int = DEFAULT_MAX_FILES,
     max_bytes: int = DEFAULT_MAX_BYTES,
+    ignore: list[str] | None = None,
+    languages: list[Language] | None = None,
 ) -> RepoSnapshot:
     """Read code files: changed files first, then their directories, then the rest.
 
@@ -59,16 +64,22 @@ def collect_sources(
         priority_paths: Changed files; always read first so a size limit never drops them.
         max_files: Stop after this many files (the snapshot is then marked truncated).
         max_bytes: Stop after this many characters.
+        ignore: Repository exclusion patterns, applied even to priority paths.
+        languages: Enabled languages; excluded languages never enter context or snapshots.
     """
     snapshot = RepoSnapshot(sources={})
     total = 0
     for path in _paths_in_reading_order(workspace, supports or set(), priority_paths):
+        if source_exclusion_reason(path, ignore, languages):
+            snapshot.skipped.append(path)
+            continue
         if len(snapshot.sources) >= max_files or total >= max_bytes:
             snapshot.truncated = True
             break
-        text = _read_small_file(workspace / path)
+        text = _read_small_file(workspace, path)
         if text is None:
             snapshot.skipped.append(path)
+            snapshot.unreadable.append(path)
             continue
         snapshot.sources[path] = text
         total += len(text)
@@ -103,10 +114,7 @@ def _paths_in_reading_order(
     workspace: Path, extensions: set[str], priority_paths: list[str]
 ) -> list[str]:
     """Changed files, then files in the same directories, then everything else (shallow first)."""
-    try:
-        all_files = list_files(workspace)
-    except (GitError, OSError):
-        all_files = []
+    all_files = list_files(workspace)
     changed = [
         p
         for p in dict.fromkeys(priority_paths)
@@ -123,13 +131,11 @@ def _paths_in_reading_order(
     return [*changed, *rest]
 
 
-def _read_small_file(path: Path) -> str | None:
+def _read_small_file(root: Path, path: str) -> str | None:
     """File text, or None when the file is too large or unreadable."""
     try:
-        if path.stat().st_size > MAX_FILE_BYTES:
-            return None
-        return path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+        return read_repository_text(root, path, MAX_FILE_BYTES)
+    except (OSError, UnicodeError, RepositoryPathError):
         return None
 
 

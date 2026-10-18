@@ -62,7 +62,9 @@ def build_summary(
     risk = compute_risk(surfaced)
     return ReviewSummary(
         risk=risk,
-        headline=_headline(risk, stats),
+        headline="No findings confirmed; review has limitations"
+        if not surfaced and limitations
+        else _headline(risk, stats),
         stats=stats,
         what_changed=_what_changed(changeset, stats, changed_symbols),
         attention=[
@@ -81,7 +83,7 @@ def build_stats(
     by_severity = Counter(f.severity.value for f in surfaced)
     return ReviewStats(
         files_changed=len(changeset.files) + len(changeset.skipped),
-        files_reviewed=sum(1 for _ in changeset.reviewable()),
+        files_reviewed=len(changeset.files),
         files_skipped=len(changeset.skipped),
         lines_added=changeset.lines_added,
         lines_removed=changeset.lines_removed,

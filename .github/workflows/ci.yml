@@ -39,16 +39,20 @@ jobs:
           node-version: "22"
       - name: Install
         run: |
-          pip install -e ".[dev,postgres,analyzers]"
-          npm install -g typescript@5 eslint@9 @typescript-eslint/parser@8
+          pip install -c requirements.lock -e ".[dev,postgres,analyzers]"
+          npm ci --prefix tools/analyzers --omit=dev --no-audit --no-fund
+          echo "$GITHUB_WORKSPACE/tools/analyzers/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "NODE_PATH=$GITHUB_WORKSPACE/tools/analyzers/node_modules" >> "$GITHUB_ENV"
       - name: Build the fix sandbox image (enables the Docker sandbox tests)
         run: docker build -f Dockerfile.sandbox -t sentinel-sandbox:latest .
       - name: Ruff
         run: |
-          ruff check src tests scripts
-          ruff format --check src tests scripts
+          ruff check src tests scripts tools/opencode_bridge
+          ruff format --check src tests scripts tools/opencode_bridge
       - name: mypy (strict)
-        run: mypy
+        run: |
+          mypy
+          mypy --strict tools/opencode_bridge
       - name: Tests with coverage (≥80% overall)
         run: pytest --cov=sentinel --cov-report=term --cov-report=xml --cov-fail-under=80
       - name: Core coverage (≥90%)
@@ -69,7 +73,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Typecheck + Prettier
         run: npm run lint
       - name: Unit tests
@@ -78,9 +82,17 @@ jobs:
         run: npm run build
 
   docker:
-    name: Docker images build
+    name: Compose deployment and Docker validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t sentinel .
-      - run: docker build -f Dockerfile.sandbox -t sentinel-sandbox .
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Full isolated Compose acceptance
+        run: python scripts/verify_compose.py --output /tmp/sentinel-compose-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compose-evidence
+          path: /tmp/sentinel-compose-evidence

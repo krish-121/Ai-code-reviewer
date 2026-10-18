@@ -4,10 +4,23 @@
 
 Sentinel reviews a code change — staged files, a commit range, or a GitHub pull request —
 in the context of the whole codebase. An AI model proposes problems; deterministic
-analysis then **verifies every claim against the code** before you see it. Findings come
+analysis then **checks each claim against the available evidence** before you see it. Findings come
 with the evidence, the call path from the nearest entry point, and the exact checks that
 confirmed or rejected them. For confirmed problems Sentinel can generate a fix, test it in a
 locked-down sandbox, and apply it when you say so.
+
+**Release status:** an audited V1 implementation with explicit limits, not a guarantee of complete
+bug detection or exploit proof. Changes that remove code compare diagnostics across the eligible
+base and head source trees, including unchanged dependents. Missing snapshots, tools or analysis
+coverage make that review partial. Static patterns and inferred call paths remain limited.
+Fix validation requires a Docker image
+containing project dependencies. POSIX filesystem confinement requires Linux/WSL for local fixes.
+See [release readiness](docs/RELEASE_READINESS.md) for current evidence, and the dated
+[audit remediation](docs/REMAINING_AUDIT_REMEDIATION.md) for the earlier defect history.
+
+Learning on Windows? Start with [local setup, Ollama and GitHub explained step by step](docs/LOCAL_SETUP_AND_GITHUB.md).
+For how the code works, follow [WALKTHROUGH.md](docs/WALKTHROUGH.md) and
+[the code-graph explanation](docs/GRAPH_ANALYSIS.md).
 
 ![A finding with its call path, verification checks and a sandbox-validated fix](docs/screenshots/finding-light.png)
 
@@ -86,7 +99,7 @@ Runs on Linux and macOS. **On Windows, use WSL 2** (Ubuntu): the sandbox code us
 POSIX-only calls. You need:
 
 - Python 3.11+ and git
-- Node.js 22 with the `typescript` package — full TypeScript structure (otherwise a
+- Node.js 22.13+ with the `typescript` package — full TypeScript structure (otherwise a
   labelled regex fallback is used), and needed to change the web UI
 - Docker — to validate fixes by running their tests in the sandbox
 - PostgreSQL 16 — optional; SQLite is the default
@@ -94,16 +107,19 @@ POSIX-only calls. You need:
 ```bash
 git clone <this repository> sentinel && cd sentinel     # or unzip the project archive
 python3 -m venv .venv && source .venv/bin/activate
-pip install -U pip && pip install -e ".[dev,analyzers]" # + ",postgres" for PostgreSQL
-npm install -g typescript@5
+pip install -U pip && pip install -c requirements.lock -e ".[dev,analyzers]" # + ",postgres" for PostgreSQL
+npm ci --prefix tools/analyzers --omit=dev --no-audit --no-fund
+export PATH="$PWD/tools/analyzers/node_modules/.bin:$PATH"
+export NODE_PATH="$PWD/tools/analyzers/node_modules"
 docker build -f Dockerfile.sandbox -t sentinel-sandbox .   # for fix validation
-cd web && npm install && cd ..   # only to change the UI; the built UI is already included
+cd web && npm ci && cd ..   # only to change the UI; the built UI is already included
 ```
 
 Check the setup with `pytest` (see [Testing](#testing)) and `python scripts/seed_demo.py`.
 Before changing code, read [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Team server with PostgreSQL, API, UI and workers: `docker compose up` — see
+Team server with PostgreSQL, API, UI, review worker and Docker validation worker:
+`docker compose up --build` — see
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## CLI usage
@@ -142,7 +158,9 @@ severity thresholds, ignored paths, disabled analyzers, the test command for fix
 Install Sentinel as a GitHub App with three permissions (contents: read, pull requests:
 write, issues: write). Each push to a pull request queues a review; a worker posts **one
 summary comment that is edited in place** and inline comments for new findings only, so
-re-pushing never duplicates comments. Sentinel comments; it never approves or blocks.
+repeat publication deduplicates owned comment markers. Superseded revisions are rejected;
+GitHub's final compare-and-comment race remains documented in `docs/GITHUB_APP.md`.
+Sentinel comments; it never approves or blocks.
 Setup: **[docs/GITHUB_APP.md](docs/GITHUB_APP.md)**.
 
 ## AI providers
@@ -154,13 +172,22 @@ Bring your own key — or none:
 | Anthropic Claude | `SENTINEL_PROVIDER=claude` | `SENTINEL_CLAUDE_KEY` or `ANTHROPIC_API_KEY` |
 | Google Gemini | `SENTINEL_PROVIDER=gemini` | `SENTINEL_GEMINI_KEY` or `GEMINI_API_KEY` |
 | Ollama (local) | `SENTINEL_PROVIDER=ollama` | none; `SENTINEL_OLLAMA_URL` |
+| Free DeepSeek through OpenCode | `SENTINEL_PROVIDER=opencode` | separate local bridge token; no vendor key |
 | None | `SENTINEL_PROVIDER=none` or `--no-ai` | deterministic review only |
 
-All providers are called over plain HTTPS with `httpx` (no vendor SDKs) and must answer
+Providers use `httpx` over vendor HTTPS or local bridge HTTP (no vendor SDKs) and must answer
 with JSON that validates against a strict schema; invalid answers get one correction
 retry, rate limits are retried with backoff, timeouts once. Choose a model with
 `SENTINEL_MODEL` or `--model`. Adding a provider is one class and one registry entry
 ([how](docs/WALKTHROUGH.md#add-an-ai-provider)).
+
+For **Gemini -> free DeepSeek when quota is exhausted**, start the isolated bridge
+with `python scripts/opencode_bridge.py start --build`, select Gemini and enable
+`sentinel config set free_fallback true`. The helper creates a private local token;
+Google's key stays outside Docker. Use a Gemini Free Tier project without billing.
+Only explicit quota/rate-limit errors switch models; actual winner and reason are
+recorded, and local findings remain available if AI fails. GLM is excluded after
+service failures. See [setup, source tour and verified limits](docs/FREE_AI_FALLBACK.md).
 
 ## Testing
 
@@ -172,9 +199,9 @@ ruff check src tests scripts && mypy               # lint (incl. complexity & do
 cd web && npm run lint && npm test && npm run build
 ```
 
-- No test calls a real AI provider or GitHub: both are faked at the HTTP boundary with
-  `httpx.MockTransport`, including malformed JSON, missing fields, rate limits, timeouts and
-  provider errors.
+- No test calls a live AI provider or GitHub. HTTP mocks cover malformed JSON, missing
+  fields, rate limits, timeouts and provider errors. Compose acceptance uses a local
+  deterministic HTTP provider fixture with the real API, PostgreSQL and workers.
 - **Golden tests** ([`tests/golden/cases/`](tests/golden/cases/)) pin the outcome for SQL
   injection, an auth bypass, a race condition, performance problems, secrets, prompt
   injection, TypeScript and a clean change — including which wrong AI claims must be
@@ -182,19 +209,20 @@ cd web && npm run lint && npm test && npm run build
 - The **end-to-end test** drives a pull request from webhook to published comments through
   the real API, worker, pipeline and database.
 - CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of the above plus the
-  Docker sandbox tests and both image builds. Performance numbers:
+  Docker sandbox tests and complete isolated Compose acceptance (including validated
+  multi-file Apply and persistence after service recreation). Performance numbers:
   [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Security model
 
 Sentinel handles source code, which may contain secrets and hostile content.
 
-- **Secrets never reach a model.** `.env` files, private keys and credential stores are
-  never read; secrets elsewhere are redacted in the diff, in the context and in the final
-  prompt.
+- **Secret filtering and redaction.** Recognized `.env` files, private keys and credential stores are
+  excluded; detected secrets elsewhere are redacted in the diff, in the context and in the final
+  prompt. Unrecognized credentials can escape pattern detection; review the material you share.
 - **Repository content is data, not instructions.** It is fenced in tags with a per-review
   nonce that the content cannot forge; text aimed at an AI reviewer is reported as a
-  finding; and verification means the model cannot talk a finding into existence.
+  finding. Claims are checked against available evidence, with uncertainty reported explicitly.
 - **Untrusted pull requests cannot execute code on the server**: no project-local linters,
   type-checker plugins or packages are loaded for PR reviews.
 - **Generated code never runs on the host.** Fix tests run in containers with no network, a
@@ -216,19 +244,24 @@ Full table: [ARCHITECTURE.md §10](docs/ARCHITECTURE.md#10-security-boundaries).
 | [STUDY_GUIDE.md](docs/STUDY_GUIDE.md) | A 14-day reading plan |
 | [GITHUB_APP.md](docs/GITHUB_APP.md) · [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Running it for a team |
 | [BENCHMARKS.md](docs/BENCHMARKS.md) | Measured latency and memory by repository size |
+| [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) | Current checks, remaining gaps and rough work estimate |
+| [DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md) · [MULTI_FILE_FIXES.md](docs/MULTI_FILE_FIXES.md) | Upgrades, legacy adoption and coordinated fixes |
 | [PROGRESS.md](PROGRESS.md) | Build status, assumptions, what is verified only with mocks, open questions |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [SPEC.md](docs/SPEC.md) | Code-quality standard and pre-commit checks · the original product spec |
 
 ## Project status
 
-V1 scope of the spec is implemented. Things to know (details in [PROGRESS.md](PROGRESS.md)):
+The core V1 workflows are implemented; release acceptance and the remaining limitations
+are tracked in [PROGRESS.md](PROGRESS.md). Things to know:
 
 - The AI providers and the GitHub App are tested against faithful fakes, not live services —
   test them with real keys before relying on them.
 - The web UI is a React + TypeScript single-page app bundled with esbuild rather than the
   recommended Next.js/Tailwind/shadcn/Monaco stack (the build environment had no npm
   registry access).
-- Database tables are created with `create_all()`; add migrations before upgrading a
-  database with data you want to keep.
+- Database upgrades use [versioned migrations](docs/DATABASE_MIGRATIONS.md). Existing
+  unversioned databases require explicit, validated adoption before startup.
+- [Multi-file fixes](docs/MULTI_FILE_FIXES.md) can coordinate supplied files and create
+  an approved regression test, with Docker validation and guarded application.
 
 License: MIT.

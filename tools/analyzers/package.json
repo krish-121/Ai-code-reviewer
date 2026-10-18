@@ -1,0 +1,10 @@
+{
+  "name": "sentinel-analyzers",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@typescript-eslint/parser": "8.71.2",
+    "eslint": "10.13.0",
+    "typescript": "5.9.3"
+  }
+}

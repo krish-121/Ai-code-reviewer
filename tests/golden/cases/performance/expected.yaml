@@ -1,6 +1,6 @@
 risk: medium
 surfaced:
-  - {tag: n+1, file: app/reports.py, verification: supported}
+  - {tag: n+1, file: app/reports.py, verification: likely}
   - {tag: blocking-in-async, file: app/reports.py, verification: supported}
 suppressed_or_surfaced:
   - {tag: quadratic, file: app/reports.py}

@@ -73,9 +73,14 @@ to admins only.
 | draft PRs | ignored until marked ready for review |
 | anything else | acknowledged (`200`) and ignored |
 
-Each push produces a new review. The summary comment (marked
+Each distinct base/head revision queues one review; repeated deliveries return its existing ID.
+Workers reject superseded PR revisions before analysis and before publication. The summary identifies
+the reviewed commit. GitHub has no atomic compare-and-comment operation, so a push concurrent with
+the final network request can still leave a comment explicitly labeled with the older commit.
+The summary comment (marked
 `<!-- sentinel:summary -->`) is **edited in place**; inline comments are posted only for
-findings whose fingerprint is not already on the PR, so re-pushing does not repeat comments.
+findings whose fingerprint is not already in comments owned by the authenticated bot/user.
+Markers in other users' comments never suppress findings or select a comment for editing.
 Findings on lines outside the diff (GitHub cannot comment there) are listed in the summary.
 Sentinel posts reviews with the `COMMENT` event: it never approves or blocks a PR.
 
@@ -83,8 +88,10 @@ Sentinel posts reviews with the `COMMENT` event: it never approves or blocks a P
 
 GitHub must reach your machine. With any tunnel (e.g. `cloudflared tunnel --url
 http://127.0.0.1:8000` or `ngrok http 8000`), set the App's webhook URL to the tunnel URL +
-`/api/github/webhook`. Note that `sentinel serve` refuses to listen on a public interface in
-`local` auth mode; the tunnel connects to `127.0.0.1`, so local mode is fine for testing.
+`/api/github/webhook`. A tunnel exposes the local server publicly even when it listens on loopback.
+Run with `SENTINEL_AUTH_MODE=token`, create a user token, and set the webhook secret before exposing
+the server. Alternatively, configure a reverse proxy to expose **only** `/api/github/webhook` and
+deny every other route. Never tunnel the full server in local/no-login auth mode.
 
 GitHub's App settings → *Advanced* → *Recent deliveries* shows each webhook and Sentinel's
 response (`202` with a `review_id` when a review was queued). A `401` means the webhook

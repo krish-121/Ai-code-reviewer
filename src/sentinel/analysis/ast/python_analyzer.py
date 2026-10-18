@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import posixpath
 
+from sentinel.analysis.ast.python_access import global_accesses
 from sentinel.analysis.ast.python_sql import db_operation_kind, sql_tables
 from sentinel.core.domain.code import (
     CallSite,
@@ -196,6 +197,20 @@ class _Visitor(ast.NodeVisitor):
                     )
         self.generic_visit(node)
 
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if not self.scope and isinstance(node.target, ast.Name):
+            self.symbols.append(
+                Symbol(
+                    name=node.target.id,
+                    qualified_name=node.target.id,
+                    kind=SymbolKind.VARIABLE,
+                    line_start=node.lineno,
+                    line_end=node.end_lineno or node.lineno,
+                )
+            )
+        if node.value is not None:
+            self.visit(node.value)
+
     # ---------------------------------------------------------------- control flow
     def _visit_loop(self, node: ast.For | ast.AsyncFor | ast.While) -> None:
         if isinstance(node, ast.For | ast.AsyncFor):
@@ -333,6 +348,11 @@ class PythonAnalyzer:
         result.calls = visitor.calls
         result.endpoints = visitor.endpoints
         result.db_operations = visitor.db_ops
+        try:
+            result.variable_accesses = global_accesses(tree, path, source)
+        except SyntaxError as exc:
+            # ast.parse accepts some constructs (e.g. top-level return) compilation rejects.
+            result.parse_error = f"SyntaxError: {exc.msg} (line {exc.lineno})"
         return result
 
 

@@ -26,8 +26,28 @@ class AIConfigurationError(AIError):
     """Missing API key, unknown model, unreachable local server ..."""
 
 
+class AIConnectionError(AIConfigurationError):
+    """Connection failed; unlike a wrong key, another provider can still work."""
+
+
+class AIUnavailableError(AIError):
+    """Transient transport/timeout failure after bounded retries."""
+
+
+class AIRateLimitError(AIError):
+    """Quota or rate limit reached; carries the server's suggested waiting period."""
+
+    def __init__(self, message: str, retry_after_s: float = 0.0) -> None:
+        super().__init__(message)
+        self.retry_after_s = retry_after_s
+
+
 class AIResponseError(AIError):
     """The provider answered, but not with something we can use."""
+
+
+class AIBlockedError(AIResponseError):
+    """The provider explicitly refused this input; schema repair cannot resolve it."""
 
 
 @runtime_checkable

@@ -1,9 +1,177 @@
 # Sentinel — build progress
 
 Living log of what is built, what was decided, and what still needs a human eye.
-Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-02.
+Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-18.
+
+## Normal sandbox and complete live fix workflow - 18 October 2026
+
+- Built the current trusted `sentinel-sandbox:latest` image (about 706 MB) and saved
+  Docker/copy transport for the existing WSL runtime. Added the missing writable
+  `sandbox_transport` setting and a validation/preservation regression test.
+- Used the installed main checkout and actual Gemini `gemini-3.8-flash` to review a
+  fresh disposable SQL example. All eight review stages completed. The model generated
+  a parameterized query and a new security test on its first generation attempt.
+- All seven normal fix checks passed, including baseline tests and a new regression
+  test that fails before and passes after. Normal `FixService.apply` wrote only the
+  example's two proposed files. Three tests and an independent SQL-input probe passed
+  afterward inside Docker; stored statuses became applied/fixed. No bypass or host
+  execution of generated code was used. Gemini quota was not simulated in this run.
+- Normal local API/UI and in-process worker startup passed using the saved setup and
+  disposable database. The test server was stopped. A full deployed browser run with
+  the new bridge remains separate.
+- Beginner explanation and source trace: [LIVE_FIX_WORKFLOW.md](docs/LIVE_FIX_WORKFLOW.md).
+  The walkthrough, setup guide and ordered remaining work now link this completed step.
+- Required checks passed: 518 Python tests, 27 PostgreSQL skips, all seven real Docker
+  cases; coverage 93.36% overall and 96% core. Ruff lint/format and strict typing passed.
+  Initial incomplete-environment test runs and their resolution are documented in the
+  live workflow report. No frontend code changed.
+
+## Gemini quota fallback connected - 18 October 2026
+
+- Implemented Gemini -> official OpenCode bridge -> free DeepSeek for explicit HTTP 429
+  quota/rate-limit errors. GLM is excluded; the failed direct-HTTP candidate was replaced.
+- Preserved the AIProvider boundary, existing verification, private keys, cache and Apply
+  rules. Actual winner and fallback reason survive review persistence.
+- The local Docker bridge receives no vendor credentials, repository mount or Docker
+  socket. It has authentication, per-request cleanup, approval rejection, bounded input/
+  output and a deadline. Review/API workers keep their existing no-daemon boundary.
+- Real Gemini-first CLI review passed. Controlled Gemini 429 -> real hosted DeepSeek ->
+  full eight-stage review/database run passed. Repeat reused cooldown and cached answer
+  without further model calls. Live tool-permission diagnostic rejected its command.
+- Python suite: 517 passed, 27 PostgreSQL skips; overall coverage 93%, core 96%. Strict
+  typing/lint passed, including the standalone bridge. Optional Compose configuration
+  validated; its full deployment is not claimed by this continuation.
+- Setup and source tour: [FREE_AI_FALLBACK.md](docs/FREE_AI_FALLBACK.md) and
+  [WALKTHROUGH.md section 6.1](docs/WALKTHROUGH.md#61-automatic-deepseek-fallback-when-gemini-reaches-its-limit).
+  Evidence and remaining limits: [DEEPSEEK_FALLBACK_VERIFICATION.md](docs/DEEPSEEK_FALLBACK_VERIFICATION.md).
+
+## Current continuation: graph/context, Apply and report integrity — 2026-10-18
+
+See [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the consolidated requirement map,
+earlier fix history and ordered remaining work. [LOCAL_SETUP_AND_GITHUB.md](docs/LOCAL_SETUP_AND_GITHUB.md)
+explains the offline → real model → GitHub sequence for the owner, who has not configured
+Ollama or an online repository yet.
+
+- Preserved modules/variables and lexical module/import reads/writes across Python/TS/JS;
+  changed constants include unchanged consumers. Added file/handler endpoint identity,
+  independent deterministic UI projections, a hard node budget and symbol cache version 4.
+- Browser acceptance exposed unverified Apply and a 20 KB truncation of valid analyzer JSON.
+  Apply now requires validation at every surface; machine-readable reports get a separate
+  bounded budget. The demo includes TypeScript configuration and validates its Python fix.
+- **35 additional pytest cases** and **1 additional web case**. Final Python 3.14:
+  **495 passed, no skips**; Python 3.11: **494 passed, 1 optional namespace skip** (passes on
+  3.14). All seven real Docker cases and PostgreSQL variants ran in both suites.
+- Overall coverage **93.48% / 93.46%** (3.14/3.11); core **96.21%** on both. Ruff,
+  formatting, strict mypy (149 source files), dependency checks, web **21 tests** and build pass.
+- Final rebuilt Compose workflow passes review → multi-file fix → Docker validation →
+  three-file Apply → service recreation/persistence. Browser smoke covers token/invalid-token
+  recovery, local review creation, finding details, graph variable source and validated Apply.
+  Providers in these runs are fixtures/replay, not real models.
+- Refreshed small/medium/large staged-review benchmarks: medians **1.073 / 1.465 / 4.042 s**
+  over three runs each, with all six analyzers and an instantaneous measuring provider.
+  The large graph is capped at 2,000 source files; these are not deletion/fix/load measurements.
+- Live model/GitHub acceptance, representative quality evaluation, complete browser/accessibility,
+  deployment operations/load and hosted release remain. No claim of complete V1 acceptance.
+
+## SPEC gaps: Compose validation and analyzer parity — 2026-10-18
+
+Dedicated fix-only Docker worker, stdin/tmpfs scratch transfer and identical locked runtime
+analyzers are implemented. Full Compose acceptance covers auth/UI/SSE/metrics, six analyzers,
+queued multi-file fix validation/Apply and persistence after service recreation. No fallback
+database password remains. See [RELEASE_READINESS.md](docs/RELEASE_READINESS.md).
+
+- Added 21 pytest regression cases and a reusable Compose acceptance harness/CI job.
+- Final Python 3.14: **460 passed, no skips**; Python 3.11: **459 passed, 1 platform skip**.
+  PostgreSQL and all five actual Docker cases ran in both suites. No pytest warnings.
+- Focused **29 passed**; web **20 passed**; overall/core coverage **93.36% / 96.16%**.
+  Lint, format, strict types, dependency checks, three production targets and installed
+  image checks pass. ESLint 10.13.0 replaces the unsupported 9.x pin.
+- Rough remaining release-readiness effort: **10–20%, centred on 15%**, judgment-based.
+  Live providers/GitHub, actual-browser flows, production operations, quality/load and graph
+  gaps remain explicit. Only disposable test data was changed; no real external requests.
+
+## SPEC gaps: migrations and multi-file fixes — 2026-10-18
+
+Database migrations and bounded multi-file fixes/new regression tests are implemented.
+See [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) for changes, evidence, remaining
+unverified workflows and the rough **15–25%** release-readiness effort estimate.
+
+- Added 37 regression cases. Focused **261 passed**; full Python 3.14 **435 passed/4 skips**;
+  Python 3.11 **434 passed/5 skips**. No warnings; PostgreSQL variants all ran.
+- All four Docker test bodies passed separately, including two edited files plus a new
+  regression test, which fails before and passes after the patch. Web **20 passed**.
+- Overall coverage **93.41%**, core **96.10%** (Python 3.14); both environments pass
+  the 80%/90% gates. Lint/types/builds and installed-package/HTTP/schema checks pass.
+- Existing databases require explicit upgrade/adoption. No user data was migrated here.
+- Hosted services, browser/Compose acceptance, backup/restore, load and quality evaluation,
+  analyzer parity and remaining graph/demo work are still explicit release gaps.
+
+Earlier dated checkpoints below retain their original counts and limitations.
+
+## S16 completion — 2026-10-18
+
+**All 24 audit defects S10–S33 are resolved**, within the supported analysis boundaries.
+[S16_REMEDIATION.md](docs/S16_REMEDIATION.md) records the implementation, source evidence,
+regressions, exact final counts and remaining external/SPEC limits.
+
+- Added 38 S16 regression cases. Focused suite: **225 passed**.
+- Full Python 3.11 + Node 22: **398 passed, 4 environment skips**; Python 3.14 + Node 22:
+  **399 passed, 3 Docker skips**. No warnings. PostgreSQL variants all ran.
+- All three Docker test bodies passed separately in real containers. The optional process
+  namespace case skipped in Python 3.11 passed in WSL.
+- Coverage: **93.89% overall, 96.85% core** on Python 3.14; both Python environments
+  exceed the 80%/90% gates. Ruff, formatting, strict types, dependency consistency, 20 web
+  tests, clean web install, production bundle, both Docker builds and app smoke checks pass.
+- Base/head scans include unchanged dependents; uncertainty and resource/tool limits remain
+  explicit. Dynamic behavior and external/live release workflows are not certified.
+- Changes remain local and uncommitted. The following sections are historical checkpoints.
+
+## Remaining audit remediation — 2026-10-17
+
+**23 of S10–S33 are resolved; S16 remains partial.** The complete issue-by-issue disposition,
+source/test evidence and unresolved SPEC limits are in
+[REMAINING_AUDIT_REMEDIATION.md](docs/REMAINING_AUDIT_REMEDIATION.md).
+
+- Full Python 3.11 suite: **360 passed, 4 environment skips**, no warnings; 93.54% coverage.
+- Full Python 3.14 suite: **361 passed, 3 Docker skips**, no warnings; 93.61% coverage.
+- All three skipped Docker test bodies passed separately in real containers; the process
+  namespace test skipped in Python 3.11 passed in WSL. PostgreSQL variants all ran.
+- Core coverage **96.71%**; focused regressions **187 passed**; web **20 passed**.
+- Clean dependency installs, lint, formatting, strict types, UI bundle, both Docker builds,
+  installed package assets and HTTP/auth smoke checks pass. Test database leaks and the
+  test-client deprecation are fixed. Source changes remain uncommitted.
+- S16 still needs base/head diagnostic comparison and full dependent-code deletion analysis.
+  Live service publication, hosted CI and full browser/Compose workflows remain unverified.
+
+The following dated sections are historical evidence, not current acceptance results.
+
+## Engineering audit remediation — 2026-10-16
+
+The nine high-priority audit blockers S01–S09 are implemented and regression-tested.
+See [the remediation report](docs/BLOCKER_REMEDIATION.md) for each change, its evidence,
+and the remaining limitations. The previous completion claims below describe the earlier
+build and do not close the audit's remaining S10–S33 findings.
+
+- Added 53 regression cases. Focused suite: **141 passed**. Full Linux suite: **305 passed,
+  12 skipped**, 93.52% overall coverage; core coverage **96.59%** (gate 90%).
+- Both Docker test bodies passed separately in real Docker Desktop containers, including
+  full fix validation with an untrusted repository plugin present. The full suite's two
+  Docker skips reflect disabled WSL integration; ten PostgreSQL variants remain untested.
+- Ruff, formatting, strict mypy (123 source files), whitespace checks and sandbox image
+  build pass. SQLite resource warnings and a test-client deprecation remain.
+- Fix analysis and tests now require Docker. No process fallback executes generated code.
+  Rebuild the sandbox image after upgrading; install project test dependencies in it.
+- Filesystem confinement rejects symlinks/hard links and requires POSIX/WSL facilities.
+  Demo creation refuses existing destinations. Incomplete checks never yield `validated`.
+- Assumption: conservative same-rule/location checks are preferable to falsely confirming
+  a fix; ambiguous or incomplete validation remains unverified.
 
 ## Steps
+
+Historical implementation milestones below are not release acceptance. The current audit
+disposition and final check results are tracked in
+[Remaining audit remediation](docs/REMAINING_AUDIT_REMEDIATION.md). Deployment limitations
+and external-service verification remain explicit there.
 
 | # | Step | Status |
 |---|------|--------|
@@ -205,7 +373,7 @@ Full write-ups go in `docs/DESIGN_DECISIONS.md` (step 7). Short version:
 - The demo seeding script writes to `.demo/` in the repo (git-ignored). The weaker process
   sandbox is opt-in only (`--allow-process-sandbox`).
 
-## Verified only with mocks — test these live with real keys
+## Original-build verification snapshot (superseded by the 2026-10-17 report)
 
 | Path | How it is tested here | What to try live |
 |------|----------------------|------------------|
@@ -228,20 +396,61 @@ real PostgreSQL 16 (`SENTINEL_TEST_DATABASE_URL`, marker `postgres`).
 ## NEEDS REVIEW
 
 1. **Frontend stack (§31).** The spec *recommends* Next.js, Tailwind, shadcn/ui, Monaco and
-   TanStack Query. The npm registry is blocked in this workspace, so the UI is React 19 +
+   TanStack Query. The original build used React 19 +
    TypeScript bundled with esbuild, hand-written CSS, a small built-in syntax highlighter and
    a tiny `useQuery` hook. It is served by FastAPI as static files. Components are plain
    React, so moving to Next.js later is mostly a routing/bundling change.
-2. **Database migrations.** Tables are created with SQLAlchemy `create_all()`; Alembic is
-   not set up. Fine for a fresh install, but schema changes on an existing database need a
-   migration tool before real use.
-3. **Fix validation in Docker Compose.** The compose stack does not mount the Docker socket
-   into the worker (that would give the container root on the host), so fixes generated
-   there are reported *unverified* (tests skipped). Fully validated fixes need a worker on a
-   host with Docker (docs/DEPLOYMENT.md). Alternatives if this matters: a dedicated sandbox
-   service with a narrow API, rootless Docker / Podman in the worker, or gVisor.
+2. **Database migrations — implemented.** Packaged Alembic history and explicit legacy
+   adoption are regression-tested on SQLite and PostgreSQL. Deployment backup/restore and
+   production-data rehearsals remain. See [DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md).
+3. **Fix validation in Docker Compose — implemented.** A dedicated fix-only worker has
+   Docker access; the API and review/publication worker do not. Scratch stdin transfer into
+   tmpfs avoids daemon/worker path mismatch. Use a dedicated engine/host: the trusted
+   validation worker controls that daemon. Rootless engines and stronger VM isolation
+   remain deployment options requiring their own acceptance runs (docs/DEPLOYMENT.md).
 4. **GitHub App permissions.** Installation tokens are requested with only
    `contents: read`, `pull_requests: write`, `issues: write` (`MIN_PERMISSIONS` in
    `integrations/github/client.py`); `issues: write` is needed because PR conversation
    comments use the Issues API. Check runs are not used. Confirm this matches how you want
    results to appear on PRs.
+
+## Live Gemini verification - 18 October 2026
+
+Gemini 3.8 Flash is now configured and verified with invented examples. A complete
+CLI review finished all eight stages, and the model's SQL-injection finding was
+independently supported by local analysis. Its proposed parameterized query passed
+a separate before/after Docker test: one existing test failed before, both passed
+after. The saved fix remains unverified because the current policy requires an
+already-passing baseline suite; Apply was not bypassed. No project patch was applied.
+
+See [GEMINI_LIVE_TEST.md](docs/GEMINI_LIVE_TEST.md) for evidence, usage and limits.
+At that earlier Gemini-only test stage, OpenCode fallback was off. The current connected fallback is described above.
+
+## OpenCode Docker experiment - 18 October 2026
+
+Docker runs an application in a separate environment. Its image is a saved setup;
+a container is a running copy. The official OpenCode 1.19.3 application was installed
+inside an image of about 825 MB. The online DeepSeek/GLM models were not downloaded.
+No project directory, Gemini key, user login or Docker socket was shared with it.
+The temporary containers are gone; the reusable image remains cached.
+
+DeepSeek V4.1 Flash Free answered without a key or payment and reported zero cost.
+It identified an empty-list crash, passed Sentinel's actual review JSON schema for
+an invented SQL-injection change, and returned no findings for the safe parameterized
+version. No tool calls occurred in those successful responses. This is limited
+compatibility evidence, not a project-wide accuracy benchmark or an unlimited quota.
+
+GLM-5.3-Flash Free returned HTTP 503 (upstream unavailable) on two standard-mode
+attempts. Its review quality is not verified. Denying every OpenCode tool had first
+caused misleading HTTP 403 errors for both models; standard Build mode with global
+tool permissions set to ask allowed DeepSeek to respond, without any approvals.
+
+At the earlier experiment stage, automatic fallback was off. That earlier direct-HTTP adapter was not the tested
+OpenCode route. The new integration above supersedes that candidate, with timeout/output
+bounds, verified rejection of tool requests, and a real quota-switching test. Preserve
+the existing deployment boundary: review/API workers do not control Docker. No source
+patch was installed into the main repository by this experiment.
+
+See [FREE_AI_VERIFICATION.md](docs/FREE_AI_VERIFICATION.md) for the test matrix, explanation,
+limitations and remaining integration work. Gemini's separate live results are in
+[GEMINI_LIVE_TEST.md](docs/GEMINI_LIVE_TEST.md).

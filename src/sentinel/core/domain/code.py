@@ -83,6 +83,15 @@ class DbOperation(BaseModel):
     in_loop: bool = False
 
 
+class VariableAccess(BaseModel):
+    """A lexically resolved access to a module variable or an imported binding."""
+
+    symbol: str
+    name: str
+    line: int
+    operation: str = Field(description="read | write")
+
+
 class FileSymbols(BaseModel):
     """Everything a language analyzer extracted from one file."""
 
@@ -94,6 +103,7 @@ class FileSymbols(BaseModel):
     calls: list[CallSite] = Field(default_factory=list)
     endpoints: list[EndpointRef] = Field(default_factory=list)
     db_operations: list[DbOperation] = Field(default_factory=list)
+    variable_accesses: list[VariableAccess] = Field(default_factory=list)
     is_test_file: bool = False
     parse_error: str | None = None
     loc: int = 0

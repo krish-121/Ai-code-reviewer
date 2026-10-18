@@ -147,10 +147,19 @@ def test_fix_command_with_scripted_provider(env: Path, monkeypatch: pytest.Monke
 
     monkeypatch.setattr("sentinel.apps.cli.fix_command.build_fix_engine", fake_engine)
     res = runner.invoke(app, ["fix", fid, "--apply", "--yes"])
-    assert res.exit_code == 0, res.output
-    assert "Patch validated" in res.output and "Applied to app/db.py" in res.output
-    assert "LIKE ?" in (env / "app" / "db.py").read_text()
-    assert "fixed" in runner.invoke(app, ["findings"]).output
+    assert res.exit_code == 3, res.output
+    assert "could not be verified" in res.output and "Only validated patches" in res.output
+    assert VULN in (env / "app" / "db.py").read_text()
+    assert "Applied to app/db.py" not in res.output
+    from sqlalchemy import select
+
+    from sentinel.infrastructure.database.models import FixAttempt
+    from sentinel.infrastructure.database.session import Database
+
+    db = Database(os.environ["SENTINEL_DATABASE_URL"])
+    with db.session() as session:
+        assert session.scalar(select(FixAttempt.status)) == "unverified"
+    db.engine.dispose()
     assert runner.invoke(app, ["fix"]).exit_code == 2
 
 
@@ -174,6 +183,14 @@ def test_config_set_masks_secrets_and_rejects_unknown_keys(env: Path) -> None:
     assert runner.invoke(app, ["config", "init"]).exit_code == 2  # demo has .sentinel.yml
     assert runner.invoke(app, ["config", "init", "--force"]).exit_code == 0
     assert "include_style" in (env / ".sentinel.yml").read_text()
+
+
+def test_config_secret_can_be_entered_without_shell_history(env: Path) -> None:
+    result = runner.invoke(app, ["config", "set", "gemini_api_key"], input="local-secret\n")
+    assert result.exit_code == 0 and "local-secret" not in result.output
+    assert "local-secret" not in runner.invoke(app, ["config"]).output
+    missing = runner.invoke(app, ["config", "set", "provider"])
+    assert missing.exit_code == 2 and "Provide a value" in missing.output
 
 
 def test_version_graph_and_user_admin_commands(env: Path) -> None:

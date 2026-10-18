@@ -46,6 +46,8 @@ export function useQuery<T>(
         });
     };
     setData(cache.get(key) as T | undefined);
+    setError(undefined);
+    setLoading(!cache.has(key));
     run();
     const timer = pollMs ? window.setInterval(run, pollMs) : undefined;
     return () => {

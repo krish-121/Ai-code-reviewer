@@ -70,6 +70,13 @@ class PythonRules(ast.NodeVisitor):
         self.functions: list[_Function] = []  # stack: innermost last
         self.loops: list[ast.AST] = []  # loops in the current function, innermost last
         self._reported_sql: set[int] = set()
+        self.http_aliases = {
+            alias.asname or alias.name: alias.name
+            for node in tree.body
+            if isinstance(node, ast.Import)
+            for alias in node.names
+            if alias.name in {"requests", "httpx"}
+        }
         self.coroutines = {n.name for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef)}
         self.module_assignments: dict[str, ast.AST] = {
             target.id: node.value
@@ -294,7 +301,23 @@ class PythonRules(ast.NodeVisitor):
 
     def _check_tls(self, node: ast.Call) -> None:
         """Rule ``tls-verify-disabled``: ``verify=False``."""
-        if not _keyword_is_false(node, "verify"):
+        name = expr_name(node.func)
+        root, _, suffix = name.partition(".")
+        if (
+            root not in self.http_aliases
+            or root in self.assignments
+            or root in self.module_assignments
+        ):
+            return
+        if self.functions and any(arg.arg == root for arg in self.functions[-1].node.args.args):
+            return
+        name = self.http_aliases[root] + "." + suffix
+        known = name in {"httpx.Client", "httpx.AsyncClient"} or (
+            name.split(".")[0] in {"requests", "httpx"}
+            and name.split(".")[-1]
+            in {"get", "post", "put", "patch", "delete", "head", "request", "options"}
+        )
+        if not known or not _keyword_is_false(node, "verify"):
             return
         self.add(
             rule="tls-verify-disabled",

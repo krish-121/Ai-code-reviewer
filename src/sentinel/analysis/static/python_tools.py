@@ -189,6 +189,7 @@ class MypyAnalyzer:
             exe,
             "--ignore-missing-imports",
             "--follow-imports=silent",
+            "--check-untyped-defs",
             "--no-error-summary",
             "--show-error-codes",
             "--show-column-numbers",

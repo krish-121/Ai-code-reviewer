@@ -1,0 +1,9 @@
+{
+  "enabled_providers": ["opencode"],
+  "model": "opencode/deepseek-v4.1-flash-free",
+  "small_model": "opencode/deepseek-v4.1-flash-free",
+  "autoupdate": false,
+  "share": "disabled",
+  "permission": {"*": "ask"},
+  "agent": {"build": {"steps": 1, "permission": {"*": "ask"}}}
+}

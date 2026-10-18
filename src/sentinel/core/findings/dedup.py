@@ -52,7 +52,9 @@ def fingerprint(finding: Finding) -> str:
     small edits and lets GitHub publishing skip duplicates.
     """
     anchor = finding.symbol or f"L{finding.line_start // 10}"
-    raw = "|".join([finding.file, finding.category.value, concept(finding), anchor])
+    raw = "|".join(
+        [finding.file, finding.category.value, concept(finding), anchor, finding.site_anchor or ""]
+    )
     return hashlib.sha1(raw.encode(), usedforsecurity=False).hexdigest()[:16]
 
 
@@ -138,8 +140,23 @@ def merge(group: list[Finding]) -> Finding:
     if len(producers) > 1:
         primary.source = FindingSource.COMBINED
     primary.merged_ids = [f.id for f in ranked[1:]] + [mid for f in ranked for mid in f.merged_ids]
+    primary.baseline_status = _baseline_status(ranked)
+    if primary.baseline_status is not None:
+        primary.in_changed_lines = primary.baseline_status != "pre-existing"
     primary.fingerprint = fingerprint(primary)
     return primary
+
+
+def _baseline_status(findings: list[Finding]) -> str | None:
+    """A new diagnostic must not be hidden by merging it with an older one."""
+    statuses = {f.baseline_status for f in findings}
+    if "introduced" in statuses:
+        return "introduced"
+    if "unknown" in statuses:
+        return "unknown"
+    if "pre-existing" in statuses:
+        return "pre-existing"
+    return None
 
 
 def _rejected(f: Finding) -> bool:

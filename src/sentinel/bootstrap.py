@@ -16,7 +16,7 @@ from sentinel.analysis.static.runner import StaticAnalysisRunner, default_analyz
 from sentinel.core.configuration.config import RepoConfig, Settings
 from sentinel.core.domain.ports import AIConfigurationError, AIProvider, Cache, ProgressReporter
 from sentinel.core.fixes.engine import FixEngine
-from sentinel.core.fixes.validation import Sandbox, SyntaxChecker, python_syntax
+from sentinel.core.fixes.validation import Sandbox, python_syntax
 from sentinel.core.review.orchestrator import ReviewOrchestrator
 from sentinel.core.verification.checks import generic_checks
 from sentinel.core.verification.engine import VerificationEngine, Verifier
@@ -27,6 +27,7 @@ from sentinel.integrations.github.client import (
     GitHubError,
     StaticToken,
 )
+from sentinel.sandbox.analysis import SandboxStaticRunner
 from sentinel.sandbox.runners import DockerSandbox, ProcessSandbox
 
 # Pass as ``ai=`` / ``sandbox=`` to build the component from settings (the default).
@@ -55,7 +56,7 @@ def build_orchestrator(
     repo_config: RepoConfig,
     *,
     workspace: Path,
-    ai: AIProvider | None | str = FROM_SETTINGS,
+    ai: AIProvider | str | None = FROM_SETTINGS,
     progress: ProgressReporter | None = None,
     cache: Cache | None = None,
     registry: LanguageRegistry | None = None,
@@ -92,7 +93,7 @@ def build_orchestrator(
 def build_sandbox(settings: Settings) -> Sandbox | None:
     """Docker by default. The weaker process sandbox is used only when explicitly allowed."""
     if settings.sandbox == "docker":
-        docker = DockerSandbox(settings.sandbox_image)
+        docker = DockerSandbox(settings.sandbox_image, transport=settings.sandbox_transport)
         if docker.is_available():
             return docker
     if settings.allow_process_sandbox:
@@ -100,49 +101,36 @@ def build_sandbox(settings: Settings) -> Sandbox | None:
     return None
 
 
-def _ts_syntax(registry: LanguageRegistry) -> SyntaxChecker:
-    def check(path: str, content: str) -> str | None:
-        if not path.endswith((".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts")):
-            return None
-        fs = registry.analyze({path: content}).get(path)
-        if fs is not None and fs.failed_to_parse:
-            return f"{path}: {fs.parse_error}"
-        return None
-
-    return check
-
-
 def build_fix_engine(
     settings: Settings,
     repo_config: RepoConfig,
     *,
     workspace: Path,
-    ai: AIProvider | None | str = FROM_SETTINGS,
-    sandbox: Sandbox | None | str = FROM_SETTINGS,
+    ai: AIProvider | str | None = FROM_SETTINGS,
+    sandbox: Sandbox | str | None = FROM_SETTINGS,
     trusted_workspace: bool = True,
 ) -> FixEngine:
     """Build a ``FixEngine`` with the configured provider, analyzers and sandbox.
 
-    ``trusted_workspace=False`` applies the same no-repository-code rule as reviews.
+    All generated-code analysis runs in Docker, regardless of repository trust.
+    ``workspace`` and ``trusted_workspace`` are retained for caller compatibility.
     """
     provider = create_provider(settings) if ai == FROM_SETTINGS else ai
     if provider is None or isinstance(provider, str):
         raise AIConfigurationError(
             "Generating fixes needs an AI provider. Configure one with `sentinel config set "
-            "provider claude|gemini|ollama`."
+            "provider claude|gemini|ollama|opencode`."
         )
-    roots = (workspace,) if trusted_workspace else ()
-    registry = default_registry(search_roots=roots, cache=MemoryCache())
-    runner = StaticAnalysisRunner(
-        default_analyzers(registry, trust_workspace=trusted_workspace),
-        disabled=repo_config.static.disabled,
-    )
+    selected = build_sandbox(settings) if sandbox == FROM_SETTINGS else sandbox
+    if isinstance(selected, str):
+        raise ValueError("unknown sandbox selector")
+    runner = SandboxStaticRunner(selected, repo_config)
     return FixEngine(
         provider,
         static_runner=runner,
-        sandbox=build_sandbox(settings) if sandbox == FROM_SETTINGS else sandbox,  # type: ignore[arg-type]
+        sandbox=selected,
         config=repo_config,
-        syntax_checkers=[python_syntax, _ts_syntax(registry)],
+        syntax_checkers=[python_syntax],
     )
 
 

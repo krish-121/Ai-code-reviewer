@@ -97,24 +97,32 @@ export function History({ events }: { events: FindingDetail["events"] }) {
 /** Accept / dismiss an open finding, or reopen a triaged one. */
 export function StatusActions({ finding, onChanged }: { finding: Finding; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const setStatus = async (status: FindingStatus) => {
     setBusy(true);
+    setError(null);
     try {
       await api.setStatus(finding.id, status);
       onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setBusy(false);
     }
   };
   if (finding.status !== "open") {
     return (
-      <button className="btn" disabled={busy} onClick={() => setStatus("open")}>
-        Reopen ({finding.status})
-      </button>
+      <>
+        <button className="btn" disabled={busy} onClick={() => setStatus("open")}>
+          Reopen ({finding.status})
+        </button>
+        {error ? <div role="alert">{error.message}</div> : null}
+      </>
     );
   }
   return (
     <>
+      {error ? <div role="alert">{error.message}</div> : null}
       <button className="btn" disabled={busy} onClick={() => setStatus("accepted")}>
         Accept
       </button>

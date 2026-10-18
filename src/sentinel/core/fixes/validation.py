@@ -100,16 +100,23 @@ def reproducing_rules(finding: Finding) -> set[str]:
 def check_resolved(
     finding: Finding, before: list[Finding], after: list[Finding], duration_ms: int
 ) -> FixCheck:
-    """Passed when a rule that reported the finding before the patch reports less after it."""
+    """Confirm a reproduced target only when its rules no longer fire in that file."""
     rules = reproducing_rules(finding)
-    count_before = sum(1 for f in before if f.file == finding.file and f.rule_id in rules)
+    count_before = sum(
+        1
+        for f in before
+        if f.file == finding.file
+        and f.rule_id in rules
+        and f.line_start <= finding.line_end
+        and f.line_end >= finding.line_start
+    )
     if not rules or count_before == 0:
-        detail = "no deterministic rule reproduces this finding; relying on tests"
+        detail = "no deterministic rule reproduces this finding at its cited location"
         return FixCheck(
             name="finding-resolved", status="skipped", duration_ms=duration_ms, detail=detail
         )
     count_after = sum(1 for f in after if f.file == finding.file and f.rule_id in rules)
-    if count_after < count_before:
+    if count_after == 0:
         fired = ", ".join(sorted(rules & {f.rule_id or "" for f in before}))
         detail = f"{fired} no longer reported ({count_before} → {count_after})"
         return FixCheck(
@@ -125,16 +132,19 @@ def check_no_new_issues(
     before: list[Finding], after: list[Finding], runs: list[AnalysisRun], duration_ms: int
 ) -> FixCheck:
     """Failed when the patched files have medium/high findings the originals did not."""
+    if not runs or any(run.status != ToolStatus.OK for run in runs):
+        return FixCheck(name="no-new-issues", status="skipped", detail="analysis incomplete")
 
-    def key(f: Finding) -> tuple[str, str, str]:
-        return (f.file, f.rule_id or "", f.title)
+    def key(f: Finding) -> tuple[str, str, str, int, int]:
+        return (f.file, f.rule_id or "", f.title, f.line_start, f.line_end)
 
     new = Counter(key(f) for f in after if f.severity in SERIOUS) - Counter(
         key(f) for f in before if f.severity in SERIOUS
     )
     if new:
         listed = "; ".join(
-            f"{rule} {title} ({file})" for file, rule, title in list(new)[:MAX_LISTED_ISSUES]
+            f"{rule} {title} ({file}:{start})"
+            for file, rule, title, start, _ in list(new)[:MAX_LISTED_ISSUES]
         )
         return FixCheck(
             name="no-new-issues",
@@ -157,19 +167,25 @@ def check_tests(
     timeout_s: int,
     base_dir: Path,
     patched_dir: Path,
+    *,
+    allow_empty_baseline: bool = False,
 ) -> FixCheck:
     """Run the tests on the original and on the patched copy, both inside the sandbox."""
     if command is None:
         return FixCheck(name="tests", status="skipped", detail="no test command detected")
-    if sandbox is None or not sandbox.is_available():
+    if sandbox is None or sandbox.isolation != "docker" or not sandbox.is_available():
         return FixCheck(
             name="tests",
             status="skipped",
-            detail="no sandbox available (start Docker, or opt in to the process sandbox); "
-            "generated code was not executed",
+            detail="Docker sandbox unavailable; generated code was not executed",
         )
     baseline = sandbox.run(base_dir, command, timeout_s)
-    if not baseline.ok:
+    empty_pytest = (
+        allow_empty_baseline
+        and command[:3] == ["python", "-m", "pytest"]
+        and baseline.exit_code == 5
+    )
+    if not baseline.ok and not empty_pytest:
         return FixCheck(
             name="tests",
             status="skipped",
@@ -192,4 +208,30 @@ def check_tests(
         status="failed",
         duration_ms=patched.duration_ms,
         detail=f"tests fail after the patch ({reason}): " + " | ".join(tail),
+    )
+
+
+def check_analysis(before: list[AnalysisRun], after: list[AnalysisRun]) -> FixCheck:
+    """Require the same complete set of successful analyzers on both versions."""
+    complete = (
+        bool(before)
+        and bool(after)
+        and {r.tool for r in before} == {r.tool for r in after}
+        and all(r.status == ToolStatus.OK for r in [*before, *after])
+    )
+    problems = [
+        f"{phase} {run.tool}: {run.status} ({run.detail or 'no detail'})"
+        for phase, runs in (("before", before), ("after", after))
+        for run in runs
+        if run.status != ToolStatus.OK
+    ]
+    if not before or not after or {r.tool for r in before} != {r.tool for r in after}:
+        problems.append("missing or mismatched analyzer reports")
+    return FixCheck(
+        name="analysis",
+        status="passed" if complete else "skipped",
+        detail="all analyzers completed"
+        if complete
+        else "analysis incomplete; cannot establish resolution: "
+        + "; ".join(problems[:MAX_LISTED_ISSUES]),
     )

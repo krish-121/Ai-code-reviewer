@@ -57,7 +57,9 @@ def review(
     repo: Annotated[
         str | None, typer.Option("--repo", help="owner/name for --pr (default: origin).")
     ] = None,
-    provider: Annotated[str | None, typer.Option(help="claude | gemini | ollama | none")] = None,
+    provider: Annotated[
+        str | None, typer.Option(help="claude | gemini | ollama | opencode | none")
+    ] = None,
     model: Annotated[str | None, typer.Option(help="Model name for the provider.")] = None,
     no_ai: Annotated[bool, typer.Option("--no-ai", help="Deterministic analysis only.")] = False,
     output: Annotated[str, typer.Option("--format", help="rich | json | markdown")] = RICH,
@@ -72,12 +74,16 @@ def review(
     ] = False,
 ) -> None:
     """Review a change: staged/uncommitted changes, a commit range, a path, or a PR."""
+    if fail_on not in {"none", "high", "medium", "low"}:
+        raise typer.BadParameter("must be high, medium, low, or none", param_hint="--fail-on")
+    if output not in {RICH, JSON, MARKDOWN}:
+        raise typer.BadParameter("must be rich, json, or markdown", param_hint="--format")
     settings = load_cli_settings(provider=provider, model=model)
     if no_ai:
         settings = settings.model_copy(update={"provider": "none"})
     db = open_database(settings)
     if pr is not None:
-        result = _review_pull_request(db, settings, pr, repo, no_ai)
+        result = _review_pull_request(db, settings, pr, repo, no_ai, live=output == RICH)
     else:
         request = _local_request(target, staged, worktree, path, range_)
         result = _review_local(db, settings, request, no_ai, live=output == RICH)
@@ -144,7 +150,13 @@ def _origin_repo() -> str | None:
 
 
 def _review_pull_request(
-    db: Database, settings: Settings, number: int, repo: str | None, no_ai: bool
+    db: Database,
+    settings: Settings,
+    number: int,
+    repo: str | None,
+    no_ai: bool,
+    *,
+    live: bool = True,
 ) -> ReviewResult:
     """Review a GitHub PR from the command line (token auth; nothing is posted)."""
     factory = github_factory(settings)
@@ -168,6 +180,8 @@ def _review_pull_request(
     )
     service = ReviewService(db, settings, ai_factory=ai_factory_for(no_ai), github_factory=factory)
     review_id = service.create_github(event, enqueue=False, publish=False)
+    if not live:
+        return service.run(review_id)
     with LiveProgress(console) as progress:
         return service.run(review_id, progress)
 

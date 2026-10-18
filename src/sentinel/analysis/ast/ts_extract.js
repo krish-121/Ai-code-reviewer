@@ -10,6 +10,7 @@
  * stdout: [FileSymbols, ...]  (snake_case keys, see sentinel/core/domain/code.py)
  */
 'use strict';
+const { bindingAccesses } = require('./ts_bindings.js');
 
 let ts;
 try {
@@ -118,6 +119,7 @@ function extract(path, source) {
     : /\.jsx$/.test(path) ? ts.ScriptKind.JSX : ts.ScriptKind.JS;
   const language = kind === ts.ScriptKind.TS || kind === ts.ScriptKind.TSX ? 'typescript' : 'javascript';
   const sf = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind);
+  const recordAccess = bindingAccesses(ts, sf);
   const isTest = TEST_FILE.test(path);
   const result = {
     path,
@@ -128,6 +130,7 @@ function extract(path, source) {
     calls: [],
     endpoints: [],
     db_operations: [],
+    variable_accesses: [],
     is_test_file: isTest,
     parse_error: null,
     loc: source.split('\n').length - (source.endsWith('\n') ? 1 : 0),
@@ -278,6 +281,7 @@ function extract(path, source) {
 
   function visit(node) {
     if (!node) return;
+    result.variable_accesses.push(...recordAccess(node, current()));
     switch (node.kind) {
       case ts.SyntaxKind.ImportDeclaration: {
         const spec = node.moduleSpecifier.text;

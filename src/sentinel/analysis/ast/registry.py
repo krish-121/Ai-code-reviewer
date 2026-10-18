@@ -18,7 +18,7 @@ from sentinel.core.domain.code import FileSymbols
 from sentinel.core.domain.ports import Cache, LanguageAnalyzer
 from sentinel.infrastructure.storage.cache import content_key
 
-ANALYZER_VERSION = "3"
+ANALYZER_VERSION = "4"
 
 
 class LanguageRegistry:

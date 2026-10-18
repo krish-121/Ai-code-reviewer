@@ -15,25 +15,32 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
+
+from sentinel.analysis.diff.git import repo_root
 from sentinel.analysis.diff.parser import parse_unified_diff
 from sentinel.bootstrap import FROM_SETTINGS, build_orchestrator
 from sentinel.core.configuration.config import Settings, load_repo_config
 from sentinel.core.domain.errors import SentinelError
 from sentinel.core.domain.models import ReviewResult, StageRecord, utcnow
 from sentinel.core.domain.ports import AIProvider, ProgressReporter
+from sentinel.infrastructure.database.deliveries import Delivery, delivery_keys
 from sentinel.infrastructure.database.models import Review, User
 from sentinel.infrastructure.database.session import Database
 from sentinel.infrastructure.database.store import Store
 from sentinel.infrastructure.queue import jobs
 from sentinel.integrations.github.client import GitHubClient
 from sentinel.integrations.github.publisher import GitHubPublisher, PublishResult
+from sentinel.integrations.github.snapshots import require_revision
 from sentinel.integrations.github.webhooks import PullRequestEvent
+from sentinel.services.baselines import github_baseline
+from sentinel.services.resources import close_provider
 from sentinel.services.workspaces import LocalRequest, prepare_local
 
 log = logging.getLogger("sentinel.services")
 
 # Returns the provider to use: an AIProvider, None (no AI), or FROM_SETTINGS.
-AIFactory = Callable[[], AIProvider | None | str]
+AIFactory = Callable[[], AIProvider | str | None]
 # Returns a GitHub client for an App installation id (None: token auth).
 GitHubFactory = Callable[[int | None], GitHubClient]
 GITHUB_KIND = "github"
@@ -74,6 +81,7 @@ class GitHubRequest:
     number: int
     head_sha: str
     installation_id: int | None
+    base_sha: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> GitHubRequest:
@@ -83,6 +91,7 @@ class GitHubRequest:
             number=int(data["number"]),
             head_sha=str(data.get("head_sha") or ""),
             installation_id=data.get("installation_id"),
+            base_sha=data.get("base_sha"),
         )
 
 
@@ -107,12 +116,12 @@ class ReviewService:
     # ------------------------------------------------------------------ creation
     def create_local(self, user_id: str, request: LocalRequest, *, enqueue: bool) -> str:
         """Create a review of a local repository; queue it for the worker if ``enqueue``."""
-        path = str(Path(request.path).expanduser().resolve())
+        path = str(repo_root(Path(request.path).expanduser().resolve()).resolve())
         request = request.model_copy(update={"path": path})
         with self.db.transaction() as s:
             store = Store(s)
             user = store.local_user() if user_id == LOCAL_USER else s.get_one(User, user_id)
-            repo = store.repository(user, Path(path).name, kind="local", local_path=path)
+            repo = store.repository(user, path, kind="local", local_path=path)
             review = store.create_review(
                 repo,
                 request=request.model_dump(),
@@ -124,7 +133,30 @@ class ReviewService:
             return review.id
 
     def create_github(
-        self, event: PullRequestEvent, *, enqueue: bool = True, publish: bool = True
+        self,
+        event: PullRequestEvent,
+        *,
+        enqueue: bool = True,
+        publish: bool = True,
+        delivery_id: str | None = None,
+    ) -> str:
+        """Coalesce webhook redeliveries atomically, including concurrent requests."""
+        keys = delivery_keys(event, delivery_id) if enqueue else []
+        for attempt in range(3):
+            try:
+                return self._create_github(event, enqueue=enqueue, publish=publish, keys=keys)
+            except IntegrityError:
+                if attempt == 2:
+                    raise
+        raise AssertionError("unreachable")
+
+    def _create_github(
+        self,
+        event: PullRequestEvent,
+        *,
+        enqueue: bool,
+        publish: bool,
+        keys: list[str],
     ) -> str:
         """Create a review for a pull-request event.
 
@@ -133,6 +165,10 @@ class ReviewService:
         (``enqueue=False, publish=False``).
         """
         with self.db.transaction() as s:
+            for key in keys:
+                existing = s.get(Delivery, key)
+                if existing is not None:
+                    return existing.review_id
             store = Store(s)
             owner = store.installation_owner(event.installation_id)
             repo = store.repository(
@@ -154,6 +190,7 @@ class ReviewService:
                     "repo": event.repo,
                     "number": event.number,
                     "head_sha": event.head_sha,
+                    "base_sha": event.base_sha,
                     "installation_id": event.installation_id,
                     "publish": publish,
                 },
@@ -163,6 +200,8 @@ class ReviewService:
             )
             if enqueue:
                 jobs.enqueue(s, jobs.REVIEW_JOB, {"review_id": review.id})
+            for key in keys:
+                s.add(Delivery(key=key, review_id=review.id))
             return review.id
 
     # ------------------------------------------------------------------ running
@@ -207,9 +246,17 @@ class ReviewService:
                 ai=self.ai_factory(),
                 progress=progress,
             )
-            return orchestrator.review(
-                ws.changeset, ws.workspace, repository=ws.repository, review_id=review_id
-            )
+            try:
+                return orchestrator.review(
+                    ws.changeset,
+                    ws.workspace,
+                    repository=ws.repository,
+                    review_id=review_id,
+                    baseline=ws.baseline,
+                    baseline_error=ws.baseline_error,
+                )
+            finally:
+                close_provider(orchestrator)
 
     def _run_github(
         self, review_id: str, request: GitHubRequest, progress: ProgressReporter
@@ -218,10 +265,15 @@ class ReviewService:
         if self.github_factory is None:
             raise IntegrationNotConfiguredError("GitHub integration is not configured")
         client = self.github_factory(request.installation_id)
-        pr = client.pull(request.repo, request.number)
-        head_sha = request.head_sha or str((pr.get("head") or {}).get("sha", ""))
+        pr = require_revision(
+            client, request.repo, request.number, request.head_sha, request.base_sha
+        )
+        head_sha = request.head_sha
         changeset = parse_unified_diff(
             client.pull_diff(request.repo, request.number), source=GITHUB_SOURCE
+        )
+        require_revision(
+            client, request.repo, request.number, head_sha, (pr.get("base") or {}).get("sha")
         )
         changeset.title = f"#{request.number} {pr.get('title', '')}".strip()
         changeset.base_ref = (pr.get("base") or {}).get("sha")
@@ -238,9 +290,18 @@ class ReviewService:
                 progress=progress,
                 trusted_workspace=False,
             )
-            return orchestrator.review(
-                changeset, workspace, repository=request.repo, review_id=review_id
-            )
+            try:
+                with github_baseline(client, request.repo, changeset) as (baseline, error):
+                    return orchestrator.review(
+                        changeset,
+                        workspace,
+                        repository=request.repo,
+                        review_id=review_id,
+                        baseline=baseline,
+                        baseline_error=error,
+                    )
+            finally:
+                close_provider(orchestrator)
         finally:
             shutil.rmtree(workspace, ignore_errors=True)
 
@@ -254,12 +315,15 @@ class ReviewService:
             request = GitHubRequest.from_dict(review.request)
             result = Store(s).load_result(review)
         client = self.github_factory(request.installation_id)
-        pr_changeset = parse_unified_diff(client.pull_diff(request.repo, request.number))
         url = f"{self.public_url}/reviews/{review_id}" if self.public_url else None
-        published = GitHubPublisher(client, url).publish(
-            request.repo, request.number, request.head_sha, result, pr_changeset
-        )
         with self.db.transaction() as s:
+            # Hold the lease's row lock through network effects, preventing concurrent reclaim.
+            require_revision(
+                client, request.repo, request.number, request.head_sha, result.changeset.base_ref
+            )
+            published = GitHubPublisher(client, url).publish(
+                request.repo, request.number, request.head_sha, result, result.changeset
+            )
             review = s.get_one(Review, review_id)
             review.published_at = utcnow()
         log.info(

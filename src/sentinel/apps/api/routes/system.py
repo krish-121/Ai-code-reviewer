@@ -9,7 +9,7 @@ from fastapi.responses import PlainTextResponse
 
 from sentinel import __version__
 from sentinel.apps.api.dependencies import ContextDep, SessionDep, UserDep
-from sentinel.infrastructure.observability.metrics import METRICS
+from sentinel.infrastructure.observability.durable import render_persisted
 from sentinel.infrastructure.queue import jobs
 
 router = APIRouter(tags=["system"])
@@ -35,6 +35,6 @@ def me(user: UserDep) -> dict[str, Any]:
 
 
 @router.get("/metrics", response_class=PlainTextResponse)
-def metrics() -> str:
+def metrics(session: SessionDep) -> str:
     """Counters and timings in the Prometheus text format."""
-    return METRICS.render()
+    return render_persisted(session)

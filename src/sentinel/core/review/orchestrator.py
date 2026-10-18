@@ -15,6 +15,7 @@ provider still yields the deterministic results.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import posixpath
 import time
@@ -49,6 +50,8 @@ from sentinel.core.findings.dedup import deduplicate, fingerprint
 from sentinel.core.findings.normalize import derive_tags, normalize_ai_findings
 from sentinel.core.findings.prioritize import select
 from sentinel.core.review.ai_request import build_review_request
+from sentinel.core.review.baseline import analyze_deletions, incomplete, needs_comparison
+from sentinel.core.review.impact_context import add_impact_context
 from sentinel.core.review.state import PipelineState
 from sentinel.core.review.summary import build_summary
 from sentinel.core.review.workspace import collect_sources, snapshot_sources
@@ -122,6 +125,8 @@ class ReviewOrchestrator:
         *,
         repository: str = "local",
         review_id: str | None = None,
+        baseline: Path | None = None,
+        baseline_error: str | None = None,
     ) -> ReviewResult:
         """Run every stage in order and return the result (never raises for stage errors)."""
         started = self.clock()
@@ -129,6 +134,8 @@ class ReviewOrchestrator:
             result=self._new_result(changeset, review_id),
             workspace=workspace,
             repository=repository,
+            baseline=baseline,
+            baseline_error=baseline_error,
         )
         stages: list[tuple[StageName, Callable[[PipelineState, StageRecord], None]]] = [
             (StageName.PARSE_DIFF, self._parse_diff),
@@ -181,6 +188,8 @@ class ReviewOrchestrator:
             self.supported_extensions,
             state.changed_paths,
             max_files=self.max_graph_files,
+            ignore=[*self.config.ignore, *(s.path for s in state.changeset.skipped)],
+            languages=self.config.languages,
         )
         state.sources = snapshot.sources
         symbols = self.extractor.analyze(state.sources)
@@ -202,6 +211,12 @@ class ReviewOrchestrator:
                 f"Code graph limited to {len(state.sources)} files (repository is larger)"
             )
         state.limitations += _parse_limitations(symbols)
+        if needs_comparison(state.changeset) and (
+            snapshot.truncated
+            or snapshot.unreadable
+            or any(fs.parse_error for fs in symbols.values())
+        ):
+            incomplete(state, "head source inventory or dependency parsing is incomplete")
 
     def _extract_context(self, state: PipelineState, record: StageRecord) -> None:
         """Choose the code around the change that the AI reviewer should see."""
@@ -231,15 +246,33 @@ class ReviewOrchestrator:
             for p in state.changed_paths
             if posixpath.splitext(p)[1].lower() in self.supported_extensions
         ]
-        found, runs = self.static_runner.run(state.workspace, targets)
+        if needs_comparison(state.changeset):
+            found, runs = analyze_deletions(
+                state,
+                self.static_runner.run,
+                self.extractor.analyze,
+                self.config,
+                self.supported_extensions,
+                self.max_graph_files,
+            )
+            changed = set(state.sources)
+        else:
+            found, runs = self.static_runner.run(state.workspace, targets)
+            changed = set(state.changed_paths)
         state.result.analysis_runs = runs
-        changed = set(state.changed_paths)
         state.static_findings = [f for f in found if f.file in changed]
         record.metrics = {
             "findings": len(state.static_findings),
             "tools_ok": sum(1 for r in runs if r.status == ToolStatus.OK),
             "tools_unavailable": sum(1 for r in runs if r.status == ToolStatus.UNAVAILABLE),
         }
+        if needs_comparison(state.changeset):
+            record.metrics.update(
+                base_files=state.baseline_files,
+                head_files=len(state.sources),
+                introduced=sum(f.baseline_status == "introduced" for f in found),
+                pre_existing=sum(f.baseline_status == "pre-existing" for f in found),
+            )
         record.detail = ", ".join(f"{r.tool}:{r.status}" for r in runs) or "no analyzers applied"
         problems = [f"{r.tool} {r.status}" for r in runs if r.status in TOOL_PROBLEMS]
         if problems:
@@ -252,16 +285,19 @@ class ReviewOrchestrator:
             record.detail = "no AI provider configured: deterministic review only"
             state.limitations.append("AI review skipped (no provider configured)")
             return
-        if not state.changed_paths:
+        if not state.changeset.files:
             record.status = StageStatus.SKIPPED
             record.detail = "nothing reviewable"
             return
+        add_impact_context(state, self.config.review.max_context_chars)
         request = build_review_request(
             review_id=state.result.review_id,
             repository=state.repository,
             changeset=state.changeset,
             bundle=state.bundle,
-            static_findings=state.static_findings,
+            static_findings=[
+                f for f in state.static_findings if f.baseline_status != "pre-existing"
+            ],
             config=self.config,
         )
         try:
@@ -269,6 +305,7 @@ class ReviewOrchestrator:
         except AIError as exc:
             raise StageFailedError(str(exc)) from exc
         state.result.usage = state.result.usage + answer.usage
+        state.result.provider, state.result.model = answer.provider, answer.model
         known_files = set(state.sources) | set(state.changed_paths)
         state.ai_findings = normalize_ai_findings(
             answer.payload, provider=answer.provider, known_files=known_files
@@ -285,6 +322,9 @@ class ReviewOrchestrator:
             f"{len(state.ai_findings)} candidate finding(s) "
             f"from {answer.provider}/{answer.model}{cached}"
         )
+        if answer.fallback_events:
+            record.detail += "; fallback: " + "; ".join(answer.fallback_events)
+        record.metrics["fallback_events"] = len(answer.fallback_events)
 
     def _verify(self, state: PipelineState, record: StageRecord) -> None:
         """Check every AI claim against the code; deterministic findings verify by construction."""
@@ -347,13 +387,30 @@ class ReviewOrchestrator:
         for finding in findings:
             node = state.graph.enclosing(finding.file, finding.line_start)
             finding.symbol = node.name if node is not None else None
+            lines = state.sources.get(finding.file, "").splitlines()
+            start = max(0, (node.line_start or 1) - 1) if node else 0
+            site = (
+                " ".join(lines[finding.line_start - 1].split())
+                if finding.line_start <= len(lines)
+                else ""
+            )
+            occurrence = sum(
+                " ".join(line.split()) == site for line in lines[start : finding.line_start]
+            )
+            site_hash = hashlib.sha256(site.encode()).hexdigest()[:16]
+            finding.site_anchor = f"{site_hash}|{occurrence}" if site else f"L{finding.line_start}"
             # Filter findings (secrets, sensitive files) are about the change by definition.
-            if id(finding) not in from_filter:
+            if finding.baseline_status is not None:
+                finding.in_changed_lines = finding.baseline_status != "pre-existing"
+            elif id(finding) not in from_filter:
                 change = state.changeset.get(finding.file)
                 finding.in_changed_lines = bool(
                     change
-                    and change.touches(
-                        finding.line_start, finding.line_end, slack=CHANGED_LINE_SLACK
+                    and (
+                        change.deletions > 0
+                        or change.touches(
+                            finding.line_start, finding.line_end, slack=CHANGED_LINE_SLACK
+                        )
                     )
                 )
             if not finding.tags:

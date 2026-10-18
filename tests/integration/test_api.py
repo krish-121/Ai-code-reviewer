@@ -114,22 +114,20 @@ def test_local_review_lifecycle_and_fix_flow(tmp_path: Path, demo: Path, backend
     fix_id = client.post(f"/api/findings/{sqli['id']}/fix", headers=H).json()["id"]
     assert worker.run_once()
     fix = client.get(f"/api/fixes/{fix_id}").json()
-    assert fix["status"] == "validated", fix
-    assert fix["can_apply"]
+    assert fix["status"] == "unverified", fix  # no Docker was provided
+    assert not fix["can_apply"]
     patch = client.get(f"/api/fixes/{fix_id}/patch")
     assert patch.headers["content-type"].startswith("text/x-diff")
     assert '+    query = "SELECT id, name, price FROM products WHERE name LIKE ?' in patch.text
-    applied = client.post(f"/api/fixes/{fix_id}/apply", headers=H).json()
-    assert applied == {"applied": ["app/db.py"]}
-    assert "LIKE ?" in (demo / "app/db.py").read_text()
-    again = client.post(f"/api/fixes/{fix_id}/apply", headers=H)
-    assert again.status_code == 409
+    before = (demo / "app/db.py").read_text()
+    applied = client.post(f"/api/fixes/{fix_id}/apply", headers=H)
+    assert applied.status_code == 409 and "unverified" in applied.json()["detail"]
+    assert (demo / "app/db.py").read_text() == before
     detail = client.get(f"/api/findings/{sqli['id']}").json()
-    assert detail["finding"]["status"] == "fixed"
+    assert detail["finding"]["status"] == "accepted"
     assert [e["event"] for e in detail["events"]] == [
         "status_changed",
         "fix_generated",
-        "status_changed",
     ]
     assert client.post(f"/api/fixes/{fix_id}/reject", headers=H).json() == {"status": "rejected"}
 

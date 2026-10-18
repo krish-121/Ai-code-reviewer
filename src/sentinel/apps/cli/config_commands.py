@@ -60,8 +60,12 @@ def config_show(ctx: typer.Context) -> None:
     console.print(table)
 
 
-def config_set(key: str, value: str) -> None:
-    """Persist a setting, e.g. `sentinel config set provider claude`."""
+def config_set(key: str, value: Annotated[str | None, typer.Argument()] = None) -> None:
+    """Persist a setting; omit a secret's value to enter it at a hidden prompt."""
+    if value is None:
+        if key not in SECRET_KEYS:
+            raise fail("Provide a value for non-secret settings.")
+        value = typer.prompt(f"Enter {key}", hide_input=True)
     try:
         path = save_user_setting(key, value)
     except (ConfigError, ValueError) as exc:

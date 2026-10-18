@@ -124,3 +124,16 @@ def test_save_user_setting_is_private(tmp_path: Path) -> None:
         save_user_setting("database_password", "x", path)
     with pytest.raises(ValueError, match="provider"):
         save_user_setting("provider", "nope", path)
+
+
+def test_save_sandbox_transport_validates_and_preserves_settings(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    save_user_setting("gemini_api_key", "test-only-key", path)
+    save_user_setting("sandbox_transport", "copy", path)
+    settings = load_settings(path, env={})
+    assert settings.sandbox_transport == "copy"
+    assert settings.api_key_for("gemini") == "test-only-key"
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="sandbox_transport"):
+        save_user_setting("sandbox_transport", "invalid", path)
+    assert path.read_bytes() == before

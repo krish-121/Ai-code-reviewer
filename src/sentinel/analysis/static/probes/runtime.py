@@ -77,10 +77,8 @@ class AsyncProbe:
 
     def _check_blocking(self, function: FunctionNode) -> VerificationCheck | None:
         if not isinstance(function, ast.AsyncFunctionDef):
-            detail = f"`{function.name}` is not async, so it cannot block an event loop"
-            return result(
-                self.name, CheckOutcome.CONTRADICTS, detail, VERY_HIGH_WEIGHT, decisive=True
-            )
+            detail = f"`{function.name}` is synchronous; its callers may run on an event loop"
+            return result(self.name, CheckOutcome.NEUTRAL, detail, LOW_WEIGHT)
         blocking = [
             c
             for c in ast.walk(function)

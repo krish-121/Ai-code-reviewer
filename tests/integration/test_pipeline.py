@@ -24,16 +24,42 @@ from sentinel.core.domain.models import (
     StageStatus,
     VerificationStatus,
 )
-from sentinel.core.domain.ports import AIError
+from sentinel.core.domain.ports import AIError, AIProvider
 from sentinel.infrastructure.storage.cache import MemoryCache
+from sentinel.services.workspaces import prepare_baseline
 from tests.fakes import ScriptedProvider, ai_finding
 from tests.helpers import SHOP
+from tests.unit.test_ai_providers import GOOD, Script, ok
+from tests.unit.test_free_fallback import chain, chat_body, rate_limited
 
 SAFE_FIND_USER = (
     "    cur.execute(\n"
     '        "SELECT * FROM users WHERE name = ? AND password = ?", (name, password)\n'
     "    )\n"
 )
+
+
+def test_fallback_pipeline_records_actual_provider_and_preserves_verification(repo: Path) -> None:
+    script = Script(rate_limited(), ok(chat_body(GOOD)))
+    provider = chain(script)
+    result = run(repo, provider)
+    assert result.provider == "opencode" and result.model == "deepseek-v4.1-flash-free"
+    stage = next(stage for stage in result.stages if stage.name is StageName.AI_REVIEW)
+    assert stage.status is StageStatus.DONE
+    assert "rate limit reached" in stage.detail
+    assert any(f.is_deterministic for f in result.findings)
+    assert all(f.verification is not None for f in result.findings)
+    provider.close()
+
+
+def test_unavailable_fallback_pipeline_still_returns_local_findings(repo: Path) -> None:
+    provider = chain(Script(rate_limited(), rate_limited()))
+    result = run(repo, provider)
+    assert result.status is ReviewStatus.PARTIAL
+    assert any(f.is_deterministic for f in result.findings)
+    stage = next(stage for stage in result.stages if stage.name is StageName.AI_REVIEW)
+    assert stage.status is StageStatus.FAILED and "No AI provider available" in stage.detail
+    provider.close()
 
 
 def git(repo: Path, *args: str) -> str:
@@ -90,7 +116,7 @@ class Recorder:
 
 def run(
     repo: Path,
-    ai: ScriptedProvider | None,
+    ai: AIProvider | None,
     config: RepoConfig | None = None,
     progress: Recorder | None = None,
 ):  # type: ignore[no-untyped-def]
@@ -103,7 +129,8 @@ def run(
         progress=progress,
         cache=MemoryCache(),
     )
-    return orch.review(cs, repo, repository="shop")
+    with prepare_baseline(repo, cs) as (baseline, error):
+        return orch.review(cs, repo, repository="shop", baseline=baseline, baseline_error=error)
 
 
 AI_FINDINGS = [
@@ -283,8 +310,11 @@ def test_empty_change(tmp_path: Path) -> None:
 def test_each_stage_logs_a_structured_line(
     repo: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Arrange: `configure_logging` (run by CLI tests) stops propagation to pytest's handler.
-    monkeypatch.setattr(logging.getLogger("sentinel"), "propagate", True)
+    # Capture once at the review logger, independent of CLI-installed stderr handlers
+    # and pytest's parent-logger capture configuration.
+    logger = logging.getLogger("sentinel.review")
+    monkeypatch.setattr(logger, "handlers", [caplog.handler])
+    monkeypatch.setattr(logger, "propagate", False)
 
     # Act
     with caplog.at_level("INFO", logger="sentinel.review"):

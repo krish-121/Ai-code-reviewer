@@ -1,5 +1,9 @@
 # Benchmarks
 
+The current continuation was measured on 18 October 2026. The older results below
+are preserved as history; differences in runtime/environment mean the two tables
+are not a controlled speed comparison.
+
 How review time and memory grow with repository size (spec §42). Every number below was
 produced by [`scripts/benchmark.py`](../scripts/benchmark.py) on the machine described at
 the bottom; re-run it to get numbers for yours:
@@ -25,7 +29,38 @@ is listed separately below rather than mixed into these numbers.
 
 Each run is a fresh process (cold caches, separate memory measurement).
 
-## Results
+## Current continuation — 18 October 2026
+
+| | small | medium | large |
+|---|---:|---:|---:|
+| Files in repository | 43 | 388 | 2,304 |
+| Lines of code | 986 | 9,641 | 57,721 |
+| Files in the change | 4 | 4 | 4 |
+| Code-graph nodes | 353 | 3,323 | 18,912 |
+| `parse_diff` (ms) | 0 | 0 | 0 |
+| `filter_files` (ms) | 1 | 1 | 1 |
+| `build_graph` (ms) | 284 | 615 | 2,306 |
+| `extract_context` (ms) | 1 | 8 | 57 |
+| `static_analysis` (ms) | 769 | 822 | 1,581 |
+| `ai_review` (ms) | 1 | 1 | 2 |
+| `verification` (ms) | 0 | 2 | 17 |
+| `finalize` (ms) | 1 | 3 | 18 |
+| **Total review latency (ms)** | **1,073** | **1,465** | **4,042** |
+| Peak memory (max RSS, MiB) | 63 | 83 | 190 |
+| AI prompt size (tokens, est.) | 2,633 | 2,633 | 2,633 |
+
+Static analyzers: sentinel (ok), ruff (ok), mypy (ok), bandit (ok), eslint (ok), tsc (ok).
+Python 3.14.4 on Linux x86_64; median of 3 runs.
+
+
+All six installed analyzers completed. AI responses are instantaneous and prompt tokens
+are estimated at four characters per token. Each sample starts a fresh process.
+The large repository exceeds the default 2,000-source-file graph budget: this is a
+bounded graph review, not complete graph coverage of all 2,304 files. Static tools
+analyze the four changed files. These runs do not measure base/head deletion scans,
+Docker fix validation, model latency, sustained concurrency or service capacity.
+
+## Original-build results (historical)
 
 | | small | medium | large |
 |---|---:|---:|---:|

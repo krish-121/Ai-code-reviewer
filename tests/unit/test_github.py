@@ -117,6 +117,8 @@ class FakeGitHub:
         if self.fail_next:
             return httpx.Response(self.fail_next.pop(0), text="rate limit exceeded")
         path, method = req.url.path, req.method
+        if path == "/user":
+            return httpx.Response(200, json={"id": 42})
         if path == "/repos/acme/shop/pulls/7" and method == "GET":
             return self._pull(req)
         if path.startswith("/repos/acme/shop/tarball/"):
@@ -141,7 +143,7 @@ class FakeGitHub:
         if req.method != "POST":
             return httpx.Response(200, json=self.issue_comments)
         self.next_id += 1
-        comment = {"id": self.next_id, "body": json.loads(req.content)["body"]}
+        comment = {"id": self.next_id, "body": json.loads(req.content)["body"], "user": {"id": 42}}
         self.issue_comments.append(comment)
         return httpx.Response(201, json=comment)
 
@@ -156,7 +158,9 @@ class FakeGitHub:
         body = json.loads(req.content)
         self.reviews.append(body)
         for comment in body["comments"]:
-            self.review_comments.append({"body": comment["body"], "path": comment["path"]})
+            self.review_comments.append(
+                {"body": comment["body"], "path": comment["path"], "user": {"id": 42}}
+            )
         return httpx.Response(200, json={"id": len(self.reviews)})
 
     def client(self, sleeps: list[float] | None = None) -> GitHubClient:

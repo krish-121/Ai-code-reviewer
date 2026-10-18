@@ -16,6 +16,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from sentinel.analysis.diff.git import GitError
 from sentinel.apps.api.dependencies import (
     MUTATING,
     ContextDep,
@@ -28,7 +29,7 @@ from sentinel.core.domain.models import ReviewStatus
 from sentinel.infrastructure.database.models import Review
 from sentinel.infrastructure.database.session import Database
 from sentinel.infrastructure.database.store import Store
-from sentinel.services.workspaces import LocalRequest
+from sentinel.services.workspaces import LocalRequest, authorize_root
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -66,9 +67,18 @@ def create_review(
         )
     if not path.is_dir():
         raise HTTPException(status_code=400, detail=f"{path} is not a directory")
+    try:
+        authorize_root(path, context.settings.allowed_roots())
+    except GitError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     session.commit()  # release the request transaction before the service opens its own
     request = LocalRequest(
-        path=str(path), mode=body.mode, base=body.base, head=body.head, subpath=body.subpath
+        path=str(path),
+        mode=body.mode,
+        base=body.base,
+        head=body.head,
+        subpath=body.subpath,
+        allowed_roots=[str(p) for p in context.settings.allowed_roots()],
     )
     review_id = context.reviews.create_local(user.id, request, enqueue=True)
     return {"id": review_id}

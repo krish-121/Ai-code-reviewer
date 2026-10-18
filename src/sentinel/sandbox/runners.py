@@ -12,23 +12,28 @@ a private network namespace. It reports its isolation level honestly.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
-import signal
 import subprocess
 import tempfile
 import time
 import uuid
 from collections.abc import Callable
+from contextlib import ExitStack
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from sentinel.core.domain.ports import SandboxResult
 from sentinel.core.fixes.scratch import scratch_copy
+from sentinel.sandbox.output import communicate_capped
+from sentinel.sandbox.workspace import pack_workspace
 
 __all__ = ["DockerSandbox", "ProcessSandbox", "scratch_copy"]
 
 MAX_OUTPUT = 20_000
+MAX_REPORT_OUTPUT = 1_048_576
 DEFAULT_IMAGE = "sentinel-sandbox:latest"
 DEFAULT_TIMEOUT_S = 120
 DOCKER_PROBE_TIMEOUT_S = 15
@@ -41,9 +46,9 @@ PASSTHROUGH_ENV = ("PYTHONPATH", "NODE_PATH", "VIRTUAL_ENV")
 UNSHARE_NETWORK = ["unshare", "--user", "--map-root-user", "--net"]
 
 
-def _truncate(text: str) -> str:
+def _truncate(text: str, limit: int = MAX_OUTPUT) -> str:
     """Cap captured output so a noisy test run cannot fill the database."""
-    return text if len(text) <= MAX_OUTPUT else text[:MAX_OUTPUT] + "\n… (truncated)"
+    return text if len(text) <= limit else text[:limit] + "\n… (truncated)"
 
 
 class DockerSandbox:
@@ -59,12 +64,14 @@ class DockerSandbox:
         cpus: str = "1.0",
         pids: int = 256,
         docker: str = "docker",
+        transport: Literal["bind", "copy"] = "bind",
     ) -> None:
         self.image = image
         self.memory = memory
         self.cpus = cpus
         self.pids = pids
         self.docker = docker
+        self.transport = transport
 
     def is_available(self) -> bool:
         """True when the Docker CLI works and the sandbox image exists locally."""
@@ -84,6 +91,11 @@ class DockerSandbox:
     def command(self, workspace: Path, command: list[str], name: str, network: bool) -> list[str]:
         """The full ``docker run`` command line, one isolation option per pair of lines."""
         uid, gid = os.getuid(), os.getgid()
+        mount = ["-v", f"{workspace.resolve()}:{CONTAINER_WORKDIR}:rw"]
+        invocation = command
+        if self.transport == "copy":
+            mount = ["-i", "--tmpfs", f"/workspace:rw,exec,size=512m,uid={uid},gid={gid},mode=0700"]
+            invocation = ["python", "-I", "-m", "sentinel.sandbox.launch", json.dumps(command)]
         return [
             self.docker,
             "run",
@@ -115,12 +127,11 @@ class DockerSandbox:
             "PYTHONDONTWRITEBYTECODE=1",
             "-e",
             "CI=1",
-            "-v",
-            f"{workspace.resolve()}:{CONTAINER_WORKDIR}:rw",
+            *mount,
             "-w",
             CONTAINER_WORKDIR,
             self.image,
-            *command,
+            *invocation,
         ]
 
     def run(
@@ -130,30 +141,47 @@ class DockerSandbox:
         timeout_s: int = DEFAULT_TIMEOUT_S,
         *,
         network: bool = False,
+        output_limit: int = MAX_OUTPUT,
     ) -> SandboxResult:
-        """Run ``command`` with ``workspace`` mounted; the container is killed on timeout."""
+        """Run on a scratch bind or transferred tmpfs copy; kill the container on timeout."""
+        if not 0 < output_limit <= MAX_REPORT_OUTPUT:
+            raise ValueError("sandbox output limit is outside the supported bounds")
         name = f"sentinel-sbx-{uuid.uuid4().hex[:12]}"
         cmd = self.command(workspace, command, name, network)
         start = time.monotonic()
-        try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
-        except subprocess.TimeoutExpired as exc:
-            subprocess.run([self.docker, "kill", name], capture_output=True, check=False)
-            return SandboxResult(
-                command=command,
-                exit_code=-1,
-                stdout=_truncate(_text(exc.stdout)),
-                stderr="timed out",
-                duration_ms=int((time.monotonic() - start) * 1000),
-                timed_out=True,
-                isolation=self.isolation,
+
+        def cleanup() -> None:
+            subprocess.run(
+                [self.docker, "kill", name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=15,
+            )
+
+        with ExitStack() as stack:
+            stdin = None
+            if self.transport == "copy":
+                stdin = stack.enter_context(tempfile.TemporaryFile())
+                pack_workspace(workspace, stdin)
+                stdin.seek(0)
+            proc = subprocess.Popen(
+                cmd,
+                stdin=stdin,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
+            )
+            out, err, timed_out = communicate_capped(
+                proc, timeout_s, cleanup, max_bytes=output_limit * 2
             )
         return SandboxResult(
             command=command,
-            exit_code=proc.returncode,
-            stdout=_truncate(proc.stdout),
-            stderr=_truncate(proc.stderr),
+            exit_code=-1 if timed_out else proc.returncode,
+            stdout=_truncate(out, output_limit),
+            stderr=_truncate("timed out" if timed_out else err, output_limit),
             duration_ms=int((time.monotonic() - start) * 1000),
+            timed_out=timed_out,
             isolation=self.isolation,
         )
 
@@ -212,10 +240,9 @@ class ProcessSandbox:
                 env=_scrubbed_env(home),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
                 preexec_fn=_limits_setter(self.memory_bytes, self.max_file_bytes, timeout_s),
             )
-            out, err, timed_out = _communicate(proc, timeout_s)
+            out, err, timed_out = communicate_capped(proc, timeout_s)
         finally:
             shutil.rmtree(home, ignore_errors=True)
         return SandboxResult(
@@ -256,14 +283,3 @@ def _limits_setter(memory_bytes: int, max_file_bytes: int, timeout_s: int) -> Ca
         )
 
     return set_limits
-
-
-def _communicate(proc: subprocess.Popen[str], timeout_s: int) -> tuple[str, str, bool]:
-    """Wait for the process; on timeout kill its whole process group."""
-    try:
-        out, err = proc.communicate(timeout=timeout_s)
-        return out, err, False
-    except subprocess.TimeoutExpired:
-        os.killpg(proc.pid, signal.SIGKILL)
-        out, err = proc.communicate()
-        return out, err, True

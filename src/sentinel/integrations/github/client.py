@@ -102,6 +102,15 @@ class GitHubAppAuth:
         self._cache[repo] = (token, expires)
         return token
 
+    def bot_login(self) -> str:
+        """Derive the bot identity from the JWT-authenticated App, never from comment text."""
+        response = self._http.get("/app", headers={"Authorization": f"Bearer {self.app_jwt()}"})
+        if response.status_code != 200:
+            raise GitHubError(
+                "cannot resolve authenticated GitHub App identity", response.status_code
+            )
+        return str(response.json()["slug"]) + "[bot]"
+
 
 class GitHubClient:
     """The few GitHub REST calls Sentinel needs, over ``httpx``."""
@@ -118,11 +127,26 @@ class GitHubClient:
         self.auth = auth
         self.sleep = sleep
         self.max_retries = max_retries
+        self._actor_id: int | None = None
         self._http = httpx.Client(
             base_url=api_url, transport=transport, timeout=30, follow_redirects=True
         )
 
     # ------------------------------------------------------------------ transport
+    def owns_comment(self, repo: str, comment: dict[str, Any]) -> bool:
+        """Trust markers only in comments attributed by GitHub to our authenticated actor."""
+        user = comment.get("user") or {}
+        if isinstance(self.auth, GitHubAppAuth):
+            if self._actor_id is None:
+                bot = self._request("GET", f"/users/{self.auth.bot_login()}", repo).json()
+                if bot.get("type") != "Bot":
+                    raise GitHubError("authenticated App identity is not a bot")
+                self._actor_id = int(bot["id"])
+            return user.get("type") == "Bot" and user.get("id") == self._actor_id
+        if self._actor_id is None:
+            self._actor_id = int(self._request("GET", "/user", repo).json()["id"])
+        return user.get("id") == self._actor_id
+
     def _request(
         self,
         method: str,
@@ -184,6 +208,18 @@ class GitHubClient:
         return self._request(
             "GET", f"/repos/{repo}/pulls/{number}", repo, accept="application/vnd.github.v3.diff"
         ).text
+
+    def merge_base(self, repo: str, base: str, head: str) -> str:
+        """Resolve the common ancestor used by a PR's three-dot diff."""
+        response = self._request("GET", f"/repos/{repo}/compare/{base}...{head}", repo=repo)
+        sha = response.json().get("merge_base_commit", {}).get("sha")
+        if (
+            not isinstance(sha, str)
+            or len(sha) not in (40, 64)
+            or any(c not in "0123456789abcdef" for c in sha)
+        ):
+            raise GitHubError("GitHub comparison returned no valid merge-base commit")
+        return sha
 
     def download_tree(self, repo: str, ref: str, dest: Path) -> None:
         """Download the repository at ``ref`` and extract it safely into ``dest``."""

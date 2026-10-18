@@ -8,6 +8,8 @@ Free-form Markdown is never parsed.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from sentinel.core.domain.models import Category, Severity, TokenUsage
@@ -40,15 +42,18 @@ class AIFinding(_Strict):
 class AIReviewPayload(_Strict):
     """The complete JSON object the model returns for a review."""
 
-    findings: list[AIFinding] = Field(default_factory=list, max_length=50)
+    findings: list[AIFinding] = Field(max_length=50)
 
 
 class FileEdit(_Strict):
     """A search/replace edit the model proposes for a fix."""
 
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
     file: str = Field(min_length=1)
-    search: str = Field(description="Exact existing text to replace (must occur exactly once)")
+    search: str = Field(description="Replace: exact text occurring once. Create: empty string.")
     replace: str
+    operation: Literal["replace", "create"] = "replace"
 
 
 class AIFixPayload(_Strict):
@@ -109,6 +114,9 @@ class FixRequest(BaseModel):
     line_end: int
     suggested_fix: str | None = None
     files: dict[str, str] = Field(description="path -> full current content of relevant files")
+    allowed_new_files: list[str] = Field(
+        default_factory=list, description="Only these absent regression-test files may be created"
+    )
     feedback: str | None = Field(
         default=None, description="Validation failures from a previous attempt, if retrying"
     )
@@ -123,6 +131,7 @@ class AIReviewResult(BaseModel):
     provider: str
     attempts: int = 1
     cached: bool = False
+    fallback_events: list[str] = Field(default_factory=list)
 
 
 class AIFixResult(BaseModel):
@@ -133,3 +142,4 @@ class AIFixResult(BaseModel):
     model: str
     provider: str
     attempts: int = 1
+    fallback_events: list[str] = Field(default_factory=list)

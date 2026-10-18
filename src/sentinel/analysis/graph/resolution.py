@@ -54,7 +54,7 @@ class SymbolTable:
 
     graph: CodeGraph
     files: dict[str, FileSymbols]
-    # (file path, qualified name) -> node id; MODULE_KEY maps to the file node
+    # (file path, qualified name) -> node id; MODULE_KEY maps to the module node
     by_qualified_name: dict[tuple[str, str], str] = field(default_factory=dict)
     python_modules: dict[str, str] = field(default_factory=dict)  # dotted name -> path
     js_modules: dict[str, str] = field(default_factory=dict)  # path without suffix -> path
@@ -67,7 +67,7 @@ class SymbolTable:
         return self.by_qualified_name.get((path, qualified_name))
 
     def module_node(self, path: str) -> str | None:
-        """Node id of the file node for ``path``."""
+        """Node id of the module (file fallback when no module symbol was extracted)."""
         return self.node_for(path, MODULE_KEY)
 
     def caller_node(self, path: str, caller: str) -> str | None:

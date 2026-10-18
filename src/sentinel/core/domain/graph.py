@@ -44,6 +44,7 @@ class EdgeKind(StrEnum):
 
 
 CODE_KINDS = frozenset({NodeKind.FUNCTION, NodeKind.METHOD, NodeKind.TEST, NodeKind.CLASS})
+SOURCE_KINDS = CODE_KINDS | {NodeKind.VARIABLE}
 
 
 class GraphNode(BaseModel):
@@ -172,7 +173,7 @@ class CodeGraph:
     def enclosing(self, file: str, line: int) -> GraphNode | None:
         """Innermost function/method/class node containing ``file:line``."""
         candidates = [
-            n for n in self._nodes.values() if n.kind in CODE_KINDS and n.contains(file, line)
+            n for n in self._nodes.values() if n.kind in SOURCE_KINDS and n.contains(file, line)
         ]
         if not candidates:
             return None
@@ -182,9 +183,16 @@ class CodeGraph:
         """True for endpoints, tests, exported symbols and names such as ``main``."""
         if node.kind in (NodeKind.ENDPOINT, NodeKind.TEST):
             return True
-        if node.meta.get("entrypoint") == "true" or node.meta.get("exported") == "true":
+        if node.kind in CODE_KINDS and (
+            node.meta.get("entrypoint") == "true" or node.meta.get("exported") == "true"
+        ):
             return True
-        return node.name in ("main", "__main__", "handler", "lambda_handler")
+        return node.kind in CODE_KINDS and node.name in (
+            "main",
+            "__main__",
+            "handler",
+            "lambda_handler",
+        )
 
     def path_from_entrypoint(self, node_id: str, max_depth: int = 8) -> list[GraphNode] | None:
         """Reverse BFS over CALLS/ROUTES edges to the nearest entry point.
@@ -287,10 +295,10 @@ class CodeGraph:
         """A new graph containing only ``node_ids`` and the edges between them."""
         keep = set(node_ids)
         sub = CodeGraph()
-        for nid in keep:
+        for nid in sorted(keep):
             node = self._nodes.get(nid)
             if node is not None:
-                sub.add_node(node)
+                sub.add_node(node.model_copy(deep=True))
         for e in self.edges:
             if e.source in keep and e.target in keep:
                 sub.add_edge(e.source, e.target, e.kind, e.line)

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from sentinel.core.domain.models import ChangeSet, Finding, LineKind, ReviewResult
 from sentinel.integrations.github.client import GitHubClient
 from sentinel.integrations.github.render import SUMMARY_MARKER, finding_comment, summary_comment
+from sentinel.integrations.github.snapshots import require_revision
 
 FP_RE = re.compile(r"<!-- sentinel:fp=([\w-]+) -->")
 RIGHT_SIDE = "RIGHT"  # comment on the new version of the file
@@ -68,8 +69,11 @@ class GitHubPublisher:
         out = PublishResult()
         comments, not_inline = self._inline_comments(repo, number, result, pr_changeset, out)
         body = summary_comment(result, review_url=self.review_url, not_inline=not_inline)
+        body += f"\n\nReviewed commit: `{head_sha}`."
+        require_revision(self.client, repo, number, head_sha, pr_changeset.base_ref)
         self._upsert_summary(repo, number, body, out)
         if comments:
+            require_revision(self.client, repo, number, head_sha, pr_changeset.base_ref)
             self.client.create_review(
                 repo,
                 number,
@@ -92,6 +96,7 @@ class GitHubPublisher:
         already_posted = {
             match.group(1)
             for comment in self.client.review_comments(repo, number)
+            if self.client.owns_comment(repo, comment)
             for match in FP_RE.finditer(comment.get("body") or "")
         }
         comments: list[dict[str, object]] = []
@@ -117,7 +122,7 @@ class GitHubPublisher:
             (
                 c
                 for c in self.client.issue_comments(repo, number)
-                if SUMMARY_MARKER in (c.get("body") or "")
+                if SUMMARY_MARKER in (c.get("body") or "") and self.client.owns_comment(repo, c)
             ),
             None,
         )

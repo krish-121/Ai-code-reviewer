@@ -43,5 +43,7 @@ async def github_webhook(request: Request, context: ContextDep) -> JSONResponse:
     event = parse_pull_request_event(event_name, payload)
     if event is None:
         return JSONResponse({"ignored": True}, status_code=200)
-    review_id = await asyncio.to_thread(context.reviews.create_github, event)
+    review_id = await asyncio.to_thread(
+        context.reviews.create_github, event, delivery_id=request.headers.get("x-github-delivery")
+    )
     return JSONResponse({"review_id": review_id}, status_code=202)

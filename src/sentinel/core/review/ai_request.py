@@ -8,10 +8,11 @@ short list of static-analysis hints. Secrets were already redacted by the filter
 from __future__ import annotations
 
 from sentinel.analysis.diff.parser import render_file_diff
+from sentinel.analysis.diff.secrets import redact_text
 from sentinel.analysis.graph.context import ContextBundle
 from sentinel.core.configuration.config import RepoConfig
 from sentinel.core.domain.ai import ReviewRequest, StaticHint
-from sentinel.core.domain.models import ChangeSet, ChangeType, Finding, Language
+from sentinel.core.domain.models import ChangeSet, Finding, Language
 
 MAX_DIFF_CHARS = 120_000
 MAX_STATIC_HINTS = 40
@@ -34,7 +35,7 @@ def build_review_request(
     return ReviewRequest(
         review_id=review_id,
         repository=repository,
-        title=changeset.title,
+        title=redact_text(changeset.title)[0] if changeset.title else None,
         diff=render_diff_for_prompt(changeset),
         changed_files=[f.path for f in changeset.files],
         context=bundle.blocks if bundle else [],
@@ -48,21 +49,18 @@ def build_review_request(
 def render_diff_for_prompt(changeset: ChangeSet) -> str:
     """The unified diff of every reviewable file, stopping at ``MAX_DIFF_CHARS``.
 
-    Files past the budget are listed as omitted so the model knows they exist; deleted
-    files are listed without content.
+    Files past the budget are listed as omitted so the model knows they exist. Deleted
+    code is included from the already filtered/redacted diff, not raw baseline sources.
     """
     parts: list[str] = []
     used = 0
-    for change in changeset.reviewable():
+    for change in changeset.files:
         text = render_file_diff(change)
         if used + len(text) > MAX_DIFF_CHARS:
             parts.append(f"--- {change.path}: diff omitted (size budget reached)")
             continue
         used += len(text)
         parts.append(text)
-    for change in changeset.files:
-        if change.change_type is ChangeType.DELETED:
-            parts.append(f"--- a/{change.path}\n+++ /dev/null\n(file deleted)")
     return "\n".join(parts)
 
 
@@ -74,5 +72,5 @@ def static_hint(finding: Finding) -> StaticHint:
         rule=finding.rule_id,
         file=finding.file,
         line=finding.line_start,
-        message=finding.title,
+        message=redact_text(finding.title)[0],
     )

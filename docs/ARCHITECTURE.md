@@ -24,8 +24,10 @@ flowchart LR
     CLI --> SVC
     API --> SVC[Application services<br/>ReviewService · FixService]
     API -->|enqueue| Q[(Job queue<br/>in the database)]
-    W[Worker] -->|claim| Q
+    W[Review worker] -->|claim review / publish| Q
+    FW[Validation worker<br/>Docker daemon access] -->|claim fix| Q
     W --> SVC
+    FW --> SVC
     SVC --> ENG[Review engine<br/>orchestrator · verification · fixes]
     ENG --> AN[Analysis<br/>diff · AST · code graph · static tools]
     ENG -->|AIProvider port| AI[[Claude · Gemini · Ollama<br/>httpx only]]
@@ -38,7 +40,7 @@ flowchart LR
 |---|---|---|
 | CLI | [`apps/cli/`](../src/sentinel/apps/cli/) | `sentinel review`, `fix`, `findings`, `config`, `serve`, `worker` … |
 | HTTP API | [`apps/api/`](../src/sentinel/apps/api/) | JSON API for the UI, GitHub webhook receiver, SSE progress stream, serves the UI |
-| Worker | [`apps/worker/main.py`](../src/sentinel/apps/worker/main.py) | Runs queued `review`, `publish` and `fix` jobs |
+| Workers | [`apps/worker/main.py`](../src/sentinel/apps/worker/main.py) | Job-kind filtering separates review/publication from Docker-capable fix workers in Compose |
 | Services | [`services/`](../src/sentinel/services/) | The use cases shared by CLI, API and worker; own transactions |
 | Review engine | [`core/`](../src/sentinel/core/) | Pipeline, verification, findings, fixes, summary — no I/O frameworks |
 | Analysis | [`analysis/`](../src/sentinel/analysis/) | Diff parsing, filtering, language analyzers, code graph, static tools, probes |
@@ -47,6 +49,12 @@ flowchart LR
 | Integrations | [`integrations/github/`](../src/sentinel/integrations/github/) | GitHub App auth, REST client, webhook parsing, comment publishing |
 | Sandbox | [`sandbox/runners.py`](../src/sentinel/sandbox/runners.py) | Runs tests of proposed fixes in locked-down containers |
 | Web UI | [`web/`](../web/) | React + TypeScript single-page app, bundled into the Python package |
+
+Compose grants daemon access only to the dedicated validation worker. Scratch files
+travel as a bounded archive into a new container tmpfs, so worker paths need not exist
+on the daemon host. Generated containers receive no Docker socket or application secrets.
+The trusted validation worker controls that daemon; use a dedicated engine/host as described
+in [DEPLOYMENT.md](DEPLOYMENT.md). All production targets and CI share the JS analyzer lock.
 
 ## 2. Layers and dependency direction
 
@@ -101,7 +109,7 @@ flowchart TD
     S2["2 · filter_files<br/>drop binary · generated · sensitive<br/>redact secrets · flag prompt injection"] --> S3
     S3["3 · build_graph<br/>read code files → FileSymbols → CodeGraph"] --> S4
     S4["4 · extract_context<br/>changed symbols + callers, callees, tests,<br/>entry paths, data access — within a budget"] --> S5
-    S5["5 · static_analysis<br/>built-in rules · Ruff · mypy · Bandit · ESLint · tsc<br/>(changed files, in parallel)"] --> S6
+    S5["5 · static_analysis<br/>built-in rules · Ruff · mypy · Bandit · ESLint · tsc<br/>(whole eligible base/head trees for removals)"] --> S6
     S6["6 · ai_review<br/>prompt = diff + context + static hints<br/>strict JSON → candidate findings"] --> S7
     S7["7 · verification<br/>check every AI claim against the code"] --> S8
     S8["8 · finalize<br/>fingerprint · deduplicate · prioritize · select<br/>summary · architecture subgraph · source snapshot"] --> R[ReviewResult]
@@ -136,9 +144,13 @@ flowchart LR
     H -->|calls| F["function<br/>search_products()"]
     F -->|reads| DB[("database<br/>products")]
     T["test<br/>test_search()"] -->|tests| H
-    file["file<br/>app/routes.py"] -->|defines| H
-    file -->|imports| dbfile["file<br/>app/db.py"]
-    dbfile -->|defines| F
+    file["file<br/>app/routes.py"] -->|defines| module["module<br/>app.routes"]
+    module -->|defines| H
+    module -->|imports| dbmodule["module<br/>app.db"]
+    dbfile["file<br/>app/db.py"] -->|defines| dbmodule
+    dbmodule -->|defines| F
+    dbmodule -->|defines| variable["variable<br/>LIMIT"]
+    F -->|reads| variable
     C["class<br/>Repo"] -->|inherits| B["class<br/>BaseRepo"]
 ```
 
@@ -214,13 +226,13 @@ flowchart TD
     APPLY -- yes --> SYN{patched files<br/>parse?}
     SYN -- no --> RETRY
     SYN -- yes --> COPIES[two scratch copies of the repo:<br/>original and patched]
-    COPIES --> RES[re-run static analysis on both:<br/>is the original issue gone?<br/>any new medium/high issues?]
+    COPIES --> RES[re-run static analysis on both in Docker:<br/>is the original issue gone?<br/>any new medium/high issues?]
     RES --> TESTS[run the test suite in the Docker sandbox,<br/>before and after the patch]
     TESTS --> V{verdict}
     V -- a check failed --> RETRY[retry once with the failures<br/>as feedback]
     RETRY --> AI
-    V -- re-check or tests passed --> OK[validated]
-    V -- nothing could confirm it --> UNV[unverified]
+    V -- all required checks passed --> OK[validated]
+    V -- any required check incomplete --> UNV[unverified]
     OK --> USER{user clicks Apply}
     UNV --> USER
     USER --> HASH{files unchanged since?<br/>sha256}
@@ -233,7 +245,14 @@ The repository itself is never modified until the user explicitly applies a fix
 sandbox: no network, read-only root filesystem, capped memory/CPU/PIDs, all capabilities
 dropped, a throwaway copy mounted as the working directory, a hard timeout
 ([`DockerSandbox.command`](../src/sentinel/sandbox/runners.py)). Tests that already fail
-before the patch are not blamed on it. Code:
+before the patch are not blamed on it, but prevent a validated verdict. Analysis must
+complete successfully on both versions and reproduce the finding at its cited location.
+The target rules must disappear from that file; a lower count alone is insufficient.
+The trusted analyzer entry point is installed in the image and invoked with Python's
+isolated mode. Project plugins and local tool installations are not loaded. Scratch
+copies omit dependencies and symlinks. Rebuild the sandbox image after upgrading Sentinel.
+Without Docker, generation and Python syntax parsing still work, but analysis and tests
+are unverified. Applying an unverified patch remains an explicit user action. Code:
 [`engine.py`](../src/sentinel/core/fixes/engine.py),
 [`validation.py`](../src/sentinel/core/fixes/validation.py),
 [`patch.py`](../src/sentinel/core/fixes/patch.py),
@@ -315,8 +334,11 @@ stateDiagram-v2
 
 - The queue is a table ([`jobs.py`](../src/sentinel/infrastructure/queue/jobs.py)): a worker
   claims a job with a conditional `UPDATE` (plus `SELECT … FOR UPDATE SKIP LOCKED` on
-  PostgreSQL), so several workers never run the same job — tested with racing threads on
-  both SQLite and PostgreSQL.
+  PostgreSQL). After a lease expires, old computation can overlap a new claim, but owner,
+  attempt-generation and expiry checks fence heartbeats, completion and service writes.
+  Publication holds the claim's database lock through the outbound calls. An already-running
+  provider request cannot be cancelled; its stale result cannot be committed. Crash reclaims
+  consume the same bounded attempt budget. Regression tests cover SQLite and PostgreSQL.
 - Live progress: each stage transition is written to the review row
   ([`DBProgress`](../src/sentinel/services/reviews.py)); the browser follows
   `GET /api/reviews/{id}/events`, a Server-Sent Events stream that polls that row
@@ -330,7 +352,7 @@ stateDiagram-v2
 | Secrets sent to a model | `.env`, private keys, credential stores never read; secrets on other lines redacted (diff, context, prompt — three layers) | [`filtering.py`](../src/sentinel/analysis/diff/filtering.py), [`secrets.py`](../src/sentinel/analysis/diff/secrets.py), [`context.py`](../src/sentinel/analysis/graph/context.py), [`prompts`](../src/sentinel/ai/prompts/__init__.py) |
 | Prompt injection in code | Repository text fenced in `<untrusted_* nonce=…>` tags, tag look-alikes neutralised, model told it is data; injection text reported as a finding; verification never trusts the model's word | [`prompts`](../src/sentinel/ai/prompts/__init__.py), [`injection.py`](../src/sentinel/analysis/diff/injection.py) |
 | Malicious PR executing code | PR workspaces are untrusted: no project-local tool binaries, mypy plugins/config or workspace TypeScript are loaded | `trust_workspace` in [`runner.py`](../src/sentinel/analysis/static/runner.py), [`bootstrap.py`](../src/sentinel/bootstrap.py) |
-| Generated code on the host | Tests run only in the sandbox; the process sandbox is opt-in and labelled | [`runners.py`](../src/sentinel/sandbox/runners.py) |
+| Generated code on the host | Fix analysis and tests require Docker; process execution cannot validate a fix | [`analysis.py`](../src/sentinel/sandbox/analysis.py), [`runners.py`](../src/sentinel/sandbox/runners.py) |
 | Path traversal | Diff paths and tarball members outside the repository are rejected | [`safe_path`](../src/sentinel/analysis/diff/parser.py), [`client.py`](../src/sentinel/integrations/github/client.py) |
 | Cross-tenant access | Every lookup scoped by user; tested in token mode | [`Store`](../src/sentinel/infrastructure/database/store.py), [`test_token_mode_isolates_tenants`](../tests/integration/test_api.py) |
 | Browser attacks on local mode | Loopback only, `Host` allow-list (DNS rebinding), `X-Sentinel-Client` header on writes (CSRF) | [`app.py`](../src/sentinel/apps/api/app.py), [`dependencies.py`](../src/sentinel/apps/api/dependencies.py) |

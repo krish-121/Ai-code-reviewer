@@ -166,12 +166,16 @@ class VerificationEngine:
 
     @staticmethod
     def deterministic(finding: Finding, ctx: VerificationContext) -> VerificationResult:
-        """Static findings are proven by construction; we only add reachability."""
+        """Separate syntactic evidence from heuristic claims about runtime behaviour."""
         reach, path = reachability(finding, ctx)
         tools = ", ".join(finding.origins) or "static analysis"
+        heuristic = bool(
+            set(finding.tags)
+            & {"tls", "weak-hash", "n+1", "quadratic", "deserialization", "shell-injection"}
+        )
         return VerificationResult(
-            status=VerificationStatus.SUPPORTED,
-            score=1.0,
+            status=VerificationStatus.LIKELY if heuristic else VerificationStatus.SUPPORTED,
+            score=0.6 if heuristic else 1.0,
             checks=[
                 VerificationCheck(
                     name="deterministic-rule",
@@ -180,7 +184,9 @@ class VerificationEngine:
                     weight=DETERMINISTIC_WEIGHT,
                 )
             ],
-            summary=f"deterministic rule {finding.rule_id or tools}",
+            summary=f"static pattern {finding.rule_id or tools}; runtime impact requires inspection"
+            if heuristic
+            else f"deterministic rule {finding.rule_id or tools}",
             reachability=reach,
             call_path=path,
         )

@@ -160,7 +160,7 @@ export function FilesTab({ reviewId, findings }: { reviewId: string; findings: F
   const lineParam = useSearchParam("line");
   const byFile = useMemo(() => groupByFile(findings), [findings]);
 
-  if (files.error) return <ErrorNote error={files.error} />;
+  if (files.error) return <ErrorNote error={files.error} retry={files.reload} />;
   if (!files.data) return <Spinner />;
   const list = files.data.files;
   if (list.length === 0) return <Empty title="No reviewable files in this change" />;

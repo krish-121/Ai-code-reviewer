@@ -28,7 +28,7 @@ class FixCheck(BaseModel):
 class FixOutcome(BaseModel):
     """A proposed fix and its verdict.
 
-    ``validated``: a deterministic re-check or the tests confirm the fix.
+    ``validated``: every required deterministic and sandbox test check passed.
     ``unverified``: nothing failed, but nothing could confirm it either.
     ``failed``: a check failed. ``error``: no patch could be produced.
     """
@@ -37,13 +37,14 @@ class FixOutcome(BaseModel):
     summary: str = ""
     patch: str = ""
     edits: list[FileEdit] = Field(default_factory=list)
-    original_hashes: dict[str, str] = Field(default_factory=dict)
+    original_hashes: dict[str, str | None] = Field(default_factory=dict)
     checks: list[FixCheck] = Field(default_factory=list)
     attempts: int = 0
     isolation: str = "none"
     error: str | None = None
     provider: str | None = None
     model: str | None = None
+    fallback_events: list[str] = Field(default_factory=list)
 
     @property
     def ok(self) -> bool:

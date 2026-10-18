@@ -10,8 +10,8 @@ verification, deduplication, prioritization, the fix sandbox — runs for real. 
 provider configured, run ``sentinel review`` in the demo repository instead.
 
 The fix's tests run in Docker (``sentinel-sandbox`` image, see Dockerfile.sandbox). Without
-Docker the fix is reported as *unverified*; pass ``--allow-process-sandbox`` to run the
-tests in a restricted subprocess instead (acceptable here because the patch is scripted).
+Docker the fix is reported as *unverified*. Generated-code analysis and tests require
+Docker; the process sandbox is never used for fix validation.
 """
 
 from __future__ import annotations
@@ -27,8 +27,7 @@ sys.path.insert(0, str(ROOT / "demo"))
 
 import build_demo_repo  # noqa: E402
 
-from sentinel.analysis.static.runner import StaticAnalysisRunner, default_analyzers  # noqa: E402
-from sentinel.bootstrap import build_sandbox  # noqa: E402
+from sentinel.bootstrap import build_fix_engine  # noqa: E402
 from sentinel.core.configuration.config import Settings, load_repo_config  # noqa: E402
 from sentinel.core.domain.ai import (  # noqa: E402
     AIFixPayload,
@@ -82,7 +81,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--db", default=str(ROOT / ".demo" / "sentinel-demo.db"))
     parser.add_argument("--repo", default=str(ROOT / ".demo" / "sentinel-demo"))
-    parser.add_argument("--allow-process-sandbox", action="store_true")
     args = parser.parse_args()
     Path(args.db).parent.mkdir(parents=True, exist_ok=True)
 
@@ -90,7 +88,6 @@ def main() -> None:
     settings = Settings(
         provider="none",
         database_url=f"sqlite:///{Path(args.db).resolve()}",
-        allow_process_sandbox=args.allow_process_sandbox,
     )
     db = Database(settings.database_url)
     db.create_all()
@@ -106,11 +103,12 @@ def main() -> None:
     print(f"review {review_id}: {result.summary.headline}")
 
     def engine_factory(root: Path, trusted: bool) -> FixEngine:
-        return FixEngine(
-            replay,
-            static_runner=StaticAnalysisRunner(default_analyzers()),
-            sandbox=build_sandbox(settings),
-            config=load_repo_config(root),
+        return build_fix_engine(
+            settings,
+            load_repo_config(root),
+            workspace=root,
+            ai=replay,
+            trusted_workspace=trusted,
         )
 
     target = next(f for f in result.findings if f.file == "app/db.py" and "sql-injection" in f.tags)

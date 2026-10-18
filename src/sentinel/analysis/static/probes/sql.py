@@ -69,8 +69,16 @@ class SqlInjectionProbe:
             return result(
                 self.name, CheckOutcome.CONTRADICTS, detail, VERY_HIGH_WEIGHT, decisive=True
             )
-        detail = "the SQL argument is a constant string"
-        return result(self.name, CheckOutcome.CONTRADICTS, detail, HIGH_WEIGHT, decisive=True)
+        arguments = [sql_arg(call) for call in sinks]
+        if all(isinstance(arg, ast.Constant) and isinstance(arg.value, str) for arg in arguments):
+            detail = "the SQL argument is a constant string"
+            return result(self.name, CheckOutcome.CONTRADICTS, detail, HIGH_WEIGHT, decisive=True)
+        return result(
+            self.name,
+            CheckOutcome.NEUTRAL,
+            "query value is unknown; safety is not proven",
+            LOW_WEIGHT,
+        )
 
     def _check_dynamic_call(
         self,

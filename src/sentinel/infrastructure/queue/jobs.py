@@ -67,6 +67,14 @@ def claim(
         and_(Job.status == QUEUED, Job.run_after <= now),
         and_(Job.status == RUNNING, Job.lease_until < now),
     )
+    session.execute(
+        update(Job)
+        .where(runnable, Job.attempts >= Job.max_attempts)
+        .values(
+            status=FAILED, lease_until=None, last_error="attempt limit exhausted", updated_at=now
+        )
+    )
+    runnable = and_(runnable, Job.attempts < Job.max_attempts)
     stmt = select(Job.id).where(runnable).order_by(Job.created_at).limit(CLAIM_BATCH)
     if kinds:
         stmt = stmt.where(Job.kind.in_(kinds))
@@ -96,12 +104,23 @@ def claim(
 
 
 def heartbeat(
-    session: Session, job_id: str, worker_id: str, lease_s: int = DEFAULT_LEASE_S
+    session: Session,
+    job_id: str,
+    worker_id: str,
+    lease_s: int = DEFAULT_LEASE_S,
+    *,
+    attempt: int,
 ) -> bool:
     """Extend a running job's lease; False if this worker no longer holds it."""
     result = session.execute(
         update(Job)
-        .where(Job.id == job_id, Job.worker_id == worker_id, Job.status == RUNNING)
+        .where(
+            Job.id == job_id,
+            Job.worker_id == worker_id,
+            Job.status == RUNNING,
+            Job.attempts == attempt,
+            Job.lease_until > utcnow(),
+        )
         .values(lease_until=utcnow() + timedelta(seconds=lease_s), updated_at=utcnow())
         .execution_options(synchronize_session=False)
     )
@@ -109,26 +128,35 @@ def heartbeat(
     return getattr(result, "rowcount", 0) == 1
 
 
-def complete(session: Session, job: Job) -> None:
-    """Mark a job done."""
-    job.status = DONE
-    job.lease_until = None
-    job.updated_at = utcnow()
+def _finish(session: Session, job: Job, values: dict[str, Any]) -> bool:
+    result = session.execute(
+        update(Job)
+        .where(
+            Job.id == job.id,
+            Job.worker_id == job.worker_id,
+            Job.attempts == job.attempts,
+            Job.status == RUNNING,
+            Job.lease_until > utcnow(),
+        )
+        .values(**values, lease_until=None, updated_at=utcnow())
+    )
     session.commit()
+    return getattr(result, "rowcount", 0) == 1
 
 
-def fail(session: Session, job: Job, error: str, *, retry: bool = True) -> None:
+def complete(session: Session, job: Job) -> bool:
+    """Complete only the original, still-live claim."""
+    return _finish(session, job, {"status": DONE})
+
+
+def fail(session: Session, job: Job, error: str, *, retry: bool = True) -> bool:
     """Record a failure; requeue with exponential backoff while attempts remain."""
-    job.last_error = error[:MAX_ERROR_CHARS]
-    job.lease_until = None
-    job.updated_at = utcnow()
+    values: dict[str, Any] = {"last_error": error[:MAX_ERROR_CHARS], "status": FAILED}
     if retry and job.attempts < job.max_attempts:
-        job.status = QUEUED
+        values["status"] = QUEUED
         delay = min(MAX_RETRY_DELAY_S, RETRY_BASE_DELAY_S * 2 ** (job.attempts - 1))
-        job.run_after = utcnow() + timedelta(seconds=delay)
-    else:
-        job.status = FAILED
-    session.commit()
+        values["run_after"] = utcnow() + timedelta(seconds=delay)
+    return _finish(session, job, values)
 
 
 def pending(session: Session) -> int:

@@ -139,7 +139,7 @@ def test_prepare_local_modes(repo: Path) -> None:
     (repo / "pkg" / "a.py").write_text("def a():\n    return 3\n")
     git(repo, "add", "pkg/a.py")
     with prepare_local(LocalRequest(path=str(repo), mode="staged")) as ws:
-        assert ws.workspace == repo  # staged == worktree for the changed file
+        assert ws.workspace != repo  # all context is pinned to the index, even unchanged helpers
         assert [f.path for f in ws.changeset.files] == ["pkg/a.py"]
     # an unstaged edit on top of the staged one -> the index is exported
     (repo / "pkg" / "a.py").write_text("def a():\n    return 4\n")

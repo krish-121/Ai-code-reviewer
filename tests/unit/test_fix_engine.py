@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from sentinel.analysis.ast.registry import default_registry
-from sentinel.analysis.static.runner import StaticAnalysisRunner, default_analyzers
+from sentinel.analysis.static.builtin_security import BuiltinAnalyzer
+from sentinel.analysis.static.runner import StaticAnalysisRunner
 from sentinel.core.configuration.config import load_repo_config
 from sentinel.core.domain.ai import FileEdit
 from sentinel.core.domain.models import Category, Finding, FindingSource, Severity
@@ -64,7 +64,8 @@ def fix_payload(search: str, replace: str) -> dict[str, object]:
 
 
 class FakeSandbox:
-    isolation = "fake"
+    # A Docker protocol double; these unit tests do not claim to execute containers.
+    isolation = "docker"
 
     def __init__(self, *results: SandboxResult, available: bool = True) -> None:
         self.results = list(results)
@@ -84,10 +85,12 @@ def ok(code: int = 0, out: str = "") -> SandboxResult:
 
 
 def engine(ai: ScriptedProvider, sandbox: object, root: Path) -> FixEngine:
-    registry = default_registry()
+    class ParseOnlyRunner(StaticAnalysisRunner):
+        isolation = "docker"  # deterministic test double; no external tools
+
     return FixEngine(
         ai,
-        static_runner=StaticAnalysisRunner(default_analyzers(registry), disabled=["mypy"]),
+        static_runner=ParseOnlyRunner([BuiltinAnalyzer()]),
         sandbox=sandbox,  # type: ignore[arg-type]
         config=load_repo_config(root),
     )
@@ -132,7 +135,7 @@ def test_python_syntax_and_test_detection(tmp_path: Path) -> None:
     assert detect_test_command(tmp_path, cfg)[:3] == ["python", "-m", "pytest"]  # type: ignore[index]
 
 
-def test_scratch_copy_skips_git_and_links_deps(tmp_path: Path) -> None:
+def test_scratch_copy_skips_git_and_deps(tmp_path: Path) -> None:
     root = tmp_path / "r"
     (root / ".git").mkdir(parents=True)
     (root / "node_modules" / "x").mkdir(parents=True)
@@ -142,7 +145,7 @@ def test_scratch_copy_skips_git_and_links_deps(tmp_path: Path) -> None:
     copy = scratch_copy(root)
     try:
         assert not (copy / ".git").exists()
-        assert (copy / "node_modules").is_symlink()
+        assert not (copy / "node_modules").exists()
         assert (copy / "src" / "a.py").read_text() == "x"
         assert (copy / "top.txt").exists()
     finally:
@@ -183,9 +186,9 @@ def test_bad_patch_is_retried_with_feedback(demo: Path) -> None:
     assert outcome.attempts == 2
     assert ai.fix_requests[1].feedback is not None
     assert "not found" in ai.fix_requests[1].feedback
-    assert outcome.status == "validated"  # deterministic re-check passed, tests skipped
+    assert outcome.status == "unverified"  # deterministic re-check cannot replace tests
     tests = next(c for c in outcome.checks if c.name == "tests")
-    assert tests.status == "skipped" and "no sandbox" in tests.detail
+    assert tests.status == "skipped" and "unavailable" in tests.detail
 
 
 def test_patch_that_breaks_tests_fails(demo: Path) -> None:
@@ -235,9 +238,10 @@ def test_unverifiable_fix_and_errors(demo: Path) -> None:
         apply_fix(demo, FixOutcome(status="failed"))
 
 
-def test_process_sandbox_runs_real_tests(demo: Path) -> None:
+def test_process_sandbox_cannot_execute_generated_code(demo: Path) -> None:
     ai = ScriptedProvider(fixes=[fix_payload(VULN, FIXED)])
     outcome = engine(ai, ProcessSandbox(), demo).generate(sqli_finding(), demo)
     tests = next(c for c in outcome.checks if c.name == "tests")
-    assert tests.status == "passed", tests.detail
+    assert tests.status == "skipped", tests.detail
+    assert outcome.status == "unverified"
     assert outcome.isolation.startswith("process")

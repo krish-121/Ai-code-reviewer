@@ -17,7 +17,6 @@ from sentinel.infrastructure.database.models import FindingEvent, FixAttempt, Re
 from sentinel.infrastructure.database.store import Store
 
 LOCAL_REPOSITORY = "local"
-APPLICABLE_FIX_STATUSES = ("validated", "unverified")
 MAX_NOTE_LENGTH = 2000
 
 
@@ -132,5 +131,5 @@ def fix_json(fix: FixAttempt, repository_is_local: bool) -> dict[str, Any]:
         "error": fix.error,
         "created_at": iso(fix.created_at),
         "finished_at": iso(fix.finished_at),
-        "can_apply": repository_is_local and fix.status in APPLICABLE_FIX_STATUSES,
+        "can_apply": repository_is_local and fix.status == "validated",
     }

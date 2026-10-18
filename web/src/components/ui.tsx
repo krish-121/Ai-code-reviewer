@@ -120,10 +120,15 @@ export function Spinner({ label = "Loading" }: { label?: string }) {
   );
 }
 
-export function ErrorNote({ error }: { error: Error }) {
+export function ErrorNote({ error, retry }: { error: Error; retry?: () => void }) {
   return (
     <div className="error-note" role="alert">
       {error.message}
+      {retry ? (
+        <button className="btn" onClick={retry}>
+          Retry
+        </button>
+      ) : null}
     </div>
   );
 }

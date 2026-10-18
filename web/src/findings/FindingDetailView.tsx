@@ -36,6 +36,7 @@ export function FindingDetailView({ review, finding, onChanged }: Props) {
     <article className="finding-detail" aria-labelledby="fd-title">
       <FindingHeader review={review} finding={finding} />
       <FindingMeta finding={finding} />
+      {detail.error ? <ErrorNote error={detail.error} retry={detail.reload} /> : null}
       {finding.suppressed ? (
         <p className="suppressed-note">
           <strong>Not shown as an issue:</strong> {finding.suppressed_reason}
@@ -61,6 +62,7 @@ export function FindingDetailView({ review, finding, onChanged }: Props) {
         </section>
       ) : null}
       <FindingActions
+        key={finding.id}
         review={review}
         finding={finding}
         latestFixId={detail.data?.fixes[0]?.id ?? null}

@@ -270,6 +270,7 @@ class ChangeSet(_Model):
     source: str = "diff"
     base_ref: str | None = None
     head_ref: str | None = None
+    baseline_ref: str | None = Field(default=None, description="Exact tree used for diagnostics")
     title: str | None = None
     files: list[FileChange] = Field(default_factory=list)
     skipped: list[SkippedFile] = Field(default_factory=list)
@@ -379,9 +380,15 @@ class Finding(_Model):
     verification: VerificationResult | None = None
     priority: PriorityScore | None = None
     in_changed_lines: bool = True
+    baseline_status: str | None = Field(
+        default=None, description="introduced | pre-existing | unknown after base/head comparison"
+    )
     merged_ids: list[str] = Field(default_factory=list)
     suppressed_reason: str | None = None
     symbol: str | None = Field(default=None, description="Enclosing function/class, if known")
+    site_anchor: str | None = Field(
+        default=None, description="Normalized source site and occurrence within its symbol"
+    )
 
     @property
     def location(self) -> str:

@@ -6,6 +6,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from sentinel.analysis.diff.filtering import sensitive_file_reason
 from sentinel.analysis.diff.parser import (
     UnsafePathError,
     detect_language,
@@ -14,6 +15,7 @@ from sentinel.analysis.diff.parser import (
 )
 from sentinel.core.domain.errors import SentinelError
 from sentinel.core.domain.models import ChangeSet, Language, SkippedFile
+from sentinel.core.paths import RepositoryPathError, read_repository_text
 
 DIFF_ARGS = ["diff", "-M", "--no-color", "--no-ext-diff", "--unified=3"]
 WALK_EXCLUDE = {
@@ -37,7 +39,7 @@ class GitError(SentinelError, RuntimeError):
     """A git command failed (not a repository, unknown ref ...)."""
 
 
-def _git(repo: Path, *args: str) -> str:
+def _git(repo: Path, *args: str, input_text: str | None = None) -> str:
     try:
         proc = subprocess.run(
             ["git", "-C", str(repo), *args],
@@ -45,6 +47,7 @@ def _git(repo: Path, *args: str) -> str:
             text=True,
             check=False,
             timeout=60,
+            input=input_text,
             env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C"},
         )
     except FileNotFoundError as exc:
@@ -103,8 +106,9 @@ def range_changeset(repo: Path, base: str, head: str) -> ChangeSet:
     for ref in (base, head):
         if ref.startswith("-"):
             raise GitError(f"invalid ref {ref!r}")
-    cs = parse_unified_diff(_git(repo, *DIFF_ARGS, f"{base}...{head}"), source="range")
-    cs.base_ref, cs.head_ref = base, head
+    ancestor = _git(repo, "merge-base", base, head).strip()
+    cs = parse_unified_diff(_git(repo, *DIFF_ARGS, ancestor, head), source="range")
+    cs.base_ref, cs.head_ref = ancestor, head
     cs.title = f"{base}...{head}"
     return cs
 
@@ -140,17 +144,17 @@ def path_changeset(root: Path, sub: Path | None = None) -> ChangeSet:
         ):
             continue
         try:
-            if full.stat().st_size > MAX_WHOLE_FILE_BYTES:
-                cs.skipped.append(SkippedFile(path=rel, reason="too large"))
+            if sensitive_file_reason(rel):
+                cs.files.append(whole_file_change(rel, ""))
                 continue
-            data = full.read_bytes()
-        except OSError as exc:
+            data = read_repository_text(root, rel, MAX_WHOLE_FILE_BYTES)
+        except (OSError, UnicodeError, RepositoryPathError) as exc:
             cs.skipped.append(SkippedFile(path=rel, reason=f"unreadable: {exc}"))
             continue
-        if b"\x00" in data[:8192]:
+        if "\x00" in data[:8192]:
             cs.skipped.append(SkippedFile(path=rel, reason="binary file"))
             continue
-        cs.files.append(whole_file_change(rel, data.decode("utf-8", errors="replace")))
+        cs.files.append(whole_file_change(rel, data))
     return cs
 
 
@@ -164,6 +168,19 @@ def export_index(repo: Path, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     prefix = str(dest.resolve()) + "/"
     _git(repo, "checkout-index", "-a", "-f", f"--prefix={prefix}")
+
+
+def snapshot_index(repo: Path, dest: Path) -> ChangeSet:
+    """Pin the complete index tree once, then derive both diff and workspace from it."""
+    tree = _git(repo, "write-tree").strip()
+    base = (
+        head_sha(repo) or _git(repo, "hash-object", "-t", "tree", "--stdin", input_text="").strip()
+    )
+    changeset = parse_unified_diff(_git(repo, *DIFF_ARGS, base, tree), source="staged")
+    changeset.base_ref, changeset.head_ref = base, tree
+    changeset.title = "Staged changes"
+    export_tree(repo, tree, dest)
+    return changeset
 
 
 def export_tree(repo: Path, ref: str, dest: Path) -> None:

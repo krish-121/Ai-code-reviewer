@@ -12,13 +12,14 @@ import os
 import socket
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from sentinel.infrastructure.database.models import Job
 from sentinel.infrastructure.database.session import Database
 from sentinel.infrastructure.observability.logging import review_id_var
 from sentinel.infrastructure.observability.metrics import METRICS
 from sentinel.infrastructure.queue import jobs
+from sentinel.infrastructure.queue.fencing import owned
 from sentinel.services.fixes import FixService
 from sentinel.services.reviews import ReviewService
 
@@ -42,6 +43,7 @@ class Worker:
         worker_id: str | None = None,
         poll_s: float = DEFAULT_POLL_S,
         lease_s: int = DEFAULT_LEASE_S,
+        kinds: Sequence[str] | None = None,
     ) -> None:
         self.db = db
         self.reviews = reviews
@@ -54,6 +56,10 @@ class Worker:
             jobs.PUBLISH_JOB: self._publish,
             jobs.FIX_JOB: self._fix,
         }
+        if kinds is not None:
+            if not kinds or set(kinds) - self.handlers.keys():
+                raise ValueError("worker kinds must be review, publish or fix")
+            self.handlers = {kind: self.handlers[kind] for kind in kinds}
 
     def _review(self, job: Job) -> None:
         review_id = str(job.payload["review_id"])
@@ -81,22 +87,28 @@ class Worker:
                 return False
             s.expunge(job)
         stop = threading.Event()
-        beat = threading.Thread(target=self._heartbeat, args=(job.id, stop), daemon=True)
+        beat = threading.Thread(target=self._heartbeat, args=(job, stop), daemon=True)
         beat.start()
         log.info("job started", extra={"job": job.id, "kind": job.kind, "attempt": job.attempts})
         start = time.monotonic()
         try:
-            self.handlers[job.kind](job)
+            with owned(job):
+                self.handlers[job.kind](job)
         except Exception as exc:
             stop.set()
             log.exception("job failed", extra={"job": job.id, "kind": job.kind})
             with self.db.session() as s:
-                row = s.get_one(Job, job.id)
-                jobs.fail(s, row, f"{type(exc).__name__}: {exc}")
+                jobs.fail(s, job, f"{type(exc).__name__}: {exc}")
             return True
+        finally:
+            stop.set()
+            beat.join(timeout=self.lease_s)
         stop.set()
         with self.db.session() as s:
-            jobs.complete(s, s.get_one(Job, job.id))
+            completed = jobs.complete(s, job)
+        if not completed:
+            log.warning("stale completion discarded", extra={"job": job.id})
+            return True
         log.info(
             "job done",
             extra={
@@ -107,12 +119,16 @@ class Worker:
         )
         return True
 
-    def _heartbeat(self, job_id: str, stop: threading.Event) -> None:
+    def _heartbeat(self, job: Job, stop: threading.Event) -> None:
         """Extend the lease every third of its length until ``stop`` is set."""
-        interval = max(MIN_HEARTBEAT_S, self.lease_s / HEARTBEATS_PER_LEASE)
+        interval = min(MIN_HEARTBEAT_S, self.lease_s / HEARTBEATS_PER_LEASE)
         while not stop.wait(interval):
             with self.db.session() as s:
-                jobs.heartbeat(s, job_id, self.worker_id, self.lease_s)
+                if not jobs.heartbeat(
+                    s, job.id, self.worker_id, self.lease_s, attempt=job.attempts
+                ):
+                    stop.set()
+                    log.warning("job lease lost", extra={"job": job.id})
 
     def run_forever(self, stop: threading.Event | None = None) -> None:
         """Process jobs until ``stop`` is set (or forever)."""

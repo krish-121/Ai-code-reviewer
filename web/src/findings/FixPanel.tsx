@@ -13,10 +13,12 @@ const CHECK_NAME: Record<string, string> = {
   "finding-resolved": "Original issue gone",
   "no-new-issues": "No new issues",
   tests: "Tests",
+  analysis: "Static analysis",
+  "regression-tests": "New regression tests",
 };
 const VERDICT: Record<string, string> = {
-  validated: "Validated: the patch fixes the issue and nothing broke.",
-  unverified: "Applies cleanly, but neither tests nor a deterministic re-check could confirm it.",
+  validated: "Validated: all required checks passed.",
+  unverified: "Some required checks did not complete. Complete validation before applying.",
   failed: "Failed validation. Don't apply this patch.",
   error: "Fix generation failed.",
   applied: "Applied to the working tree.",
@@ -57,14 +59,18 @@ export function FixPanel({
   canApply: boolean;
   onApplied: () => void;
 }) {
-  const [poll, setPoll] = useState(true);
-  const fix = useQuery<FixAttempt>(`fix:${fixId}`, () => api.fix(fixId), poll ? 1500 : undefined);
+  const [finishedId, setFinishedId] = useState<string | null>(null);
+  const fix = useQuery<FixAttempt>(
+    `fix:${fixId}`,
+    () => api.fix(fixId),
+    finishedId !== fixId ? 1500 : undefined,
+  );
   const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const data = fix.data;
   useEffect(() => {
-    if (data && !PENDING.has(data.status)) setPoll(false);
-  }, [data?.status]);
+    if (data?.id === fixId && !PENDING.has(data.status)) setFinishedId(fixId);
+  }, [data?.id, data?.status, fixId]);
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -84,6 +90,7 @@ export function FixPanel({
   return (
     <section className="fix-panel" aria-live="polite">
       <h3>Proposed fix</h3>
+      {fix.error ? <ErrorNote error={fix.error} retry={fix.reload} /> : null}
       {!data || PENDING.has(data.status) ? (
         <Spinner label="Generating a patch and validating it in a sandbox" />
       ) : (
@@ -114,7 +121,7 @@ export function FixPanel({
           ) : null}
           {data.patch ? <DiffView patch={data.patch} /> : null}
           <div className="fd-actions">
-            {data.can_apply && canApply ? (
+            {data.status === "validated" && data.can_apply && canApply ? (
               <button
                 className="btn btn-primary"
                 disabled={busy}

@@ -39,8 +39,10 @@ catch everything below, so read your diff with these in mind.
 ## Checks before committing
 
 ```bash
-ruff check src tests scripts && ruff format --check src tests scripts
+ruff check src tests scripts tools/opencode_bridge
+ruff format --check src tests scripts tools/opencode_bridge
 mypy
+mypy --strict tools/opencode_bridge
 pytest --cov=sentinel --cov-fail-under=80
 coverage report --include="*/sentinel/core/*" --fail-under=90
 cd web && npm run lint && npm test && npm run build    # when the UI changed

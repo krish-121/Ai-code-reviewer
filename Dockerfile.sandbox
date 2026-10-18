@@ -2,14 +2,28 @@
 #
 #   docker build -f Dockerfile.sandbox -t sentinel-sandbox .
 #
-# It holds language runtimes and test runners only: no Sentinel code and no credentials.
+# It holds trusted Sentinel analyzers, language runtimes and test runners; no credentials.
 # Every container started from it has no network, a read-only root filesystem, a 256 MB
 # writable /tmp, capped memory/CPU/PIDs, all Linux capabilities dropped, and runs as the
 # calling user. Because there is no network, a project's test dependencies must already be
 # in the image: extend it (FROM sentinel-sandbox) with your requirements for real projects.
+FROM node:22-slim AS analyzers
+WORKDIR /opt/sentinel-tools
+COPY tools/analyzers/package.json tools/analyzers/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+
 FROM python:3.11-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nodejs npm \
- && rm -rf /var/lib/apt/lists/* \
- && pip install --no-cache-dir "pytest>=8"
+ && apt-get install -y --no-install-recommends libstdc++6 libatomic1 \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=analyzers /usr/local/bin/node /usr/local/bin/node
+COPY --from=analyzers /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+COPY --from=analyzers /opt/sentinel-tools /opt/sentinel-tools
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+COPY pyproject.toml README.md LICENSE requirements.lock /opt/sentinel/
+COPY src /opt/sentinel/src
+RUN pip install --no-cache-dir -c /opt/sentinel/requirements.lock "/opt/sentinel[analyzers]" pytest
+ENV NODE_PATH=/opt/sentinel-tools/node_modules \
+    PATH=/opt/sentinel-tools/node_modules/.bin:$PATH
 WORKDIR /workspace

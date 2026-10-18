@@ -122,16 +122,45 @@ export function subscribeProgress(
   reviewId: string,
   onProgress: (e: ProgressEvent) => void,
   onDone: (status: ReviewStatus) => void,
+  pollMs = 2000,
 ): () => void {
   const controller = new AbortController();
+  let finished = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let failures = 0;
+  const done = (status: ReviewStatus) => {
+    if (finished || controller.signal.aborted) return;
+    finished = true;
+    clearTimeout(timer);
+    controller.abort();
+    onDone(status);
+  };
+  const poll = async () => {
+    try {
+      const review = await api.review(reviewId);
+      if (controller.signal.aborted) return;
+      failures = 0;
+      onProgress({ status: review.status, stages: review.stages });
+      if (review.status !== "queued" && review.status !== "running") done(review.status);
+    } catch {
+      failures += 1;
+    } finally {
+      if (!finished && !controller.signal.aborted)
+        timer = setTimeout(poll, Math.min(10000, pollMs * 2 ** Math.min(failures, 3)));
+    }
+  };
+  timer = setTimeout(poll, pollMs);
   const handle = (event: ServerSentEvent) => {
     if (event.event === "progress") onProgress(JSON.parse(event.data) as ProgressEvent);
-    if (event.event === "done") onDone((JSON.parse(event.data) as { status: ReviewStatus }).status);
+    if (event.event === "done") done((JSON.parse(event.data) as { status: ReviewStatus }).status);
   };
   void readEvents(`/api/reviews/${reviewId}/events`, controller.signal, handle).catch(() => {
-    /* aborted or connection lost: the page falls back to its regular refresh */
+    /* The independent poll also handles silent EOF and interrupted streams. */
   });
-  return () => controller.abort();
+  return () => {
+    clearTimeout(timer);
+    controller.abort();
+  };
 }
 
 async function readEvents(

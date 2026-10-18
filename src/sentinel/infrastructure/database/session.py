@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,7 +14,11 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from sentinel.infrastructure.database.models import Base
+from sentinel.infrastructure.database.schema import initialize
+from sentinel.infrastructure.queue.fencing import guard
+
+SQLITE_BUSY_SECONDS = 30
+SQLITE_RETRY_INTERVAL = 0.05
 
 
 def normalize_url(url: str) -> str:
@@ -50,8 +56,8 @@ class Database:
         return self.engine.dialect.name
 
     def create_all(self) -> None:
-        """Create missing tables (no migrations yet; see PROGRESS.md)."""
-        Base.metadata.create_all(self.engine)
+        """Initialize a fresh versioned schema; require explicit upgrades for existing data."""
+        initialize(self.engine)
 
     def session(self) -> Session:
         """A new session; the caller commits and closes it."""
@@ -62,6 +68,7 @@ class Database:
         """A session that commits on success, rolls back on error, and always closes."""
         session = self._sessions()
         try:
+            guard(session)
             yield session
             session.commit()
         except BaseException:
@@ -73,7 +80,21 @@ class Database:
 
 def _sqlite_pragmas(dbapi_conn: Any, _record: Any) -> None:
     cur = dbapi_conn.cursor()
-    cur.execute("PRAGMA foreign_keys=ON")
-    cur.execute("PRAGMA journal_mode=WAL")
-    cur.execute("PRAGMA busy_timeout=30000")
-    cur.close()
+    try:
+        cur.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_SECONDS * 1000}")
+        cur.execute("PRAGMA foreign_keys=ON")
+        _enable_wal(cur)
+    finally:
+        cur.close()
+
+
+def _enable_wal(cursor: Any) -> None:
+    deadline = time.monotonic() + SQLITE_BUSY_SECONDS
+    while True:
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower() or time.monotonic() >= deadline:
+                raise
+            time.sleep(SQLITE_RETRY_INTERVAL)

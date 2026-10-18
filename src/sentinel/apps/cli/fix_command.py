@@ -27,14 +27,14 @@ from sentinel.apps.cli.common import (
 from sentinel.bootstrap import build_fix_engine
 from sentinel.core.configuration.config import Settings, load_repo_config
 from sentinel.core.domain.errors import SentinelError
-from sentinel.core.domain.models import Finding, FindingStatus
+from sentinel.core.domain.models import Finding
 from sentinel.core.domain.ports import AIConfigurationError
-from sentinel.core.fixes.engine import FixOutcome, apply_fix
+from sentinel.core.fixes.engine import FixOutcome
 from sentinel.infrastructure.database.session import Database
 from sentinel.infrastructure.database.store import Store
 from sentinel.services.fixes import FixService
+from sentinel.services.resources import close_provider
 
-APPLICABLE = ("validated", "unverified")
 UNSUCCESSFUL = ("failed", "error")
 PROCESS_SANDBOX = "process"
 CHECK_ICONS = {
@@ -45,8 +45,8 @@ CHECK_ICONS = {
 }
 VERDICTS = {
     "validated": "[bold green]Patch validated.[/]",
-    "unverified": "[bold yellow]Patch applies cleanly but could not be verified by tests "
-    "or a deterministic re-check.[/]",
+    "unverified": "[bold yellow]Patch applies cleanly but could not be verified by all required "
+    "analysis and sandbox test checks.[/]",
     "failed": "[bold red]Patch failed validation.[/]",
     "error": "[bold red]Fix generation failed:[/] {error}",
 }
@@ -73,9 +73,13 @@ def fix(
     outcome = _generate(settings, finding, root)
     FixService(db, settings).save_outcome(fix_id, outcome)
     _print_outcome(fix_id, outcome)
-    wants_apply = apply and outcome.status in APPLICABLE
+    if apply and not outcome.ok:
+        raise fail(
+            "Only validated patches can be applied; complete the missing checks first", EXIT_FAILED
+        )
+    wants_apply = apply and outcome.ok
     if wants_apply and (yes or typer.confirm("Apply this patch to your working tree?")):
-        _apply(db, root, outcome, finding.id, fix_id)
+        _apply(db, settings, fix_id)
     if outcome.status in UNSUCCESSFUL:
         raise typer.Exit(EXIT_FAILED)
 
@@ -98,7 +102,7 @@ def _start_fix(db: Database, finding_id: str) -> tuple[Finding, Path, str]:
         if row is None:
             raise fail(f"finding {finding_id} not found", EXIT_NOT_FOUND)
         finding = store.domain_finding(row)
-        local_path = row.review.repository.local_path
+        local_path = row.review.request.get("path")
         fix_id = store.create_fix(row).id
     if not local_path:
         raise fail("this finding is not from a local repository")
@@ -115,6 +119,8 @@ def _generate(settings: Settings, finding: Finding, root: Path) -> FixOutcome:
             return engine.generate(finding, root)
         except SentinelError as exc:
             raise fail(str(exc), EXIT_FAILED) from exc
+        finally:
+            close_provider(engine)
 
 
 def _print_outcome(fix_id: str, outcome: FixOutcome) -> None:
@@ -137,15 +143,10 @@ def _print_outcome(fix_id: str, outcome: FixOutcome) -> None:
     console.print(VERDICTS[outcome.status].format(error=escape(outcome.error or "")))
 
 
-def _apply(db: Database, root: Path, outcome: FixOutcome, finding_id: str, fix_id: str) -> None:
+def _apply(db: Database, settings: Settings, fix_id: str) -> None:
     """Write the patch and mark the finding as fixed."""
     try:
-        written = apply_fix(root, outcome)
+        written = FixService(db, settings).apply(fix_id)
     except SentinelError as exc:
         raise fail(str(exc), EXIT_FAILED) from exc
-    with db.transaction() as session:
-        store = Store(session)
-        row = store.finding_for(store.local_user(), finding_id)
-        if row is not None:
-            store.set_status(row, FindingStatus.FIXED, store.local_user(), f"applied {fix_id}")
     console.print(f"[green]Applied to {', '.join(written)}[/]")

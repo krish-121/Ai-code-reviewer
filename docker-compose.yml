@@ -1,47 +1,129 @@
-# Local deployment: PostgreSQL + API (with the web UI) + one background worker.
-#
-#   cp .env.example .env      # add an AI provider key and, optionally, GitHub App settings
-#   docker compose up --build
-#   docker compose exec api sentinel users create you   # prints your API token
-#
-# The API listens on 127.0.0.1:8000 only. Fix *tests* need the sandbox, which the
-# containerized worker cannot start (see docs/DEPLOYMENT.md): fixes generated here are
-# checked statically and reported as "unverified" unless you run a worker on the host.
+# PostgreSQL + schema job + API + review worker + Docker-capable fix worker.
+# Only validation-worker receives daemon access. Scratch data travels over stdin into
+# an isolated tmpfs; see docs/DEPLOYMENT.md for the dedicated-engine trust boundary.
+
+x-app: &app
+  image: ${SENTINEL_APP_IMAGE:-sentinel:local}
+  build:
+    context: .
+    target: app
+
+x-environment: &environment
+  SENTINEL_DATABASE_URL: postgresql://sentinel:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before starting Compose}@postgres:5432/sentinel
+  SENTINEL_AUTH_MODE: token
+
+x-worker-health: &worker-health
+  test: ["CMD", "python", "-I", "-m", "sentinel.apps.worker.health"]
+  interval: 15s
+  timeout: 20s
+  retries: 5
+  start_period: 10s
 
 services:
   postgres:
     image: postgres:16
     environment:
       POSTGRES_USER: sentinel
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before starting Compose}
       POSTGRES_DB: sentinel
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sentinel"]
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
       interval: 5s
       retries: 10
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    command: ["sentinel", "db", "upgrade"]
+    environment: *environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  sandbox-image:
+    image: ${SENTINEL_SANDBOX_IMAGE:-sentinel-sandbox:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+    command: ["python", "-I", "-c", "import sentinel.sandbox.launch"]
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
 
   api:
-    build: .
-    env_file: .env
-    environment:
-      SENTINEL_DATABASE_URL: postgresql://sentinel:${POSTGRES_PASSWORD:-change-me}@postgres:5432/sentinel
+    <<: *app
+    env_file: ${SENTINEL_ENV_FILE:-.env}
+    environment: *environment
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${SENTINEL_BIND_PORT:-8000}:8000"
+    volumes:
+      - repositories:/repos
+    read_only: true
+    tmpfs: ["/tmp:rw,size=512m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-I", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).close()"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
   worker:
-    build: .
-    command: ["sentinel", "worker"]
-    env_file: .env
-    environment:
-      SENTINEL_DATABASE_URL: postgresql://sentinel:${POSTGRES_PASSWORD:-change-me}@postgres:5432/sentinel
+    <<: *app
+    command: ["sentinel", "worker", "--kind", "review", "--kind", "publish"]
+    env_file: ${SENTINEL_ENV_FILE:-.env}
+    environment: *environment
+    volumes:
+      - repositories:/repos
+    read_only: true
+    tmpfs: ["/tmp:rw,size=512m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck: *worker-health
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  validation-worker:
+    image: ${SENTINEL_VALIDATION_IMAGE:-sentinel-validation-worker:local}
+    build:
+      context: .
+      target: validation-worker
+    env_file: ${SENTINEL_ENV_FILE:-.env}
+    environment:
+      <<: *environment
+      SENTINEL_SANDBOX: docker
+      SENTINEL_SANDBOX_IMAGE: ${SENTINEL_SANDBOX_IMAGE:-sentinel-sandbox:latest}
+      SENTINEL_SANDBOX_TRANSPORT: copy
+      SENTINEL_ALLOW_PROCESS_SANDBOX: "0"
+    group_add: ["${DOCKER_GID:-0}"]
+    volumes:
+      - repositories:/repos
+      - ${SENTINEL_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    read_only: true
+    tmpfs: ["/tmp:rw,size=512m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      <<: *worker-health
+      test: ["CMD", "python", "-I", "-m", "sentinel.apps.worker.health", "--sandbox"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      sandbox-image:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
 volumes:
   pgdata:
+  repositories:

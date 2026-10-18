@@ -1,20 +1,21 @@
 """Adapters for JavaScript/TypeScript tools: ESLint and the TypeScript compiler.
 
 ESLint runs with a Sentinel-generated flat config (bug/security rules only) so results
-don't depend on — or get silenced by — the project's own lint setup. TypeScript files
-are linted only when ``@typescript-eslint/parser`` is installed in the project; the
-type checker (``tsc``) covers them otherwise.
+don't depend on — or get silenced by — the project's own lint setup. TypeScript uses
+an installed trusted parser, or a project parser only for explicitly trusted workspaces.
+Missing parser coverage is recorded as unavailable even when JS files can be linted.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import tempfile
 from pathlib import Path
 
 from sentinel.analysis.static.base import find_tool, relpath, run_record, run_tool, static_finding
-from sentinel.core.domain.models import Category, Finding, Language, Severity
+from sentinel.core.domain.models import Category, Finding, Language, Severity, ToolStatus
 from sentinel.core.domain.ports import StaticAnalysisOutput
 
 ESLINT_RULES: dict[str, tuple[Category, Severity, float, list[str]]] = {
@@ -41,6 +42,15 @@ JS_GLOBS = ["**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs"]
 TS_GLOBS = ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"]
 
 
+def _trusted_ts_parser() -> Path | None:
+    """Find an explicitly installed parser outside a reviewed repository."""
+    for root in os.environ.get("NODE_PATH", "").split(os.pathsep):
+        candidate = Path(root) / "@typescript-eslint" / "parser"
+        if root and (candidate / "package.json").is_file():
+            return candidate
+    return None
+
+
 def _config_source(ts_parser: Path | None) -> str:
     rules = dict.fromkeys(ESLINT_RULES, "error")
     base = {
@@ -56,8 +66,10 @@ def _config_source(ts_parser: Path | None) -> str:
     lines.append(json.dumps({"files": JS_GLOBS, "languageOptions": base, "rules": rules}) + ",")
     if ts_parser is not None:
         ts_block = json.dumps({"files": TS_GLOBS, "rules": rules})[:-1]
+        package_json = json.dumps(str(ts_parser / "package.json"))
         lines.append(
-            f'{ts_block}, "languageOptions": {{"parser": require({json.dumps(str(ts_parser))}),'
+            f'{ts_block}, "languageOptions": {{"parser": createRequire({package_json})'
+            '("@typescript-eslint/parser"),'
             ' "sourceType": "module", "ecmaVersion": "latest"}},'
         )
     lines.append("];")
@@ -85,7 +97,7 @@ class ESLintAnalyzer:
         if exe is None or not files:
             return StaticAnalysisOutput(run_record(self.name, None, 0, "eslint not installed"))
         ts_parser = workspace / "node_modules" / "@typescript-eslint" / "parser"
-        parser = ts_parser if self.trust_workspace and ts_parser.is_dir() else None
+        parser = ts_parser if self.trust_workspace and ts_parser.is_dir() else _trusted_ts_parser()
         ts_exts = (".ts", ".tsx", ".mts", ".cts")
         targets = [f for f in files if parser is not None or not f.endswith(ts_exts)]
         if not targets:
@@ -108,8 +120,12 @@ class ESLintAnalyzer:
             ]
             result = run_tool(cmd, workspace, self.timeout_s)
         findings = [] if result.timed_out else self.parse(result.stdout, workspace)
-        detail = "" if parser else "TypeScript files skipped (no @typescript-eslint/parser)"
-        return StaticAnalysisOutput(run_record(self.name, result, len(findings), detail), findings)
+        missing_parser = parser is None and any(f.endswith(ts_exts) for f in files)
+        detail = "TypeScript files skipped (no @typescript-eslint/parser)" if missing_parser else ""
+        run = run_record(self.name, result, len(findings), detail)
+        if missing_parser and run.status == ToolStatus.OK:
+            run.status = ToolStatus.UNAVAILABLE
+        return StaticAnalysisOutput(run, findings)
 
     @staticmethod
     def parse(stdout: str, workspace: Path) -> list[Finding]:

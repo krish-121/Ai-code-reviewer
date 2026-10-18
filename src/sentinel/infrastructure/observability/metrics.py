@@ -10,11 +10,28 @@ from __future__ import annotations
 import threading
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 
 from sentinel.core.domain.models import ReviewResult, StageStatus
 
 BUCKETS_MS = (50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000)
 Labels = tuple[tuple[str, str], ...]
+
+
+@dataclass
+class Histogram:
+    """Constant-space cumulative buckets, count and sum."""
+
+    count: int = 0
+    total: float = 0.0
+    buckets: list[int] = field(default_factory=lambda: [0] * len(BUCKETS_MS))
+
+    def observe(self, value: float) -> None:
+        """Accumulate without retaining individual samples."""
+        self.count += 1
+        self.total += value
+        for i, bound in enumerate(BUCKETS_MS):
+            self.buckets[i] += int(value <= bound)
 
 
 class Metrics:
@@ -23,7 +40,7 @@ class Metrics:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self.counters: dict[str, dict[Labels, float]] = defaultdict(dict)
-        self.histograms: dict[str, dict[Labels, list[float]]] = defaultdict(dict)
+        self.histograms: dict[str, dict[Labels, Histogram]] = defaultdict(dict)
         self.help: dict[str, str] = {}
 
     def inc(self, name: str, value: float = 1.0, help: str = "", **labels: str) -> None:
@@ -38,7 +55,7 @@ class Metrics:
         key = tuple(sorted(labels.items()))
         with self._lock:
             self.help.setdefault(name, help)
-            self.histograms[name].setdefault(key, []).append(value)
+            self.histograms[name].setdefault(key, Histogram()).observe(value)
 
     def record_review(self, result: ReviewResult) -> None:
         """Count a finished review: status, duration, stage timings, findings, tokens."""
@@ -99,12 +116,11 @@ class Metrics:
             for name, hseries in sorted(self.histograms.items()):
                 lines += [f"# HELP {name} {self.help.get(name, '')}", f"# TYPE {name} histogram"]
                 for labels, values in hseries.items():
-                    for b in BUCKETS_MS:
-                        count = sum(1 for v in values if v <= b)
+                    for b, count in zip(BUCKETS_MS, values.buckets, strict=True):
                         lines.append(f"{name}_bucket{_fmt((*labels, ('le', str(b))))} {count}")
-                    lines.append(f"{name}_bucket{_fmt((*labels, ('le', '+Inf')))} {len(values)}")
-                    lines.append(f"{name}_sum{_fmt(labels)} {sum(values):g}")
-                    lines.append(f"{name}_count{_fmt(labels)} {len(values)}")
+                    lines.append(f"{name}_bucket{_fmt((*labels, ('le', '+Inf')))} {values.count}")
+                    lines.append(f"{name}_sum{_fmt(labels)} {values.total:g}")
+                    lines.append(f"{name}_count{_fmt(labels)} {values.count}")
         return "\n".join(lines) + "\n"
 
 

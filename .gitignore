@@ -22,3 +22,14 @@ web/dist/
 !.env.example
 .DS_Store
 .demo/
+# Private authentication keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Additional local databases and their temporary files
+*.sqlite3
+*.db-*
+*.sqlite-*
+*.sqlite3-*

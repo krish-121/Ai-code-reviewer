@@ -13,6 +13,7 @@ const KIND_LABEL: Record<string, string> = {
   class: "Class",
   test: "Test",
   database: "Data store",
+  variable: "Variable",
 };
 
 function findingsIn(node: GraphNode, findings: Finding[]): Finding[] {
@@ -26,7 +27,7 @@ function findingsIn(node: GraphNode, findings: Finding[]): Finding[] {
 }
 
 function shortName(node: GraphNode): string {
-  if (node.kind === "endpoint" || node.kind === "database") return node.name;
+  if (["endpoint", "database", "variable", "class"].includes(node.kind)) return node.name;
   const parts = node.name.split(".");
   return parts.length > 1 ? `${parts.slice(-2).join(".")}()` : `${node.name}()`;
 }
@@ -66,6 +67,7 @@ function NodePanel({
 
   return (
     <aside className="node-panel" aria-label={`Details for ${node.name}`}>
+      {source.error ? <ErrorNote error={source.error} retry={source.reload} /> : null}
       <p className="np-kind">{KIND_LABEL[node.kind] ?? node.kind}</p>
       <h2>{node.name}</h2>
       {node.file ? (
@@ -172,7 +174,7 @@ export function ArchitectureTab({ reviewId, findings }: { reviewId: string; find
   const layout = useMemo(() => (graph.data ? layoutGraph(graph.data, 5) : null), [graph.data]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  if (graph.error) return <ErrorNote error={graph.error} />;
+  if (graph.error) return <ErrorNote error={graph.error} retry={graph.reload} />;
   if (!graph.data || !layout) return <Spinner label="Laying out the code graph" />;
   if (layout.nodes.length === 0) {
     return (

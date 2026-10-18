@@ -105,6 +105,8 @@ def _suppression_reason(f: Finding, enabled: set[Category], config: RepoConfig) 
         return f"category '{f.category.value}' not enabled"
     if not f.severity.at_least(config.severity_threshold):
         return f"below severity threshold ({config.severity_threshold.value})"
+    if f.baseline_status == "pre-existing":
+        return "pre-existing diagnostic confirmed in the base tree"
     if not f.in_changed_lines and f.is_deterministic:
         return "pre-existing issue outside the change"
     if f.confidence < config.review.min_confidence:

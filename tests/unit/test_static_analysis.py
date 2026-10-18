@@ -358,12 +358,15 @@ def test_mypy_real_run(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(shutil.which("eslint") is None, reason="eslint not installed")
-def test_eslint_real_run(tmp_path: Path) -> None:
+def test_eslint_real_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from sentinel.analysis.static import js_tools
+
     (tmp_path / "a.js").write_text("export function f(x) { return eval(x); }\n")
     (tmp_path / "b.ts").write_text("export const y: number = 1;\n")
-    out = ESLintAnalyzer().run(tmp_path, ["a.js", "b.ts"])
+    out = ESLintAnalyzer().run(tmp_path, ["a.js"])
     assert out.run.status == "ok", out.run
     assert [f.rule_id for f in out.findings] == ["eslint/no-eval"]
+    monkeypatch.setattr(js_tools, "_trusted_ts_parser", lambda: None)
     only_ts = ESLintAnalyzer().run(tmp_path, ["b.ts"])
     assert only_ts.run.status == "unavailable"
 

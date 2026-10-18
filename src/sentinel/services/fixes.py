@@ -16,6 +16,7 @@ from sentinel.infrastructure.database.models import Finding as FindingRow
 from sentinel.infrastructure.database.models import FixAttempt, Review
 from sentinel.infrastructure.database.session import Database
 from sentinel.infrastructure.database.store import Store
+from sentinel.services.resources import close_provider
 from sentinel.services.reviews import (
     GITHUB_KIND,
     GitHubFactory,
@@ -58,7 +59,7 @@ class FixService:
             finding = Store.domain_finding(row)
             review = s.get_one(Review, row.review_id)
             request = dict(review.request)
-            local_path = review.repository.local_path
+            local_path = review.request.get("path")
             fix.status = "running"
         tmp: Path | None = None
         try:
@@ -73,7 +74,11 @@ class FixService:
                 if not local_path:
                     raise RuntimeError("review has no local repository path")
                 root, trusted = Path(local_path), True
-            outcome = self.engine_factory(root, trusted).generate(finding, root)
+            engine = self.engine_factory(root, trusted)
+            try:
+                outcome = engine.generate(finding, root)
+            finally:
+                close_provider(engine)
         except Exception as exc:
             outcome = FixOutcome(status="error", error=f"{type(exc).__name__}: {exc}")
         finally:
@@ -99,7 +104,10 @@ class FixService:
             fix.finished_at = utcnow()
             fix.original_hashes = dict(outcome.original_hashes)
             row = s.get_one(FindingRow, fix.finding_id)
-            Store(s).record_event(row, "fix_generated", None, f"{fix.id}: {outcome.status}")
+            note = f"{fix.id}: {outcome.status}"
+            if outcome.fallback_events:
+                note += "; AI fallback: " + "; ".join(outcome.fallback_events)
+            Store(s).record_event(row, "fix_generated", None, note)
 
     @staticmethod
     def outcome_of(fix: FixAttempt) -> FixOutcome:
@@ -127,7 +135,7 @@ class FixService:
             fix = s.get_one(FixAttempt, fix_id)
             row = s.get_one(FindingRow, fix.finding_id)
             review = s.get_one(Review, row.review_id)
-            local_path = review.repository.local_path
+            local_path = review.request.get("path")
             if review.request.get("kind") == GITHUB_KIND or not local_path:
                 raise FixNotApplicableError(
                     "fixes for GitHub pull requests are applied by pushing the patch; "

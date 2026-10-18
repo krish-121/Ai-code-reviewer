@@ -11,7 +11,8 @@ import fnmatch
 import posixpath
 from dataclasses import dataclass, field
 
-from sentinel.analysis.diff.secrets import redact_line, scan_line
+from sentinel.analysis.diff.parser import detect_language
+from sentinel.analysis.diff.secrets import redact_text, scan_line
 from sentinel.core.domain.models import (
     Category,
     ChangeSet,
@@ -191,6 +192,26 @@ def sensitive_file_reason(path: str) -> tuple[Severity, str] | None:
     return None
 
 
+def source_exclusion_reason(
+    path: str, ignore: list[str] | None = None, languages: list[Language] | None = None
+) -> str | None:
+    """Shared path policy for diff, graph/context, snapshots and fix requests."""
+    if sensitive_file_reason(path):
+        return "sensitive file"
+    if _matches_ignore(path, ignore or []):
+        return "ignored by .sentinel.yml"
+    low = path.lower()
+    if any(low.startswith(d) or f"/{d}" in low for d in GENERATED_DIRS):
+        return "generated directory"
+    if low.endswith((*GENERATED_SUFFIXES, ".d.ts")):
+        return "generated file"
+    if posixpath.basename(low) in LOCK_FILES or posixpath.splitext(low)[1] in BINARY_EXTENSIONS:
+        return "binary or lock file"
+    if languages and detect_language(path) not in languages:
+        return "language not enabled"
+    return None
+
+
 def _is_generated(change: FileChange) -> bool:
     """Build output, vendored code, or a file whose first lines say it is generated."""
     low = change.path.lower()
@@ -298,12 +319,18 @@ def _redact_in_place(change: FileChange) -> int:
     model.
     """
     count = 0
-    for hunk in change.hunks:
-        for line in hunk.lines:
-            redacted, matches = redact_line(line.content)
-            if matches:
-                line.content = redacted
-                count += len(matches)
+    original = {id(line): line.content for h in change.hunks for line in h.lines}
+    # Redact old and new streams independently: an added END marker must not terminate
+    # a removed private-key block (or vice versa). Preserve line numbering in both.
+    for excluded in (LineKind.ADDED, LineKind.REMOVED):
+        lines = [line for h in change.hunks for line in h.lines if line.kind is not excluded]
+        if not lines:
+            continue
+        redacted, found = redact_text("\n".join(original[id(line)] for line in lines))
+        count += found
+        for line, content in zip(lines, redacted.split("\n"), strict=True):
+            if content != original[id(line)]:
+                line.content = content
     return count
 
 

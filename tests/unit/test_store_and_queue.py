@@ -185,8 +185,8 @@ def test_queue_claim_complete_and_ordering(db: Database) -> None:
         job = jobs.claim(s, "w1")
         assert job is not None and job.id == first.id and job.status == "running"
         assert job.attempts == 1 and job.worker_id == "w1"
-        assert jobs.heartbeat(s, job.id, "w1")
-        assert not jobs.heartbeat(s, job.id, "someone-else")
+        assert jobs.heartbeat(s, job.id, "w1", attempt=job.attempts)
+        assert not jobs.heartbeat(s, job.id, "someone-else", attempt=job.attempts)
         jobs.complete(s, job)
         second = jobs.claim(s, "w1", kinds=["review"])
         assert second is not None and second.payload == {"n": 2}

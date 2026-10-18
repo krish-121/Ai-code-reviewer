@@ -8,7 +8,7 @@ anything kept.
 
 from __future__ import annotations
 
-from sentinel.core.domain.graph import CODE_KINDS, CodeGraph, EdgeKind, GraphNode, NodeKind
+from sentinel.core.domain.graph import SOURCE_KINDS, CodeGraph, EdgeKind, GraphNode, NodeKind
 
 DEFAULT_MAX_NODES = 48
 FLOW_EDGES = (EdgeKind.CALLS, EdgeKind.ROUTES, EdgeKind.READS, EdgeKind.WRITES, EdgeKind.TESTS)
@@ -21,6 +21,7 @@ KIND_RANK = {
     NodeKind.METHOD: 2,
     NodeKind.CLASS: 3,
     NodeKind.TEST: 4,
+    NodeKind.VARIABLE: 3,
 }
 UNKNOWN_RANK = 9
 CHANGED_FLAG = "changed"
@@ -34,12 +35,13 @@ def architecture_subgraph(
     Changed nodes get ``meta["changed"] = "true"`` so the UI can outline them.
     """
     focus = {
-        nid for nid in changed_ids if (n := graph.node(nid)) is not None and n.kind in CODE_KINDS
+        nid for nid in changed_ids if (n := graph.node(nid)) is not None and n.kind in SOURCE_KINDS
     }
-    keep = list(focus)
+    max_nodes = max(0, max_nodes)
+    keep = sorted(focus)[:max_nodes]
     for group in (_entry_paths(graph, focus), _neighbours(graph, focus)):
         _add_by_rank(graph, keep, group, max_nodes)
-    _add_routing_endpoints(graph, keep)
+    _add_routing_endpoints(graph, keep, max_nodes)
     sub = graph.subgraph(keep)
     for nid in focus:
         node = sub.node(nid)
@@ -64,7 +66,7 @@ def _neighbours(graph: CodeGraph, focus: set[str]) -> set[str]:
 
 def _add_by_rank(graph: CodeGraph, keep: list[str], group: set[str], max_nodes: int) -> None:
     """Append nodes from ``group`` (endpoints first) until the budget is used up."""
-    for nid in sorted(group - set(keep), key=lambda i: _rank(graph.node(i))):
+    for nid in sorted(group - set(keep), key=lambda i: (_rank(graph.node(i)), i)):
         node = graph.node(nid)
         if node is None or node.kind in HIDDEN_KINDS:
             continue
@@ -73,11 +75,11 @@ def _add_by_rank(graph: CodeGraph, keep: list[str], group: set[str], max_nodes: 
         keep.append(nid)
 
 
-def _add_routing_endpoints(graph: CodeGraph, keep: list[str]) -> None:
+def _add_routing_endpoints(graph: CodeGraph, keep: list[str], max_nodes: int) -> None:
     """Endpoints that route to anything kept, so every entry point is visible."""
     for nid in list(keep):
         for edge in graph.in_edges(nid, [EdgeKind.ROUTES]):
-            if edge.source not in keep:
+            if edge.source not in keep and len(keep) < max_nodes:
                 keep.append(edge.source)
 
 

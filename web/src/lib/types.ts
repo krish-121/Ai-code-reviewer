@@ -3,13 +3,7 @@
 export type Severity = "high" | "medium" | "low";
 export type Risk = "high" | "medium" | "low" | "none";
 export type Category =
-  | "bug"
-  | "security"
-  | "performance"
-  | "tests"
-  | "architecture"
-  | "documentation"
-  | "style";
+  "bug" | "security" | "performance" | "tests" | "architecture" | "documentation" | "style";
 export type VerificationStatus = "supported" | "likely" | "uncertain" | "rejected";
 export type FindingStatus = "open" | "accepted" | "dismissed" | "fixed";
 export type ReviewStatus = "queued" | "running" | "completed" | "partial" | "failed";
@@ -230,14 +224,7 @@ export interface FixAttempt {
   id: string;
   finding_id: string;
   status:
-    | "queued"
-    | "running"
-    | "validated"
-    | "unverified"
-    | "failed"
-    | "error"
-    | "applied"
-    | "rejected";
+    "queued" | "running" | "validated" | "unverified" | "failed" | "error" | "applied" | "rejected";
   summary: string | null;
   patch: string | null;
   checks: FixCheck[];

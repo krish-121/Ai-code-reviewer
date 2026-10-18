@@ -25,11 +25,14 @@ from sentinel.analysis.graph.resolution import (
     SymbolTable,
     resolve_imports,
 )
+from sentinel.analysis.graph.variables import add_variable_edges
 from sentinel.core.domain.code import DbOperation, FileSymbols, Symbol, SymbolKind
-from sentinel.core.domain.graph import CodeGraph, EdgeKind, GraphNode, NodeKind, node_id
+from sentinel.core.domain.graph import CODE_KINDS, CodeGraph, EdgeKind, GraphNode, NodeKind, node_id
 from sentinel.core.domain.models import Language
 
 KIND_MAP = {
+    SymbolKind.MODULE: NodeKind.MODULE,
+    SymbolKind.VARIABLE: NodeKind.VARIABLE,
     SymbolKind.CLASS: NodeKind.CLASS,
     SymbolKind.FUNCTION: NodeKind.FUNCTION,
     SymbolKind.METHOD: NodeKind.METHOD,
@@ -80,6 +83,7 @@ class GraphBuilder:
             self._add_file(fs)
         for fs in self.files.values():
             self._add_imports(fs)
+        add_variable_edges(self.table, self.files)
         for fs in self.files.values():
             self._add_inheritance(fs)
         for fs in self.files.values():
@@ -140,7 +144,10 @@ class GraphBuilder:
             )
         )
         self.table.by_qualified_name[(fs.path, symbol.qualified_name)] = node.id
-        parent_id = self.table.node_for(fs.path, symbol.parent) if symbol.parent else None
+        parent_name = symbol.qualified_name.rpartition(".")[0] or symbol.parent
+        parent_id = self.table.node_for(fs.path, parent_name or MODULE_KEY)
+        if kind is NodeKind.MODULE:
+            parent_id = file_id
         self.graph.add_edge(parent_id or file_id, node.id, EdgeKind.DEFINES)
         if kind is NodeKind.METHOD:
             self.table.methods_by_name.setdefault(symbol.name, []).append(node.id)
@@ -179,7 +186,7 @@ class GraphBuilder:
             name = f"{endpoint.method} {endpoint.route}"
             endpoint_node = self.graph.add_node(
                 GraphNode(
-                    id=node_id(NodeKind.ENDPOINT, None, name),
+                    id=node_id(NodeKind.ENDPOINT, fs.path, f"{name}::{endpoint.handler}"),
                     kind=NodeKind.ENDPOINT,
                     name=name,
                     file=fs.path,
@@ -206,7 +213,8 @@ class GraphBuilder:
             if source is None:
                 continue
             target = self.resolver.resolve(fs, call.callee, call.caller)
-            if target is None:
+            target_node = self.graph.node(target) if target else None
+            if target is None or target_node is None or target_node.kind not in CODE_KINDS:
                 self.unresolved += 1
                 continue
             self.resolved += 1

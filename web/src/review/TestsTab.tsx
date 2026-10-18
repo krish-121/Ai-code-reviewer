@@ -4,27 +4,24 @@ import { api } from "../lib/api";
 import { useQuery } from "../lib/hooks";
 import type { Finding } from "../lib/types";
 import { FindingRow } from "../findings/FindingRow";
-import { Empty, Spinner } from "../components/ui";
+import { Empty, ErrorNote, Spinner } from "../components/ui";
+import { testsReaching } from "../lib/testReachability";
 
 export function TestsTab({ reviewId, findings }: { reviewId: string; findings: Finding[] }) {
   const graph = useQuery(`graph:${reviewId}`, () => api.graph(reviewId));
   const coverage = useMemo(() => {
     const data = graph.data;
     if (!data) return [];
-    const byId = new Map(data.nodes.map((n) => [n.id, n]));
     const changed = data.nodes.filter((n) => n.meta.changed === "true" && n.kind !== "test");
     return changed.map((n) => {
-      const tests = data.edges
-        .filter((e) => e.target === n.id && (e.kind === "tests" || e.kind === "calls"))
-        .map((e) => byId.get(e.source))
-        .filter((s) => s?.kind === "test");
-      return { node: n, tests: [...new Map(tests.map((t) => [t?.id, t])).values()] };
+      return { node: n, tests: testsReaching(data, n.id) };
     });
   }, [graph.data]);
   const testFindings = findings.filter(
     (f) => f.category === "tests" || f.tags.includes("missing-test"),
   );
 
+  if (graph.error) return <ErrorNote error={graph.error} retry={graph.reload} />;
   if (!graph.data) return <Spinner />;
   return (
     <div className="tests">
@@ -57,7 +54,7 @@ export function TestsTab({ reviewId, findings }: { reviewId: string; findings: F
                         </code>
                       ))
                     ) : (
-                      <span className="cov-gap">No test in the repository calls this</span>
+                      <span className="cov-gap">No test path found in the available graph</span>
                     )}
                   </td>
                 </tr>
@@ -66,8 +63,8 @@ export function TestsTab({ reviewId, findings }: { reviewId: string; findings: F
           </table>
         )}
         <p className="fine">
-          Derived from the code graph: a test covers a function when it calls it directly or through
-          a short call chain.
+          Graph evidence follows calls up to four edges. A call path does not prove assertion
+          coverage; missing paths may reflect incomplete static analysis.
         </p>
       </section>
       {testFindings.length ? (

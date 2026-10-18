@@ -198,19 +198,21 @@ def test_github_pull_request_end_to_end(demo_repo: Path, tmp_path: Path, backend
     assert client.get(f"/api/reviews/{review_id}").json()["published_at"]
     assert not worker.run_once()  # queue drained
 
-    # 4. A new push: the summary is updated, existing comments are not duplicated
+    # 4. A duplicate event for the same revision does not schedule more work.
     body2 = json.dumps(pr_payload("synchronize")).encode()
-    client.post(
+    repeated = client.post(
         "/api/github/webhook",
         content=body2,
         headers={"X-GitHub-Event": "pull_request", "X-Hub-Signature-256": sign(SECRET, body2)},
     )
-    assert worker.run_once() and worker.run_once()
+    assert repeated.json()["review_id"] == review_id
+    assert not worker.run_once()
+    reviews.publish(review_id)  # retrying publication is still idempotent
     assert len(gh.issue_comments) == 1
     assert len(gh.reviews) == 1  # no new review: every finding was already commented
 
     listing = client.get("/api/reviews").json()
-    assert len(listing) == 2 and listing[0]["repository"] == "acme/shop"
+    assert len(listing) == 1 and listing[0]["repository"] == "acme/shop"
 
 
 def test_webhook_edge_cases(tmp_path: Path) -> None:

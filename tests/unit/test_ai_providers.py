@@ -198,18 +198,23 @@ def test_empty_and_blocked_responses() -> None:
     with pytest.raises(AIResponseError, match="blocked"):
         make(GeminiProvider, s).review(request())
     s = Script(ok({"candidates": [{"content": {"parts": []}, "finishReason": "MAX_TOKENS"}]}))
+    s.items *= 2  # malformed envelopes receive exactly one corrective retry
     with pytest.raises(AIResponseError, match="MAX_TOKENS"):
         make(GeminiProvider, s).review(request())
     s = Script(ok({"candidates": []}))
+    s.items *= 2  # malformed envelopes receive exactly one corrective retry
     with pytest.raises(AIResponseError, match="no candidates"):
         make(GeminiProvider, s).review(request())
     s = Script(ok({"content": [], "stop_reason": "max_tokens"}))
+    s.items *= 2  # malformed envelopes receive exactly one corrective retry
     with pytest.raises(AIResponseError, match="no content"):
         make(ClaudeProvider, s).review(request())
     s = Script(ok({"message": {}}))
+    s.items *= 2  # malformed envelopes receive exactly one corrective retry
     with pytest.raises(AIResponseError, match="empty"):
         make(OllamaProvider, s).review(request())
     s = Script(httpx.Response(200, text="<html>oops</html>"))
+    s.items *= 2  # malformed envelopes receive exactly one corrective retry
     with pytest.raises(AIResponseError, match="non-JSON"):
         make(OllamaProvider, s).review(request())
 
@@ -350,7 +355,7 @@ def test_factory_builds_the_configured_provider() -> None:
     with pytest.raises(AIConfigurationError, match="SENTINEL_CLAUDE_KEY"):
         create_provider(Settings(provider="claude"))
     p = create_provider(Settings(provider="gemini", gemini_api_key="g"))  # type: ignore[arg-type]
-    assert isinstance(p, GeminiProvider) and p.model == "gemini-2.5-flash"
+    assert isinstance(p, GeminiProvider) and p.model == "gemini-3.8-flash"
     o = create_provider(
         Settings(provider="ollama", ollama_url="http://gpu:11434", model="llama3"),
         sleep=lambda _s: None,

@@ -14,6 +14,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from sentinel.analysis.diff.secrets import redact_text
+from sentinel.analysis.static.diagnostics import output_error
 from sentinel.core.domain.models import (
     AnalysisRun,
     Category,
@@ -97,8 +99,15 @@ def run_record(
     if result is None:
         return AnalysisRun(tool=tool, status=ToolStatus.UNAVAILABLE, detail=detail)
     status = ToolStatus.TIMEOUT if result.timed_out else ToolStatus.OK
+    error = output_error(tool, result.returncode, result.stdout, result.stderr)
+    if error and not result.timed_out:
+        status, detail = ToolStatus.FAILED, error
     return AnalysisRun(
-        tool=tool, status=status, duration_ms=result.duration_ms, findings=findings, detail=detail
+        tool=tool,
+        status=status,
+        duration_ms=result.duration_ms,
+        findings=findings,
+        detail=redact_text(detail)[0],
     )
 
 
@@ -124,13 +133,18 @@ def static_finding(
         category=category,
         severity=severity,
         confidence=confidence,
-        title=title,
-        explanation=explanation or title,
+        title=redact_text(title)[0],
+        explanation=redact_text(explanation or title)[0],
         file=file,
         line_start=line,
         line_end=max(line, end_line or line),
         evidence=[
-            Evidence(source=tool, text=evidence or f"{tool} {rule}: {title}", file=file, line=line)
+            Evidence(
+                source=tool,
+                text=redact_text(evidence or f"{tool} {rule}: {title}")[0],
+                file=file,
+                line=line,
+            )
         ],
         suggested_fix=suggested_fix,
         source=FindingSource.STATIC_ANALYZER,

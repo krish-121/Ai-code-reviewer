@@ -89,6 +89,7 @@ RULES: tuple[SecretRule, ...] = (
 
 _PLACEHOLDER_HINTS = (
     "changeme",
+    "changeme-please",
     "change_me",
     "example",
     "placeholder",
@@ -121,9 +122,9 @@ def shannon_entropy(value: str) -> float:
 
 def _looks_like_placeholder(value: str) -> bool:
     low = value.lower()
-    if any(c in value for c in "{}$%<>()[]"):  # template/format placeholders, SQL params
-        return True
-    return any(h in low for h in _PLACEHOLDER_HINTS) or len(set(value)) <= 3
+    # Only complete template expressions count, never a substring such as "test".
+    template = r"(?:\$?\{[\w.]+\}|%\([\w.]+\)s(?:-template)?|x+|\*+)"
+    return low in _PLACEHOLDER_HINTS or bool(re.fullmatch(template, low))
 
 
 @dataclass(frozen=True)
@@ -143,7 +144,7 @@ class SecretMatch:
         return f"{head}{'*' * min(12, max(4, len(self.value) - 4))}"
 
 
-def scan_line(text: str, line_no: int) -> list[SecretMatch]:
+def scan_line(text: str, line_no: int, *, redact: bool = False) -> list[SecretMatch]:
     """Every secret on one line (overlapping matches are reported once)."""
     matches: list[SecretMatch] = []
     taken: list[tuple[int, int]] = []
@@ -153,8 +154,10 @@ def scan_line(text: str, line_no: int) -> list[SecretMatch]:
             value = m.group(rule.group)
             if any(s < end and start < e for s, e in taken):
                 continue
-            if rule.check_entropy and (
-                _looks_like_placeholder(value) or shannon_entropy(value) < 3.0
+            if (
+                not redact
+                and rule.check_entropy
+                and (_looks_like_placeholder(value) or shannon_entropy(value) < 3.0)
             ):
                 continue
             taken.append((start, end))
@@ -180,7 +183,9 @@ def scan_text(text: str) -> list[SecretMatch]:
 
 def redact_line(text: str) -> tuple[str, list[SecretMatch]]:
     """The line with every secret replaced by a placeholder, and the matches."""
-    matches = scan_line(text, 0)
+    # Redaction is deliberately more conservative than finding detection: entropy and
+    # placeholder heuristics must not authorize disclosure of an assigned credential.
+    matches = scan_line(text, 0, redact=True)
     if not matches:
         return text, []
     pieces: list[str] = []
@@ -202,10 +207,10 @@ def redact_text(text: str) -> tuple[str, int]:
     """Redact every detected secret. Returns (redacted_text, number_of_redactions)."""
     count = 0
 
-    def _block(_: re.Match[str]) -> str:
+    def _block(match: re.Match[str]) -> str:
         nonlocal count
         count += 1
-        return "[REDACTED:private-key]"
+        return "[REDACTED:private-key]" + "\n" * match.group().count("\n")
 
     text = _KEY_BLOCK_RE.sub(_block, text)
     out_lines: list[str] = []

@@ -41,8 +41,9 @@ command; it is the table of contents of the CLI. `review` is implemented in
    reads settings: `~/.config/sentinel/config.toml`, then `SENTINEL_*` environment
    variables, then the flags (see `load_settings` in
    [`config.py`](../src/sentinel/core/configuration/config.py)).
-2. `open_database(settings)` connects to the database (SQLite file by default) and creates
-   tables.
+2. `open_database(settings)` connects to the database (SQLite file by default). Empty
+   databases are initialized through versioned migrations; existing databases must have a
+   compatible schema. See [DATABASE_MIGRATIONS.md](DATABASE_MIGRATIONS.md).
 3. `_local_request(...)` turns the flags into a
    [`LocalRequest`](../src/sentinel/services/workspaces.py): *what* to review
    (`mode="staged"`, the repository path).
@@ -128,6 +129,10 @@ come from an untrusted pull request. The result is a
 
 ## 5. The code graph and the context engine
 
+For the current file/module/variable passes and a constant-to-consumer example, read
+[GRAPH_ANALYSIS.md](GRAPH_ANALYSIS.md). This includes lexical binding, cache versioning,
+independent UI subgraphs and the exact boundaries of variable analysis.
+
 **Language analyzers.** [`LanguageRegistry.analyze`](../src/sentinel/analysis/ast/registry.py)
 routes each file to its analyzer by extension and caches results by content hash:
 
@@ -192,6 +197,71 @@ enabled categories.
 [`normalize_ai_findings`](../src/sentinel/core/findings/normalize.py) converts each
 `AIFinding` into a domain `Finding` (source `ai`), matching file paths to real files and
 deriving tags such as `sql-injection` from the text (`derive_tags`).
+
+### 6.1 Automatic DeepSeek fallback when Gemini reaches its limit
+
+The complete beginner setup is in [FREE_AI_FALLBACK.md](FREE_AI_FALLBACK.md).
+The important flow is:
+
+```text
+Review text -> Gemini -> answer -> normal verification
+                 |
+                 +-> HTTP 429 (quota/rate limit)
+                          |
+                          v
+                 local bridge -> official OpenCode -> free DeepSeek
+                          |
+                          v
+                 strict JSON -> normal verification -> saved review
+```
+
+**Why a wrapper?** The engine already understands `AIProvider`. The factory wraps
+the normal Gemini provider in `FallbackProvider` rather than adding vendor branches
+to the review engine. A successful Gemini response stays with Gemini. Only an explicit
+quota error can switch; a wrong key, refusal or different error stays visible.
+
+**Why a waiting period?** After a quota error, the wrapper records a cooldown in the
+cache: normally five minutes, extended by `Retry-After` up to a day. New provider
+objects can reuse that state. After it expires the next request tries Gemini again.
+Identical requests can reuse a cached DeepSeek answer too, saving more free quota.
+
+**Why install OpenCode?** Its direct free HTTP endpoint rejected Sentinel. The supported
+route uses the actual OpenCode application. DeepSeek itself stays online: no AI model
+weights are downloaded. The small bridge gives Sentinel a normal HTTP connection to
+that application while keeping it inside Docker.
+
+**Why a separate password?** The bridge generates a local token so other callers cannot
+use it freely. It is saved privately outside the repository, just like runtime settings.
+It is unrelated to a paid service account. The Google key goes only to Google, and the
+bridge token is removed from its child OpenCode environment. No project folder or Docker
+control socket is shared into the bridge. Review/API workers still do not control Docker.
+
+**Why approval rather than disabling tools?** The free gateway returned a misleading
+403 when all tools were denied. In the working mode tools require approval; the
+noninteractive CLI automatically rejects requests. A live command diagnostic was denied
+and created no file. The bridge additionally rejects any response containing tool events.
+
+The bridge serializes requests, caps input/output, sets a 75-second deadline and removes
+each temporary session. Only the approved free DeepSeek ID is accepted. GLM is excluded
+after two service failures. The returned text passes the same schema, repair, claim
+verification and fix-validation rules as the existing providers. The saved review records
+the actual winner and the reason for switching. Both services failing leaves local results
+with an incomplete AI stage, rather than a false success.
+
+Follow the source in this order:
+
+1. [`config.py`](../src/sentinel/core/configuration/config.py): opt-in, private token and cooldown.
+2. [`factory.py`](../src/sentinel/ai/providers/factory.py): builds Gemini and DeepSeek adapters.
+3. [`fallback.py`](../src/sentinel/ai/providers/fallback.py): recognizes quota exhaustion and chooses.
+4. [`opencode.py`](../src/sentinel/ai/providers/opencode.py): sends the existing prompt to the bridge.
+5. [`server.py`](../tools/opencode_bridge/server.py): authenticates and validates the narrow local API.
+6. [`runner.py`](../tools/opencode_bridge/runner.py): runs official OpenCode inside Docker.
+7. [`opencode_bridge.py`](../scripts/opencode_bridge.py): trusted start/stop helper.
+
+Start with `python scripts/opencode_bridge.py start --build`, then enable
+`sentinel config set free_fallback true` with Gemini selected. The normal review command
+does the rest. See [live verification](DEEPSEEK_FALLBACK_VERIFICATION.md) for the actual
+Gemini-first review, controlled quota switch with real DeepSeek, cache check and limits.
 
 ## 7. The finding verifier
 
@@ -269,18 +339,47 @@ snippet, verification checks with `--details`. `--format json` prints the
 
 ## The fix path
 
+**Live example completed 18 October 2026:** real Gemini review → generated SQL fix
+and security test → all seven validation checks passed → normal Apply → three tests
+passed. The saved fix is `applied` and the finding is `fixed`. The normal
+`sentinel-sandbox:latest` image and private `sandbox_transport=copy` setting are now
+configured. See [LIVE_FIX_WORKFLOW.md](LIVE_FIX_WORKFLOW.md) for the beginner step-by-step
+explanation, actual IDs, source trace and acceptance limits.
+
 1. UI: *Generate fix* → `POST /api/findings/{id}/fix`
    ([`request_fix`](../src/sentinel/apps/api/routes/findings.py)) creates a `FixAttempt` and
    a `fix` job. (CLI: `sentinel fix F-…`, [`fix_command.py`](../src/sentinel/apps/cli/fix_command.py).)
-2. The worker calls [`FixService.run`](../src/sentinel/services/fixes.py), which builds a
-   [`FixEngine`](../src/sentinel/core/fixes/engine.py) and calls `generate`:
-   `ai.generate_fix` → `_try_patch` → [`apply_edits`](../src/sentinel/core/fixes/patch.py)
-   → `validate` → the checks in [`validation.py`](../src/sentinel/core/fixes/validation.py)
-   (`python_syntax`, `check_resolved`, `check_no_new_issues`, `check_tests` in the
-   [sandbox](../src/sentinel/sandbox/runners.py)) → `_verdict`.
+2. The fix worker calls [`FixService.run`](../src/sentinel/services/fixes.py), builds a
+   [`FixEngine`](../src/sentinel/core/fixes/engine.py) and calls `generate`. The engine
+   builds bounded context with [`fix_context`](../src/sentinel/core/fixes/context.py),
+   requests coordinated edits, and applies them to a scratch copy through
+   [`apply_edits`](../src/sentinel/core/fixes/patch.py). Existing files and advertised new
+   regression-test slots are permitted; arbitrary new source files and deletions are not.
+   [`validation.py`](../src/sentinel/core/fixes/validation.py) compares before/after
+   diagnostics and test results; [`regression.py`](../src/sentinel/core/fixes/regression.py)
+   checks that a new regression test fails before and passes after. Executable validators
+   and tests run in Docker. An unavailable or incomplete check cannot establish validation.
+   See [MULTI_FILE_FIXES.md](MULTI_FILE_FIXES.md) for the complete sequence.
 3. *Apply* → `POST /api/fixes/{id}/apply` → `FixService.apply` →
-   [`apply_fix`](../src/sentinel/core/fixes/engine.py), which refuses if any file's hash
-   changed since the fix was generated.
+   [`apply_fix`](../src/sentinel/core/fixes/engine.py) delegates confined writes to
+   [`apply.py`](../src/sentinel/core/fixes/apply.py). It requires a validated verdict, unchanged
+   source hashes and absent new-file destinations. Ordinary write errors roll back;
+   power-loss/crash atomicity across multiple files is not guaranteed.
+
+In Compose, [`docker-compose.yml`](../docker-compose.yml) routes review/publication jobs
+to one worker and fixes to a separate Docker-capable worker. Only the latter has daemon
+access. [`sandbox.launch`](../src/sentinel/sandbox/launch.py) extracts bounded scratch input
+into container tmpfs; generated code never gets that daemon socket. Read
+[DEPLOYMENT.md](DEPLOYMENT.md) before operating the stack.
+
+For local WSL with Windows Docker Desktop, `sentinel config set sandbox_transport copy`
+saves this transfer method. An environment variable is not needed for each new terminal.
+Build the trusted image first with
+`docker build -f Dockerfile.sandbox -t sentinel-sandbox:latest .`.
+This image contains test/checking tools, not AI model weights. It runs the proposed code
+with networking disabled. The separate OpenCode bridge described in section 6.1 uses
+internet access to request an AI answer and has no project mount. One obtains a proposal;
+the other checks it on a temporary copy.
 
 ---
 
@@ -439,3 +538,44 @@ overlaid and staged), optionally `ai.json` (scripted model findings — include 
 and `expected.yaml` (`risk`, `surfaced`, `suppressed`; see
 [`sql_injection/expected.yaml`](../tests/golden/cases/sql_injection/expected.yaml)).
 [`test_golden.py`](../tests/golden/test_golden.py) picks it up automatically.
+
+## Live Gemini verification - 18 October 2026
+
+Gemini 3.8 Flash is now configured and verified with invented examples. A complete
+CLI review finished all eight stages, and the model's SQL-injection finding was
+independently supported by local analysis. Its proposed parameterized query passed
+a separate before/after Docker test: one existing test failed before, both passed
+after. The saved fix remains unverified because the current policy requires an
+already-passing baseline suite; Apply was not bypassed. No project patch was applied.
+
+See [GEMINI_LIVE_TEST.md](GEMINI_LIVE_TEST.md) for evidence, usage and limits.
+At that earlier Gemini-only test stage, OpenCode fallback was off. The current connected fallback is described above.
+
+## OpenCode Docker experiment - 18 October 2026
+
+Docker runs an application in a separate environment. Its image is a saved setup;
+a container is a running copy. The official OpenCode 1.19.3 application was installed
+inside an image of about 825 MB. The online DeepSeek/GLM models were not downloaded.
+No project directory, Gemini key, user login or Docker socket was shared with it.
+The temporary containers are gone; the reusable image remains cached.
+
+DeepSeek V4.1 Flash Free answered without a key or payment and reported zero cost.
+It identified an empty-list crash, passed Sentinel's actual review JSON schema for
+an invented SQL-injection change, and returned no findings for the safe parameterized
+version. No tool calls occurred in those successful responses. This is limited
+compatibility evidence, not a project-wide accuracy benchmark or an unlimited quota.
+
+GLM-5.3-Flash Free returned HTTP 503 (upstream unavailable) on two standard-mode
+attempts. Its review quality is not verified. Denying every OpenCode tool had first
+caused misleading HTTP 403 errors for both models; standard Build mode with global
+tool permissions set to ask allowed DeepSeek to respond, without any approvals.
+
+At the earlier experiment stage, automatic fallback was off. That earlier direct-HTTP adapter was not the tested
+OpenCode route. The new integration above supersedes that candidate, with timeout/output
+bounds, verified rejection of tool requests, and a real quota-switching test. Preserve
+the existing deployment boundary: review/API workers do not control Docker. No source
+patch was installed into the main repository by this experiment.
+
+See [FREE_AI_VERIFICATION.md](FREE_AI_VERIFICATION.md) for the test matrix, explanation,
+limitations and remaining integration work. Gemini's separate live results are in
+[GEMINI_LIVE_TEST.md](GEMINI_LIVE_TEST.md).
