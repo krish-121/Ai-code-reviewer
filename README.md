@@ -60,6 +60,11 @@ reasons: **[docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md)**.
 
 ## Demo
 
+The key-shaped demo/test values are invented scanner fixtures. The demo Stripe value
+uses a deliberately short synthetic suffix; never replace it with a live key.
+Source publication does not install the GitHub reviewing bot; see
+[GitHub upload notes](docs/GITHUB_UPLOAD.md).
+
 The demo repository ([`demo/`](demo/)) has a feature branch with planted problems: SQL
 injection (Python and TypeScript), authorization checked before authentication, N+1
 queries, an O(n²) loop, blocking calls and a forgotten `await` in async code, a swallowed

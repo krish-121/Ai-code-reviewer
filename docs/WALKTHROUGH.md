@@ -319,6 +319,14 @@ snippet, verification checks with `--details`. `--format json` prints the
 
 ## The pull-request path
 
+The source repository is [krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer).
+Pushing Sentinel's implementation there hosts the code and triggers CI. It does not
+install the reviewing bot. Actual automatic reviews need an App installation, a signed
+webhook delivery and a running Sentinel worker. Those live integration checks remain
+pending. See [GITHUB_UPLOAD.md](GITHUB_UPLOAD.md) for the first-upload/history explanation.
+
+
+
 1. GitHub calls `POST /api/github/webhook`:
    [`github_webhook`](../src/sentinel/apps/api/routes/github.py) verifies the signature
    ([`verify_signature`](../src/sentinel/integrations/github/webhooks.py)), parses the event

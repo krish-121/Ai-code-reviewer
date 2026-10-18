@@ -3,6 +3,22 @@
 Living log of what is built, what was decided, and what still needs a human eye.
 Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-18.
 
+## GitHub source publication - 18 October 2026
+
+- Source destination: [krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer).
+  The existing CI workflow runs on main pushes. Actual GitHub App installation,
+  signed live deliveries and automatic comments remain separate acceptance work.
+- GitHub push protection caught an invented Stripe-shaped demo value in old commits.
+  Replaced that fixture throughout a separate publication copy; kept all 27 original
+  snapshots and their original signatures in a verified local backup. Cleaned commits
+  preserve authors, dates, messages and graph structure; changed IDs cannot retain their
+  original signatures. No push-protection bypass or force-push is used.
+- Current demo and end-to-end assertion use the same shorter synthetic value. Sentinel
+  must still identify and redact it. Private keys, actual provider settings, local
+  databases, dependency installations and caches remain outside the upload.
+- See [GITHUB_UPLOAD.md](docs/GITHUB_UPLOAD.md) for the distinction between source
+  hosting and bot installation, history handling and the next acceptance steps.
+
 ## Normal sandbox and complete live fix workflow - 18 October 2026
 
 - Built the current trusted `sentinel-sandbox:latest` image (about 706 MB) and saved

@@ -131,10 +131,11 @@ a passing baseline completed every normal gate without bypasses.
    alarms, missed bugs and fix quality. The live Gemini and DeepSeek examples establish
    connectivity and specific behavior, not general accuracy. Ollama and Claude remain
    optional choices; installing them is not required for this setup.
-2. **Real GitHub acceptance and hosted CI.** Put Sentinel's source in GitHub and run its
-   Actions checks. Create a disposable test repository and App, link the installation,
+2. **Real GitHub acceptance and hosted CI.** The source destination is
+   [krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer); inspect
+   its Actions checks after each push. Create a disposable test repository and App, link the installation,
    observe signed delivery -> review -> comments, then check redelivery and a second push.
-   No GitHub repository/App is configured yet. Local reviews do not need GitHub.
+   The source repository exists; no live test App is installed yet. Local reviews do not need GitHub.
 3. **Current full-stack and browser acceptance.** Rebuild the complete app with the new
    optional OpenCode bridge and check web/worker reviews, fixes, saved model display and
    service failures. Earlier full Compose/browser acceptance predates this fallback. Expand
@@ -152,8 +153,7 @@ a passing baseline completed every normal gate without bypasses.
 Items 1–3 are the next practical checks. Operations/load work is needed before claiming
 production readiness; it is not a requirement to install Ollama or buy an AI subscription.
 See [LOCAL_SETUP_AND_GITHUB.md](LOCAL_SETUP_AND_GITHUB.md) for the beginner-oriented setup
-sequence and explanations. Gemini and the free OpenCode route are configured. No GitHub
-repository, App or public endpoint is configured yet. Ollama is optional.
+sequence and explanations. Gemini and the free OpenCode route are configured. The source repository is configured; a live App installation and public webhook endpoint remain pending. Ollama is optional.
 
 ## Supported limits to retain
 
