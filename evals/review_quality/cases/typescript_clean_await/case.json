@@ -1,0 +1,16 @@
+{
+  "name": "typescript_clean_await",
+  "language": "typescript",
+  "expected_bug": false,
+  "source": "example.ts",
+  "contract": "Accessing a property after await is valid and preserves false results.",
+  "test_command": [
+    "sh",
+    "test.sh"
+  ],
+  "oracle_command": [
+    "sh",
+    "test.sh",
+    "tests/holdout.test.ts"
+  ]
+}

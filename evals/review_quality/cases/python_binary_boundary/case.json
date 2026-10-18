@@ -1,0 +1,25 @@
+{
+  "name": "python_binary_boundary",
+  "language": "python",
+  "expected_bug": true,
+  "source": "example.py",
+  "contract": "Binary search must inspect the final remaining candidate.",
+  "test_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "tests"
+  ],
+  "oracle_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "tests/test_holdout.py"
+  ]
+}

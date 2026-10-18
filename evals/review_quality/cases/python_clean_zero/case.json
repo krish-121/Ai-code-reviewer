@@ -1,0 +1,25 @@
+{
+  "name": "python_clean_zero",
+  "language": "python",
+  "expected_bug": false,
+  "source": "example.py",
+  "contract": "Equivalent refactor preserves zero rather than replacing it with the default.",
+  "test_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "tests"
+  ],
+  "oracle_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "tests/test_holdout.py"
+  ]
+}

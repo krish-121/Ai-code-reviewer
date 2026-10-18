@@ -1,0 +1,16 @@
+{
+  "name": "typescript_boolean_string",
+  "language": "typescript",
+  "expected_bug": true,
+  "source": "example.ts",
+  "contract": "The non-empty string \"false\" must decode to boolean false.",
+  "test_command": [
+    "sh",
+    "test.sh"
+  ],
+  "oracle_command": [
+    "sh",
+    "test.sh",
+    "tests/holdout.test.ts"
+  ]
+}

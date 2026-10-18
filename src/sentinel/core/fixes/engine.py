@@ -30,7 +30,7 @@ from sentinel.core.fixes.apply import ApplyError, apply_fix
 from sentinel.core.fixes.context import FixContext, analysis_targets, fix_context
 from sentinel.core.fixes.outcome import FixCheck, FixOutcome, FixStatus
 from sentinel.core.fixes.patch import PatchError, apply_edits, sha256, unified_diff
-from sentinel.core.fixes.regression import check_regression_tests
+from sentinel.core.fixes.regression import check_regression_tests, confirm_with_regression
 from sentinel.core.fixes.safety import check_fix_finding, check_fix_path
 from sentinel.core.fixes.scratch import scratch_copy
 from sentinel.core.fixes.validation import (
@@ -188,9 +188,8 @@ class FixEngine:
             analysis = check_analysis(baseline_runs, runs)
             if analysis.status != "passed":
                 return [analysis]
+            resolution = check_resolved(finding, findings_before, findings_after, elapsed_ms)
             checks = [
-                analysis,
-                check_resolved(finding, findings_before, findings_after, elapsed_ms),
                 check_no_new_issues(findings_before, findings_after, runs, elapsed_ms),
                 check_tests(
                     self.sandbox,
@@ -203,12 +202,16 @@ class FixEngine:
             ]
             new_files = {p: after[p] for p in after.keys() - before.keys()}
             if new_files:
-                checks.append(
-                    check_regression_tests(
-                        self.sandbox, repo_root, patched_dir, new_files, self.config, self.scratch
-                    )
+                regression = check_regression_tests(
+                    self.sandbox, repo_root, patched_dir, new_files, self.config, self.scratch
                 )
-            return checks
+                checks.append(regression)
+                resolution = confirm_with_regression(
+                    resolution,
+                    regression,
+                    target_changed=before.get(finding.file) != after.get(finding.file),
+                )
+            return [analysis, resolution, *checks]
         finally:
             shutil.rmtree(base_dir, ignore_errors=True)
             shutil.rmtree(patched_dir, ignore_errors=True)

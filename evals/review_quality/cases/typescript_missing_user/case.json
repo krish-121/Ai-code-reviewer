@@ -1,0 +1,16 @@
+{
+  "name": "typescript_missing_user",
+  "language": "typescript",
+  "expected_bug": true,
+  "source": "example.ts",
+  "contract": "A non-null assertion does not make an absent user exist at runtime.",
+  "test_command": [
+    "sh",
+    "test.sh"
+  ],
+  "oracle_command": [
+    "sh",
+    "test.sh",
+    "tests/holdout.test.ts"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "python_clean_sql",
+  "language": "python",
+  "expected_bug": false,
+  "source": "example.py",
+  "contract": "Moving a constant query into a variable preserves SQL parameterization.",
+  "test_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "tests"
+  ],
+  "oracle_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "tests/test_holdout.py"
+  ]
+}

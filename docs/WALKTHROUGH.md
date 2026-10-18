@@ -361,6 +361,14 @@ return 404. Closing local processes stops new delivery, but saved reviews remain
 
 ## The fix path
 
+**Multilingual quality checkpoint — 19 October 2026:** 15 controlled examples
+under neutral project names: nine known bugs detected, six correct changes without
+warnings, and nine final real-model fixes validated/applied to disposable examples with
+independent held-out Docker checks. The final round used free DeepSeek; the initial
+round naturally switched from Gemini on a real quota error. This is a small-corpus
+result, not a general perfect-accuracy claim. See [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md).
+
+
 **Live example completed 18 October 2026:** real Gemini review → generated SQL fix
 and security test → all seven validation checks passed → normal Apply → three tests
 passed. The saved fix is `applied` and the finding is `fixed`. The normal
@@ -379,7 +387,11 @@ explanation, actual IDs, source trace and acceptance limits.
    regression-test slots are permitted; arbitrary new source files and deletions are not.
    [`validation.py`](../src/sentinel/core/fixes/validation.py) compares before/after
    diagnostics and test results; [`regression.py`](../src/sentinel/core/fixes/regression.py)
-   checks that a new regression test fails before and passes after. Executable validators
+   checks that a new regression test fails before and passes after. Pytest and Node TAP
+   test-case failures are recognized; failed test loading, cancellation and timeouts are
+   not resolution evidence. A changed target and this regression can supply explicitly
+   labelled `test-backed` resolution when static rules cannot confirm it. Failed static
+   checks cannot be overridden; every other required check must still pass. Executable validators
    and tests run in Docker. An unavailable or incomplete check cannot establish validation.
    See [MULTI_FILE_FIXES.md](MULTI_FILE_FIXES.md) for the complete sequence.
 3. *Apply* → `POST /api/fixes/{id}/apply` → `FixService.apply` →
@@ -601,3 +613,24 @@ patch was installed into the main repository by this experiment.
 See [FREE_AI_VERIFICATION.md](FREE_AI_VERIFICATION.md) for the test matrix, explanation,
 limitations and remaining integration work. Gemini's separate live results are in
 [GEMINI_LIVE_TEST.md](GEMINI_LIVE_TEST.md).
+
+## Learning to measure review and fix quality
+
+Start with [the small corpus](../evals/review_quality/README.md). Its preparation helper
+creates a fresh Git repository and stages a real source change, keeping the answer key
+and held-out tests outside the model's input. Optional `--check` proves fixture truth in
+Docker without calling an AI. Then normal `sentinel review --staged` measures the actual
+configured pipeline. Compare explanations with contracts; a high confidence score is
+not a measured probability. Record false alarms, missed bugs and duplicates separately.
+
+For fixes distinguish existing tests (preserve working behaviour), the same new test
+failing before/passing after (reproduce a behaviour change), and independent held-out
+checks (challenge the model's proposal with tests it never saw). Passing old tests alone
+does not answer all three. All example code executes in Docker.
+
+Trace normalization/dedup through `core/findings/normalize.py` and `dedup.py`, and fix
+evidence through `core/fixes/engine.py` and `regression.py`. The mutable-default concept
+now merges Ruff and AI wording without lowering similarity thresholds. Node output and
+test-backed resolution have focused regressions; missing imports, incomplete/failed
+checks and stale files still cannot reach Apply. Empty reviews say no code was assessed.
+Full evidence, original failures and boundaries: [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md).

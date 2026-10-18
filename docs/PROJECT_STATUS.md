@@ -1,5 +1,12 @@
 # Current project status and remaining work
 
+**Multilingual quality checkpoint — 19 October 2026:** 15 controlled examples
+under neutral project names: nine known bugs detected, six correct changes without
+warnings, and nine final real-model fixes validated/applied to disposable examples with
+independent held-out Docker checks. The final round used free DeepSeek; the initial
+round naturally switched from Gemini on a real quota error. This is a small-corpus
+result, not a general perfect-accuracy claim. See [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md).
+
 Assessment date: **19 October 2026**. Gemini is configured and live-tested. Automatic
 quota fallback to free DeepSeek through official OpenCode is connected and tested,
 with a separate local Docker bridge. Local live GitHub acceptance is complete; broader
@@ -18,7 +25,7 @@ afterward and history records the finding as fixed. Normal local app/worker star
 also passed. See [LIVE_FIX_WORKFLOW.md](LIVE_FIX_WORKFLOW.md). This does not close the
 broader quality or deployed browser acceptance work below.
 
-Latest checks after GitHub setup/gateway changes: **525 passed, 27 PostgreSQL skips**,
+GitHub setup/gateway checkpoint checks: **525 passed, 27 PostgreSQL skips**,
 all seven real Docker tests ran against the normal image; overall/core coverage
 **93.38% / 96%**. Ruff lint/format and strict typing passed. The verification table
 below preserves the earlier PostgreSQL, browser and deployment evidence with its
@@ -143,8 +150,9 @@ The normal fix-runtime setup and complete local Gemini fix/Apply acceptance are 
 The earlier unverified proposal is retained as historical evidence; a fresh example with
 a passing baseline completed every normal gate without bypasses.
 
-1. **Broader AI quality.** Review representative Python/TS/JS projects and check false
-   alarms, missed bugs and fix quality. The live Gemini and DeepSeek examples establish
+1. **Wider AI quality.** The 15 controlled cases and nine independently checked fixes
+   passed. Next add representative multi-file Python/TS/JS changes, harder clean controls,
+   repeated runs, dependency-heavy projects, and measure false alarms/missed bugs/fix quality. The live Gemini and DeepSeek examples establish
    connectivity and specific behavior, not general accuracy. Ollama and Claude remain
    optional choices; installing them is not required for this setup.
 2. **Extended GitHub acceptance.** The basic real App path, redelivery, second push and

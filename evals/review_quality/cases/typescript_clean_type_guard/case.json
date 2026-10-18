@@ -1,0 +1,16 @@
+{
+  "name": "typescript_clean_type_guard",
+  "language": "typescript",
+  "expected_bug": false,
+  "source": "example.ts",
+  "contract": "The extracted type guard checks null and property type before access.",
+  "test_command": [
+    "sh",
+    "test.sh"
+  ],
+  "oracle_command": [
+    "sh",
+    "test.sh",
+    "tests/holdout.test.ts"
+  ]
+}

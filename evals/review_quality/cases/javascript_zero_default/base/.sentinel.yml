@@ -1,0 +1,9 @@
+languages: [javascript]
+review:
+  categories: [bug, security]
+  max_findings: 5
+  max_context_chars: 16000
+fix:
+  test_command: ["node", "--test", "tests/*.test.js"]
+  context_files: [tests/example.test.js]
+  regression_command: ["node", "--test", "{files}"]

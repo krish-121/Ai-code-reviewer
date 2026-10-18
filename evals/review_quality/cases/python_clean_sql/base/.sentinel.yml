@@ -1,0 +1,8 @@
+languages: [python]
+review:
+  categories: [bug, security]
+  max_findings: 5
+  max_context_chars: 16000
+fix:
+  test_command: ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"]
+  context_files: [tests/test_example.py]

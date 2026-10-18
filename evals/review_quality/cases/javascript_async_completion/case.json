@@ -1,0 +1,17 @@
+{
+  "name": "javascript_async_completion",
+  "language": "javascript",
+  "expected_bug": true,
+  "source": "example.js",
+  "contract": "The returned promise must wait for asynchronous callbacks.",
+  "test_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ],
+  "oracle_command": [
+    "node",
+    "--test",
+    "tests/holdout.test.js"
+  ]
+}

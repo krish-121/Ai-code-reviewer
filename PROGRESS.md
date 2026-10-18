@@ -3,6 +3,29 @@
 Living log of what is built, what was decided, and what still needs a human eye.
 Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
 
+## Controlled multilingual quality evaluation - 19 October 2026
+
+- Added 15 invented Python/JS/TS cases, a safe preparation helper and offline Docker
+  contract tests. Answer files stay outside model context; existing destinations are
+  refused, shell newlines normalized, and Git content is explicitly staged/checked.
+- Final neutral-name round: 9/9 known bugs detected, 6/6 clean changes without warnings;
+  all actual free DeepSeek responses. Initial diagnostic round used 13 Gemini / 2 DeepSeek
+  with natural quota fallback. One empty snapshot was excluded, restaged and rerun.
+- Original fix outcomes: 3 validated / 5 unverified / 1 failed. Nine final proposals
+  passed independent checks. Repaired Node TAP handling, including test-callback errors
+  versus failed file loading, and test-backed resolution for changed targets with a new
+  reproducing regression and all other complete gates. Revalidated six captured proposals
+  without new AI calls; all nine normal Apply paths and final suites/held-out checks passed,
+  with applied/fixed history. Failed static resolution and incomplete checks remain blocked.
+- Added the existing mutable-default concept to AI normalization so duplicate Ruff/AI
+  reports merge without broader thresholds. Empty reviews explicitly identify unassessed code.
+- No generated/example code executed on the host; no paid service/model download or
+  credential upload. Normal tests/CI use controlled providers and Docker, never live AI.
+- Required local checks: **590 passed, 27 PostgreSQL skips**, all 25 Docker tests;
+  overall coverage **93.42%**, core **96%**; lint, formatting and typing passed.
+- See [QUALITY_EVALUATION.md](docs/QUALITY_EVALUATION.md), the walkthrough and design
+  decision 25. This is small-corpus evidence; representative quality and production work remain.
+
 ## Real GitHub App acceptance - 18–19 October 2026
 
 - Registered the personal App `Sentinel Review krish-121` and installed it on only the

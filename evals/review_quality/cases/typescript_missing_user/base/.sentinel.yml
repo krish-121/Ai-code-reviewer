@@ -1,0 +1,9 @@
+languages: [typescript, javascript]
+review:
+  categories: [bug, security]
+  max_findings: 5
+  max_context_chars: 16000
+fix:
+  test_command: ["sh", "test.sh"]
+  context_files: [tests/example.test.ts]
+  regression_command: ["sh", "test.sh", "{files}"]

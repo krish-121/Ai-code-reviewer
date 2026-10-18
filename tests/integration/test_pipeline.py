@@ -300,11 +300,14 @@ def test_empty_change(tmp_path: Path) -> None:
     root = tmp_path / "r"
     root.mkdir()
     git(root, "init", "-q")
-    result = run(root, ScriptedProvider([]))
+    ai = ScriptedProvider([])
+    result = run(root, ai)
     assert result.status is ReviewStatus.COMPLETED
     assert result.findings == []
     assert result.summary.risk is RiskLevel.NONE
-    assert result.summary.headline == "No problems found in this change"
+    assert result.summary.headline == "No changes to review; no code was assessed"
+    assert result.summary.stats.files_reviewed == 0
+    assert ai.requests == []
 
 
 def test_each_stage_logs_a_structured_line(

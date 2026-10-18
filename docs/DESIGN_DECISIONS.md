@@ -214,7 +214,9 @@ caller's UID, a scratch copy of the repository and a hard timeout
 ([`DockerSandbox`](../src/sentinel/sandbox/runners.py)). A weaker process runner remains
 available for explicitly requested diagnostics, but fix validation refuses it. Both
 generated-code analysis and tests require Docker. Without Docker these checks are skipped
-and the fix is "unverified"; passing tests alone never establishes resolution.
+and the fix is "unverified". Passing an existing suite alone does not establish resolution.
+A reproduced static rule or genuine new before/after regression can confirm it; the latter
+is explicitly labelled test-backed and still requires every other gate.
 
 **Trade-offs.** Strong isolation with a tool developers already have. Containers share the
 host kernel (a micro-VM would isolate better), and with no network the image must already
@@ -473,3 +475,26 @@ a separate validated-only operation on the original files.
 must already exist in a trusted image. Docker Desktop must be running. This is a local
 WSL setup choice, not a replacement for the dedicated worker boundary in Compose.
 The real Gemini fix/Apply acceptance is recorded in [LIVE_FIX_WORKFLOW.md](LIVE_FIX_WORKFLOW.md).
+
+## 25. Why allow test-backed resolution for logic fixes?
+
+**Problem.** Live examples produced correct patches and reproducing tests for logic bugs
+that no linter rule recognized. Resolution stayed skipped while other checks passed.
+Node's TAP output was also mistaken for missing pytest evidence.
+
+**Decision.** Keep static rechecks. If resolution is unavailable, a changed target and
+the same new test failing on original code and passing on the patch can supply test-backed
+evidence. Complete Docker analysis, no new serious diagnostics, passing existing tests,
+supported output, path/hash checks and validated-only Apply remain required. A failed
+static recheck cannot be overwritten; editing only another context file is insufficient.
+
+**Alternatives.** Leave every AI-only logic proposal permanently unverified; use a second
+model as judge; or permit Apply because old tests pass. A reproduced regression adds
+deterministic behaviour evidence without another model or host execution.
+
+**Trade-offs.** A model's test may assert the wrong requirement. Validation proves tested
+behaviour, not all semantics; developers still inspect the patch/tests. This evaluation
+also used independent held-out checks never shown to the model. Pytest and Node TAP
+test-case failures are supported; failed module loading, cancellation, timeouts and
+unsupported/incomplete reports do not establish a regression.
+See [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md) for original and repaired outcomes.

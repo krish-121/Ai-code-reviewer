@@ -1,0 +1,17 @@
+{
+  "name": "javascript_clean_numeric_sort",
+  "language": "javascript",
+  "expected_bug": false,
+  "source": "example.js",
+  "contract": "A numeric comparator and copied input are correct, including multi-digit numbers.",
+  "test_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ],
+  "oracle_command": [
+    "node",
+    "--test",
+    "tests/holdout.test.js"
+  ]
+}

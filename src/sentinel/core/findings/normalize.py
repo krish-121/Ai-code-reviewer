@@ -66,6 +66,7 @@ TAG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
             r"no tests?\b|missing (unit |regression )?tests?|untested|without "
             r"(a |any )?tests?|not covered by tests|lacks? tests?|test coverage",
         ),
+        ("mutable-default", r"\bmutable[- ]defaults?\b"),
         ("prompt-injection", r"prompt[- ]injection"),
         ("path-traversal", r"path traversal|directory traversal|\.\./"),
         ("deserialization", r"deserializ|pickle|yaml\.load"),

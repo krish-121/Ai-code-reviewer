@@ -26,7 +26,10 @@ the new regression still has to demonstrate its failure before the fix.
 
 For another framework, configure a regression command whose `{files}` argument expands
 to the newly created test paths. It must exit 1 and report failing tests against original
-code, then exit 0 against patched code. A runner with another failure contract needs an
+code, then exit 0 against patched code. Pytest summaries and Node's completed TAP
+test-case failures are supported, including exceptions inside callbacks. Failed file
+loading, mixed incomplete runs, cancellation and timeouts are rejected.
+A runner with another failure contract needs an
 adapter; without a supported command the result remains unverified. Dependency installs
 belong in the trusted image, and generated tests/code never execute on the host.
 
@@ -36,7 +39,7 @@ fix:
   max_files: 8
   max_context_chars: 60000
   # For a JS/TS project, adapt this to the actual installed test runner:
-  regression_command: [npm, test, '--', '{files}']
+  regression_command: [node, '--test', '{files}']
 ```
 
 Apply rechecks hashes of all supplied files and absence of each new file before changing
@@ -53,3 +56,8 @@ to apply them until validation completes. No automatic commits or pushes are per
 
 Regression coverage: `tests/unit/test_multi_file_fixes.py` and the real Docker test
 `test_multi_file_fix_and_created_test_validate_in_real_docker`.
+
+If no static rule confirms a logic finding, a changed target plus a genuine new before/after
+regression can establish explicitly labelled test-backed resolution. Every other gate must
+pass. Failed static rechecks cannot be replaced; no new reproducing test means unverified.
+See [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md).

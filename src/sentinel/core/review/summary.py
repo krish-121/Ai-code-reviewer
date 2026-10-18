@@ -101,6 +101,9 @@ def _headline(risk: RiskLevel, stats: ReviewStats) -> str:
         if stats.by_severity.get(s.value)
     ]
     if not parts:
+        if stats.files_reviewed == 0:
+            scope = "No changes to review" if stats.files_changed == 0 else "No reviewable files"
+            return f"{scope}; no code was assessed"
         return "No problems found in this change"
     return f"{risk.value.upper()} risk: {', '.join(parts)} finding(s)"
 

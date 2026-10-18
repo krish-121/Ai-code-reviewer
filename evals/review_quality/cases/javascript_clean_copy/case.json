@@ -1,0 +1,17 @@
+{
+  "name": "javascript_clean_copy",
+  "language": "javascript",
+  "expected_bug": false,
+  "source": "example.js",
+  "contract": "Object spread followed by the explicit override keeps the caller unchanged.",
+  "test_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ],
+  "oracle_command": [
+    "node",
+    "--test",
+    "tests/holdout.test.js"
+  ]
+}

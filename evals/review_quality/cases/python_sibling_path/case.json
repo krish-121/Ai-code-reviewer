@@ -1,0 +1,25 @@
+{
+  "name": "python_sibling_path",
+  "language": "python",
+  "expected_bug": true,
+  "source": "example.py",
+  "contract": "A sibling with a shared text prefix is still outside the allowed directory.",
+  "test_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "tests"
+  ],
+  "oracle_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "tests/test_holdout.py"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "javascript_zero_default",
+  "language": "javascript",
+  "expected_bug": true,
+  "source": "example.js",
+  "contract": "Zero is a valid explicit setting, not a missing value.",
+  "test_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ],
+  "oracle_command": [
+    "node",
+    "--test",
+    "tests/holdout.test.js"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "typescript_sql_binding",
+  "language": "typescript",
+  "expected_bug": true,
+  "source": "example.ts",
+  "contract": "Type annotations do not make interpolated user input safe SQL.",
+  "test_command": [
+    "sh",
+    "test.sh"
+  ],
+  "oracle_command": [
+    "sh",
+    "test.sh",
+    "tests/holdout.test.ts"
+  ]
+}

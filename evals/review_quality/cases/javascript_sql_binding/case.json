@@ -1,0 +1,17 @@
+{
+  "name": "javascript_sql_binding",
+  "language": "javascript",
+  "expected_bug": true,
+  "source": "example.js",
+  "contract": "The database receives a constant query and a separate value array, even for SQL-like names.",
+  "test_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ],
+  "oracle_command": [
+    "node",
+    "--test",
+    "tests/holdout.test.js"
+  ]
+}
