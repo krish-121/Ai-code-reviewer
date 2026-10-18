@@ -16,6 +16,10 @@ Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections ref
 - Current demo and end-to-end assertion use the same shorter synthetic value. Sentinel
   must still identify and redact it. Private keys, actual provider settings, local
   databases, dependency installations and caches remain outside the upload.
+- The first real hosted CI run passed Python/PostgreSQL and Docker/Compose checks.
+  Its web formatting check exposed one unformatted test expression; corrected it
+  without changing behavior. Frontend type/format checks, all 21 tests and the
+  production build passed locally. Final hosted results are available in Actions.
 - See [GITHUB_UPLOAD.md](docs/GITHUB_UPLOAD.md) for the distinction between source
   hosting and bot installation, history handling and the next acceptance steps.
 

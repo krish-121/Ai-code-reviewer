@@ -86,7 +86,9 @@ test("S24: reusing FixPanel for a second attempt restarts polling", async () => 
 
 test("incomplete validation never offers Apply even if an older API advertises it", async () => {
   api.fix = async (id) => ({ ...fix(id, "unverified"), patch: "proposed diff", can_apply: true });
-  const view = render(createElement(FixPanel, { fixId: "incomplete", canApply: true, onApplied() {} }));
+  const view = render(
+    createElement(FixPanel, { fixId: "incomplete", canApply: true, onApplied() {} }),
+  );
   await waitFor(() => assert.match(view.container.textContent ?? "", /Complete validation/));
   assert.equal(view.queryByRole("button", { name: "Apply to working tree" }), null);
   assert.ok(view.getByRole("button", { name: "Download patch" }));
