@@ -42,7 +42,7 @@ and Docker/Compose validation succeeded. The first run exposed one frontend test
 formatting issue; the follow-up code run is green. CI uses controlled external-service
 fixtures. This is hosted acceptance of the repository, not a live GitHub App review.
 
-## What still connects the bot
+## What connects the bot
 
 1. A separate disposable project provides a safe real pull request with a deliberate bug.
 2. A GitHub App gives Sentinel a bot identity and narrowly scoped repository permissions.
@@ -51,5 +51,14 @@ fixtures. This is hosted acceptance of the repository, not a live GitHub App rev
 4. A worker runs the review and posts its summary/inline comments as the App.
 
 These steps are not completed merely by uploading source. Follow [GITHUB_APP.md](GITHUB_APP.md)
-and [LOCAL_SETUP_AND_GITHUB.md](LOCAL_SETUP_AND_GITHUB.md). Record actual delivery, review,
-comment, redelivery and second-push evidence before marking live GitHub acceptance complete.
+and [LOCAL_SETUP_AND_GITHUB.md](LOCAL_SETUP_AND_GITHUB.md). The completed delivery, review,
+comment, redelivery and second-push evidence is recorded in [GITHUB_LIVE_TEST.md](GITHUB_LIVE_TEST.md).
+
+## Reviewing App milestone completed
+
+The private `sentinel-integration-demo` repository and personal App are now connected.
+Actual signed GitHub notifications triggered Gemini reviews and App-authored comments;
+repeat delivery and a corrected second push passed, including summary updates and
+user isolation. The test PR remains unmerged. See [GITHUB_LIVE_TEST.md](GITHUB_LIVE_TEST.md).
+The connection currently runs on this computer through a webhook-only temporary tunnel;
+it is not an always-on hosted service.

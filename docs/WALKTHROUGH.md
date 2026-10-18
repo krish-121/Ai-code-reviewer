@@ -321,10 +321,23 @@ snippet, verification checks with `--details`. `--format json` prints the
 
 The source repository is [krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer).
 [Hosted CI](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39141482827) has passed Python/PostgreSQL, frontend and Docker/Compose checks.
-Pushing Sentinel's implementation there hosts the code and triggers CI. It does not
-install the reviewing bot. Actual automatic reviews need an App installation, a signed
-webhook delivery and a running Sentinel worker. Those live integration checks remain
-pending. See [GITHUB_UPLOAD.md](GITHUB_UPLOAD.md) for the first-upload/history explanation.
+Pushing Sentinel's implementation there hosts the code and triggers CI. The reviewing
+bot is now separately installed on the private `sentinel-integration-demo` test repo.
+[Its real PR](https://github.com/krish-121/sentinel-integration-demo/pull/1) completed signed
+delivery → Gemini analysis → database → authenticated UI → bot summary/inline publication.
+Actual redelivery reused the review; a corrected second push updated the same summary.
+See [GITHUB_LIVE_TEST.md](GITHUB_LIVE_TEST.md) for the step-by-step learning guide and
+the precise evidence; [GITHUB_UPLOAD.md](GITHUB_UPLOAD.md) explains source publication.
+
+Why the extra pieces? The **App** is permission and bot identity; **Gemini** is the model;
+the **webhook** tells Sentinel a PR changed; the **worker** performs the slow review. A
+temporary Cloudflare address lets GitHub contact this computer. A separate
+[`webhook gateway`](../scripts/github_webhook_gateway.py) exposes only that notification
+route, keeping the dashboard/API private. The existing signature check authenticates
+every notification. Private App settings use the same normal configuration writer as
+the provider settings; `github_webhook_secret` is masked and prompted without echo.
+Installation ownership links reviews to a non-admin user so another user's API requests
+return 404. Closing local processes stops new delivery, but saved reviews remain.
 
 
 

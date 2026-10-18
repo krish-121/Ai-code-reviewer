@@ -219,8 +219,10 @@ Acceptance means observing all of these, with the reviewed commit recorded:
 The automated tests cover these contracts with HTTP fixtures, but only this live run
 confirms the real App configuration. Finally, push Sentinel's implementation to a separate
 repository when ready and run its Actions workflow to verify hosted CI. The source destination is now
-[krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer). A live test
-repository/App has not yet completed acceptance. See [GITHUB_UPLOAD.md](GITHUB_UPLOAD.md).
+[krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer). The private test App has now completed real signed delivery, Gemini analysis, bot
+comments, repeat delivery, second push and user-isolation acceptance. See
+[GITHUB_LIVE_TEST.md](GITHUB_LIVE_TEST.md) for the result and source explanation;
+[GITHUB_UPLOAD.md](GITHUB_UPLOAD.md) covers the source upload.
 
 ## What to report if a step fails
 

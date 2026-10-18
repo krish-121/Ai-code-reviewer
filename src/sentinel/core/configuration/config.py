@@ -351,8 +351,18 @@ _WRITABLE_KEYS = {
     "sandbox_image",
     "sandbox_transport",
     "github_token",
+    "github_app_id",
+    "github_private_key_path",
+    "github_webhook_secret",
+    "auth_mode",
 }
-SECRET_KEYS = {"claude_api_key", "gemini_api_key", "github_token", "opencode_token"}
+SECRET_KEYS = {
+    "claude_api_key",
+    "gemini_api_key",
+    "github_token",
+    "github_webhook_secret",
+    "opencode_token",
+}
 
 
 def save_user_setting(key: str, value: str, path: Path | None = None) -> Path:

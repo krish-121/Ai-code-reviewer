@@ -1,9 +1,37 @@
 # Sentinel — build progress
 
 Living log of what is built, what was decided, and what still needs a human eye.
-Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-18.
+Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
 
-## GitHub source publication - 18 October 2026
+## Real GitHub App acceptance - 18–19 October 2026
+
+- Registered the personal App `Sentinel Review krish-121` and installed it on only the
+  private invented test repository. Contents read, issues/PR write and required metadata
+  read; repository-scoped short-lived tokens. Saved App secrets outside Git with 0600
+  permissions; linked installation ownership to a non-admin Sentinel user.
+- [Real PR #1](https://github.com/krish-121/sentinel-integration-demo/pull/1): GitHub's
+  signed opened event returned 202; actual Gemini completed all eight review stages,
+  supported the unsafe SQL finding with three analyzers, and published one bot summary
+  and one valid inline comment. The owner opened the saved review in the served UI.
+- Actual GitHub redelivery returned the same review ID without extra reviews/comments.
+  A Docker-tested correction/new regression triggered a second real review and updated
+  the same summary to no problems. Historical inline warning remains outdated; PR stays
+  open/unmerged and the base branch is unchanged. Another user received 404 for protected
+  review/detail/findings/files/graph/source data.
+- Added a bounded webhook-only local gateway and focused HTTP tests. Private App settings
+  can be saved through normal configuration; the webhook secret uses hidden input and
+  masked output. Added preservation/permissions and secret-display regressions.
+- Required checks: **525 passed, 27 PostgreSQL skips**, all seven real Docker cases;
+  coverage **93.38% overall / 96% core**. Ruff lint/format and strict typing passed.
+  No frontend code changed. Hosted PostgreSQL variants remain part of the CI workflow.
+- Initial automatic setup ping/installation events arrived before API startup (502);
+  their actual redeliveries succeeded (200). Actual PR deliveries returned 202. Quick
+  tunnels require running local processes and a fresh URL after restart; this is not
+  permanent hosting. Quota fallback remains enabled but was not triggered by these PRs.
+- See [GITHUB_LIVE_TEST.md](docs/GITHUB_LIVE_TEST.md) for the beginner explanation,
+  evidence, source trace and remaining production/quality/race acceptance boundaries.
+
+## GitHub source publication checkpoint - 18 October 2026
 
 - Final code run: [all three hosted CI jobs passed](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39141482827) on `8eb6c44`.
   Python/PostgreSQL: 544 passed, 1 skipped; frontend: 21 tests plus type/format/build;
@@ -75,8 +103,8 @@ Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections ref
 
 See [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the consolidated requirement map,
 earlier fix history and ordered remaining work. [LOCAL_SETUP_AND_GITHUB.md](docs/LOCAL_SETUP_AND_GITHUB.md)
-explains the offline → real model → GitHub sequence for the owner, who has not configured
-Ollama or an online repository yet.
+explains the offline → real model → GitHub sequence. Gemini, free DeepSeek fallback,
+source hosting and the real test App are now configured. Ollama remains optional.
 
 - Preserved modules/variables and lexical module/import reads/writes across Python/TS/JS;
   changed constants include unchanged consumers. Added file/handler endpoint identity,

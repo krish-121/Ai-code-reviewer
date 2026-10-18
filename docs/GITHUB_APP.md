@@ -5,9 +5,11 @@ or updated, a worker reviews it, and Sentinel posts one summary comment plus inl
 comments for new findings. Using an App (instead of a personal token) means short-lived,
 per-installation tokens with only the permissions below.
 
-> The App integration is tested against a faked GitHub API (see
-> [PROGRESS.md](../PROGRESS.md), *Verified only with mocks*). Follow this guide on a test
-> repository first.
+> **Real local acceptance passed on 18–19 October 2026:** private test installation,
+> signed GitHub delivery, actual Gemini review, database/dashboard display, bot summary
+> and inline comments, repeat delivery and second-push updates. See
+> [GITHUB_LIVE_TEST.md](GITHUB_LIVE_TEST.md) for evidence and beginner explanations.
+> The public source repo and private reviewed test repo have different purposes.
 
 ## 1. Create the App
 
@@ -49,6 +51,19 @@ For GitHub Enterprise Server also set `SENTINEL_GITHUB_API_URL=https://<ghe-host
 Start the API and at least one worker (`docker compose up`, or `sentinel serve` and
 `sentinel worker`; see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
+For a local installation, these values can also be saved in the private user config:
+
+```bash
+sentinel config set github_app_id 123456
+sentinel config set github_private_key_path /absolute/private/path/sentinel-github.pem
+sentinel config set github_webhook_secret   # hidden prompt; do not paste it into a command
+sentinel config set auth_mode token
+```
+
+Use the actual App ID/path. The writer preserves existing provider settings, creates
+owner-only config files, and masks the webhook secret in normal config output. The
+private key file itself must remain outside the repo with owner-only permissions.
+
 ## 3. Install it and link it to a user
 
 Install the App on the repositories to review (App settings → *Install App*). The
@@ -86,12 +101,32 @@ Sentinel posts reviews with the `COMMENT` event: it never approves or blocks a P
 
 ## 5. Testing the webhook locally
 
-GitHub must reach your machine. With any tunnel (e.g. `cloudflared tunnel --url
-http://127.0.0.1:8000` or `ngrok http 8000`), set the App's webhook URL to the tunnel URL +
-`/api/github/webhook`. A tunnel exposes the local server publicly even when it listens on loopback.
-Run with `SENTINEL_AUTH_MODE=token`, create a user token, and set the webhook secret before exposing
-the server. Alternatively, configure a reverse proxy to expose **only** `/api/github/webhook` and
-deny every other route. Never tunnel the full server in local/no-login auth mode.
+GitHub must reach your machine. For local development, run three terminals from the
+project root (with the installed environment active):
+
+```bash
+# Terminal 1: private local dashboard/API and worker
+sentinel serve --host 127.0.0.1 --port 8000
+
+# Terminal 2: expose only the webhook route to the tunnel
+python scripts/github_webhook_gateway.py --port 8765 --target http://127.0.0.1:8000
+
+# Terminal 3: official Cloudflare helper, installed separately
+cloudflared tunnel --url http://127.0.0.1:8765
+```
+
+Set App settings → Webhook URL to the printed HTTPS address + `/api/github/webhook`.
+The address changes after a new Quick Tunnel starts; update the App before another PR
+test. Keep all three terminals running. This is temporary development connectivity,
+not permanent hosting. The owner's exported Start/Stop helpers automate these steps
+on the already-configured Windows/WSL machine; they use local API port 8810.
+
+Set `SENTINEL_AUTH_MODE=token` (or save `auth_mode token`) and configure the webhook secret
+before connecting the tunnel. Never tunnel the full local/no-login app. The gateway
+forwards only bounded POST requests on the exact webhook path; the main API still checks
+GitHub's signature. Confirm other public routes return 404, unsigned webhooks return 401,
+and a real signed GitHub delivery succeeds. The gateway is a development helper, not a
+replacement for a properly configured production proxy.
 
 GitHub's App settings → *Advanced* → *Recent deliveries* shows each webhook and Sentinel's
 response (`202` with a `review_id` when a review was queued). A `401` means the webhook

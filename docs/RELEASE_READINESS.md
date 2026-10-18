@@ -2,9 +2,9 @@
 
 **Current continuation:** [PROJECT_STATUS.md](PROJECT_STATUS.md) supersedes the snapshot
 below for graph coverage, validated-only Apply, sandbox report budgets, browser smoke
-acceptance and refreshed benchmarks. The latest provider suite has **517 passing Python tests and 27 PostgreSQL skips**;
+acceptance and refreshed benchmarks. The latest local GitHub setup/gateway suite has **525 passing Python tests and 27 PostgreSQL skips**;
 earlier frontend acceptance has **21 passing tests**. Gemini and DeepSeek fallback are now
-live-tested; Ollama is optional. Older results below describe their dated checkpoint. See the current status for exact evidence and remaining
+live-tested; real GitHub App/PR acceptance also passed (see [GITHUB_LIVE_TEST.md](GITHUB_LIVE_TEST.md)). Ollama is optional. Older results below describe their dated checkpoint. See the current status for exact evidence and remaining
 acceptance work. The following deployment batch is retained as a historical checkpoint.
 
 Verified **2026-10-18**. The Docker-capable validation worker, runtime analyzer consistency,

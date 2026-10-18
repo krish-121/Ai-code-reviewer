@@ -193,6 +193,14 @@ def test_config_secret_can_be_entered_without_shell_history(env: Path) -> None:
     assert missing.exit_code == 2 and "Provide a value" in missing.output
 
 
+def test_github_webhook_secret_uses_hidden_prompt_and_masked_output(env: Path) -> None:
+    value = "test-webhook-secret-input"
+    result = runner.invoke(app, ["config", "set", "github_webhook_secret"], input=value + "\n")
+    assert result.exit_code == 0
+    assert value not in result.output
+    assert value not in runner.invoke(app, ["config"]).output
+
+
 def test_version_graph_and_user_admin_commands(env: Path) -> None:
     assert "sentinel 0.1.0" in runner.invoke(app, ["--version"]).output
     graph = runner.invoke(app, ["graph", ".", "--symbol", "search_products"])

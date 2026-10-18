@@ -137,3 +137,25 @@ def test_save_sandbox_transport_validates_and_preserves_settings(tmp_path: Path)
     with pytest.raises(ValueError, match="sandbox_transport"):
         save_user_setting("sandbox_transport", "invalid", path)
     assert path.read_bytes() == before
+
+
+def test_save_github_app_settings_preserves_provider_and_private_permissions(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "config.toml"
+    save_user_setting("gemini_api_key", "test-provider-key", path)
+    for key, value in (
+        ("github_app_id", "123"),
+        ("github_private_key_path", str(tmp_path / "app.pem")),
+        ("github_webhook_secret", "test-webhook-secret"),
+        ("auth_mode", "token"),
+    ):
+        save_user_setting(key, value, path)
+    settings = load_settings(path, env={})
+    assert settings.github_app_id == "123"
+    assert settings.github_private_key_path == tmp_path / "app.pem"
+    assert settings.github_webhook_secret is not None
+    assert settings.github_webhook_secret.get_secret_value() == "test-webhook-secret"
+    assert settings.auth_mode == "token"
+    assert settings.api_key_for("gemini") == "test-provider-key"
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

@@ -1,9 +1,9 @@
 # Current project status and remaining work
 
-Assessment date: **18 October 2026**. Gemini is configured and live-tested. Automatic
+Assessment date: **19 October 2026**. Gemini is configured and live-tested. Automatic
 quota fallback to free DeepSeek through official OpenCode is connected and tested,
-with a separate local Docker bridge. GitHub acceptance and production/operations
-evidence remain open; these provider checks do not declare the entire release complete.
+with a separate local Docker bridge. Local live GitHub acceptance is complete; broader
+quality and production/operations evidence remain open; these provider checks do not declare the entire release complete.
 
 See [FREE_AI_FALLBACK.md](FREE_AI_FALLBACK.md) for beginner setup and source structure,
 [DEEPSEEK_FALLBACK_VERIFICATION.md](DEEPSEEK_FALLBACK_VERIFICATION.md) for current test
@@ -16,11 +16,11 @@ the WSL copy transport is saved. Actual Gemini generated a parameterized SQL fix
 a regression test; all seven checks passed, normal Apply succeeded, three tests passed
 afterward and history records the finding as fixed. Normal local app/worker startup
 also passed. See [LIVE_FIX_WORKFLOW.md](LIVE_FIX_WORKFLOW.md). This does not close the
-broader quality, GitHub or deployed browser acceptance work below.
+broader quality or deployed browser acceptance work below.
 
-Latest checks after the saved-transport change: **518 passed, 27 PostgreSQL skips**,
+Latest checks after GitHub setup/gateway changes: **525 passed, 27 PostgreSQL skips**,
 all seven real Docker tests ran against the normal image; overall/core coverage
-**93.36% / 96%**. Ruff lint/format and strict typing passed. The verification table
+**93.38% / 96%**. Ruff lint/format and strict typing passed. The verification table
 below preserves the earlier PostgreSQL, browser and deployment evidence with its
 original scope.
 
@@ -29,8 +29,16 @@ original scope.
 [The real hosted run](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39141482827) passed all three jobs on `8eb6c44`:
 Python/PostgreSQL (**544 passed, 1 skip**), frontend (**21 passed**, type/format/build),
 and Docker/Compose acceptance. The local publication check passed 518 with 27 PostgreSQL
-skips. Hosted CI uses controlled provider/GitHub fixtures; a real reviewing App, signed
-delivery and comments on an actual pull request are still pending.
+skips. Hosted CI uses controlled provider/GitHub fixtures.
+
+**Real GitHub App acceptance also passed.** The personal App is installed only on the
+private disposable test repo. [PR #1](https://github.com/krish-121/sentinel-integration-demo/pull/1)
+completed actual signed delivery, Gemini review, database/UI display and bot summary/inline
+comments. Actual redelivery created no duplicate work; a corrected second push updated
+the same summary. Owner-isolation checks passed. The App key and notification secret are
+saved outside Git; only the webhook route is exposed by a temporary tunnel. Both PR
+reviews used Gemini successfully, so this run did not trigger the enabled DeepSeek fallback.
+See [GITHUB_LIVE_TEST.md](GITHUB_LIVE_TEST.md).
 
 ## What was inspected
 
@@ -108,7 +116,7 @@ ordinary package-manager notices and the existing warning about the non-secret
 | SPEC area | Status and practical boundary |
 |---|---|
 | Local/staged/range/path inputs (§6, §8, §26) | Implemented and exercised through services/API/CLI. |
-| GitHub PR input and comments (§6, §39) | Implemented; signed local deliveries and HTTP fixtures tested. Actual App installation/publication unverified. |
+| GitHub PR input and comments (§6, §39) | Actual private App installation, signed delivery, Gemini review, database/UI display, bot comments, real redelivery, second-push summary update and owner isolation passed. Live concurrent-push races and durable hosting remain. |
 | Python/TS/JS parsing (§5, §9) | Real parsers with explicit degraded TS/JS fallback. |
 | Graph/context (§9, §21) | Implemented structural graph including module variables, imported bindings, callers/tests/routes/data access. Bounded/degraded/dynamic analysis limits remain explicit. |
 | Static analysis (§10) | Built-in rules, Ruff, mypy, Bandit, ESLint and tsc, with normalized diagnostics and completion checks. |
@@ -139,11 +147,10 @@ a passing baseline completed every normal gate without bypasses.
    alarms, missed bugs and fix quality. The live Gemini and DeepSeek examples establish
    connectivity and specific behavior, not general accuracy. Ollama and Claude remain
    optional choices; installing them is not required for this setup.
-2. **Real GitHub App acceptance.** Source hosting and hosted CI passed. The source is at
-   [krish-121/Ai-code-reviewer](https://github.com/krish-121/Ai-code-reviewer); inspect
-   its Actions checks after each push. Create a disposable test repository and App, link the installation,
-   observe signed delivery -> review -> comments, then check redelivery and a second push.
-   The source repository exists; no live test App is installed yet. Local reviews do not need GitHub.
+2. **Extended GitHub acceptance.** The basic real App path, redelivery, second push and
+   user isolation passed. Test concurrent pushes while publication is in flight, outages
+   and recovery if moving beyond local development. The App currently covers only the
+   private test repo; the temporary connection must be running for new reviews.
 3. **Current full-stack and browser acceptance.** Rebuild the complete app with the new
    optional OpenCode bridge and check web/worker reviews, fixes, saved model display and
    service failures. Earlier full Compose/browser acceptance predates this fallback. Expand
@@ -161,7 +168,7 @@ a passing baseline completed every normal gate without bypasses.
 Items 1–3 are the next practical checks. Operations/load work is needed before claiming
 production readiness; it is not a requirement to install Ollama or buy an AI subscription.
 See [LOCAL_SETUP_AND_GITHUB.md](LOCAL_SETUP_AND_GITHUB.md) for the beginner-oriented setup
-sequence and explanations. Gemini and the free OpenCode route are configured. The source repository is configured; a live App installation and public webhook endpoint remain pending. Ollama is optional.
+sequence and explanations. Gemini and the free OpenCode route are configured. The source repository and private test App are configured; the webhook uses a temporary local development connection. Ollama is optional.
 
 ## Supported limits to retain
 
