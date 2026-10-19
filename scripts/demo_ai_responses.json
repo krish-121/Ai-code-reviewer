@@ -1,42 +1,104 @@
 {
   "_comment": "Scripted model output used ONLY by scripts/seed_demo.py so the demo UI can be shown without an API key. It deliberately includes wrong claims (a false positive, a hallucination, a style remark) to show verification rejecting them. Real reviews call a real provider.",
   "review": [
-    {"category": "security", "severity": "high", "confidence": 0.86, "file": "app/routes.py", "line": 42,
-     "title": "Authorization check runs before authentication in admin_export",
-     "explanation": "admin_export() calls is_admin() on a user looked up from the caller-supplied X-User-Email header before verify_token() authenticates the request. Anyone can export every customer by sending an admin's email address.",
-     "evidence": ["admin_export() calls is_admin()", "admin_export() calls verify_token() only afterwards"],
-     "suggested_fix": "Authenticate first: derive the user from verify_token(request.headers['Authorization']) and check is_admin() on that user."},
-    {"category": "security", "severity": "high", "confidence": 0.82, "file": "app/db.py", "line": 34,
-     "title": "SQL injection in search_products",
-     "explanation": "`term` comes straight from the `q` query parameter and is interpolated into the LIKE clause with an f-string, so a crafted search can read or modify any table.",
-     "evidence": ["search() calls search_products()", "`term` is interpolated into `query`"],
-     "suggested_fix": "Use a placeholder: `LIKE ?` with the parameter `(f\"%{term}%\",)`."},
-    {"category": "bug", "severity": "medium", "confidence": 0.66, "file": "app/routes.py", "line": 51,
-     "title": "Malformed JSON body crashes order_summary",
-     "explanation": "json.loads(request.data) raises on an empty or invalid body and payload[\"user_ids\"] raises KeyError; both surface as 500 errors instead of a 400.",
-     "evidence": ["order_summary() calls order_summaries()"],
-     "suggested_fix": "Use request.get_json(silent=True) and return 400 when user_ids is missing."},
-    {"category": "tests", "severity": "medium", "confidence": 0.6, "file": "app/db.py", "line": 33,
-     "title": "search_products has no tests",
-     "explanation": "The new search_products() function is not exercised by any test, including the empty-term and special-character cases.",
-     "evidence": []},
-    {"category": "security", "severity": "high", "confidence": 0.55, "file": "app/db.py", "line": 25,
-     "title": "SQL injection in find_user",
-     "explanation": "find_user() builds its query from the email argument.",
-     "evidence": []},
-    {"category": "bug", "severity": "medium", "confidence": 0.62, "file": "app/routes.py", "line": 34,
-     "title": "Sanitized search term is discarded",
-     "explanation": "search() calls `sanitize_term()` but passes the raw term to search_products(); the result of `escape_like()` is also ignored.",
-     "evidence": ["search() calls sanitize_term()"]},
-    {"category": "bug", "severity": "low", "confidence": 0.5, "file": "app/routes.py", "line": 41,
-     "title": "Rename variable `claimed` for readability",
-     "explanation": "The variable name is unclear.",
-     "evidence": []}
+    {
+      "category": "security",
+      "severity": "high",
+      "confidence": 0.86,
+      "file": "app/routes.py",
+      "line": 42,
+      "title": "Authorization check runs before authentication in admin_export",
+      "explanation": "admin_export() calls is_admin() on a user looked up from the caller-supplied X-User-Email header before verify_token() authenticates the request. Anyone can export every customer by sending an admin's email address.",
+      "evidence": [
+        "admin_export() calls is_admin()",
+        "admin_export() calls verify_token() only afterwards"
+      ],
+      "suggested_fix": "Authenticate first: derive the user from verify_token(request.headers['Authorization']) and check is_admin() on that user."
+    },
+    {
+      "category": "security",
+      "severity": "high",
+      "confidence": 0.82,
+      "file": "app/db.py",
+      "line": 34,
+      "title": "SQL injection in search_products",
+      "explanation": "The search term comes from the q query parameter and is inserted into a SQL LIKE clause with an f-string. Crafted input can change the WHERE condition and return products outside the intended search.",
+      "evidence": [
+        "search() calls search_products()",
+        "`term` is interpolated into `query`"
+      ],
+      "suggested_fix": "Use a placeholder: `LIKE ?` with the parameter `(f\"%{term}%\",)`."
+    },
+    {
+      "category": "bug",
+      "severity": "medium",
+      "confidence": 0.66,
+      "file": "app/routes.py",
+      "line": 51,
+      "title": "Malformed JSON body crashes order_summary",
+      "explanation": "json.loads(request.data) raises on an empty or invalid body and payload[\"user_ids\"] raises KeyError; both surface as 500 errors instead of a 400.",
+      "evidence": [
+        "order_summary() calls order_summaries()"
+      ],
+      "suggested_fix": "Use request.get_json(silent=True) and return 400 when user_ids is missing."
+    },
+    {
+      "category": "tests",
+      "severity": "medium",
+      "confidence": 0.6,
+      "file": "app/db.py",
+      "line": 33,
+      "title": "search_products has no tests",
+      "explanation": "The new search_products() function is not exercised by any test, including the empty-term and special-character cases.",
+      "evidence": []
+    },
+    {
+      "category": "security",
+      "severity": "high",
+      "confidence": 0.55,
+      "file": "app/db.py",
+      "line": 25,
+      "title": "SQL injection in find_user",
+      "explanation": "find_user() builds its query from the email argument.",
+      "evidence": []
+    },
+    {
+      "category": "bug",
+      "severity": "medium",
+      "confidence": 0.62,
+      "file": "app/routes.py",
+      "line": 34,
+      "title": "Sanitized search term is discarded",
+      "explanation": "search() calls `sanitize_term()` but passes the raw term to search_products(); the result of `escape_like()` is also ignored.",
+      "evidence": [
+        "search() calls sanitize_term()"
+      ]
+    },
+    {
+      "category": "bug",
+      "severity": "low",
+      "confidence": 0.5,
+      "file": "app/routes.py",
+      "line": 41,
+      "title": "Rename variable `claimed` for readability",
+      "explanation": "The variable name is unclear.",
+      "evidence": []
+    }
   ],
   "fix": {
-    "summary": "Parameterize the LIKE pattern instead of interpolating the search term.",
-    "edits": [{"file": "app/db.py",
-               "search": "    query = f\"SELECT id, name, price FROM products WHERE name LIKE '%{term}%' ORDER BY name\"\n    return conn.execute(query).fetchall()\n",
-               "replace": "    query = \"SELECT id, name, price FROM products WHERE name LIKE ? ORDER BY name\"\n    return conn.execute(query, (f\"%{term}%\",)).fetchall()\n"}]
+    "summary": "Parameterize the LIKE pattern and add four regression cases. Scripted demo proposal; validation runs in Docker.",
+    "edits": [
+      {
+        "file": "app/db.py",
+        "search": "    query = f\"SELECT id, name, price FROM products WHERE name LIKE '%{term}%' ORDER BY name\"\n    return conn.execute(query).fetchall()\n",
+        "replace": "    query = \"SELECT id, name, price FROM products WHERE name LIKE ? ORDER BY name\"\n    return conn.execute(query, (f\"%{term}%\",)).fetchall()\n"
+      },
+      {
+        "file": "tests/test_db_regression.py",
+        "operation": "create",
+        "search": "",
+        "replace": "\"\"\"Scripted demo regression: ordinary input, missing input, injection and quoting.\"\"\"\n\nimport sqlite3\n\nimport pytest\n\nfrom app.db import init_schema, search_products\n\n\n@pytest.mark.parametrize(\n    (\"term\", \"expected\"),\n    [(\"widget\", [\"widget\"]), (\"absent\", []), (\"' OR 1=1 --\", []), (\"O'Reilly\", [\"O'Reilly\"])],\n)\ndef test_search_keeps_input_as_data(term, expected):\n    with sqlite3.connect(\":memory:\") as connection:\n        connection.row_factory = sqlite3.Row\n        init_schema(connection)\n        connection.executemany(\n            \"INSERT INTO products (name, price) VALUES (?, ?)\",\n            [(\"widget\", 5.0), (\"O'Reilly\", 8.0)],\n        )\n        assert [row[\"name\"] for row in search_products(connection, term)] == expected\n"
+      }
+    ]
   }
 }

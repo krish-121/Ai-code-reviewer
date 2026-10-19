@@ -53,6 +53,8 @@ jobs:
         run: |
           mypy
           mypy --strict tools/opencode_bridge
+      - name: Public demo tooling types
+        run: MYPYPATH=demo:scripts mypy --strict scripts/demo_support.py scripts/seed_demo.py scripts/serve_demo.py
       - name: Tests with coverage (≥80% overall)
         run: pytest --cov=sentinel --cov-report=term --cov-report=xml --cov-fail-under=80
       - name: Core coverage (≥90%)

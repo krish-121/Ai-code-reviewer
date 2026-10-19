@@ -32,7 +32,9 @@ ENV = {
 
 
 def git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(repo), *args], check=True, env=ENV,
+    # Demo commits must not need the visitor's signing key or execute their hooks.
+    subprocess.run(["git", "-c", "core.hooksPath=" + os.devnull,
+                    "-c", "commit.gpgSign=false", "-C", str(repo), *args], check=True, env=ENV,
                    stdout=subprocess.DEVNULL)  # noqa: S603
 
 

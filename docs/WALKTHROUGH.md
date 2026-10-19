@@ -862,3 +862,50 @@ keep Gemini 3.8 as the saved default. The quota-test server is stopped, the norm
 is restored, credentials stayed private and Smee remains disconnected. The remaining
 V1 demonstration work is the public demo; distributed live-profile, recovery, complete
 accessibility and load measurements retain their separate acceptance tasks.
+
+
+## How the public demo stays repeatable
+
+Start with [PUBLIC_DEMO.md](PUBLIC_DEMO.md): it explains every command and the
+visitor's browser tour. The public main repository contains the sample templates;
+one clone is enough. The private GitHub integration repository remains private.
+
+- [build_demo_repo.py](../demo/build_demo_repo.py) copies a safe base and a deliberately
+  buggy feature into a new local Git repository. Exclusive creation preserves existing
+  work. Invented commit authors and disabled hooks/signing keep the example independent
+  of a visitor's account or Git signing setup.
+- [seed_demo.py](../scripts/seed_demo.py) runs ordinary review and fix services, prints
+  actual verdicts, and writes a receipt. Full success requires four finding categories,
+  rejected claims and Docker validation. Missing Docker is checked before creating the
+  example; `--review-only` explicitly stops short of full acceptance. No automatic Apply.
+- [demo_support.py](../scripts/demo_support.py) is the demo's small composition root.
+  It constructs `Settings` directly rather than loading the user's configuration or
+  environment keys. It injects a visibly named ReplayProvider into the normal service
+  ports, isolating the database/cache and authorizing only the sample root. It neither
+  registers a fake production vendor nor changes the owner's Gemini default.
+- [demo_ai_responses.json](../scripts/demo_ai_responses.json) contains the fixed claims
+  and SQL proposal. There is no model request or billable token usage. The new test file
+  checks ordinary, missing, injected and apostrophe-containing input. The real engine
+  proves those tests fail on original code and pass after the patch; stored model
+  metadata remains `replay / scripted-demo`.
+- [serve_demo.py](../scripts/serve_demo.py) checks the matching receipt, serves the built
+  UI only at localhost, and starts the ordinary queue worker with the same replay
+  services. It refuses an unrelated database. The visitor can inspect rejected claims,
+  regenerate the one supported scripted SQL proposal, and explicitly Apply. Only the
+  sample's working tree changes. Reopening preserves history; new paths give a clean
+  rerun without deleting previous learning work.
+- [test_public_demo.py](../tests/integration/test_public_demo.py) checks settings
+  isolation and refusal to overwrite/open unrelated data. Its real Docker test drives
+  the public seed entrypoint, checks all seven gates, applies through the normal API,
+  and runs all six tests on the actual written sample. Hosted CI runs this test too.
+
+The sample's key-shaped values and `.env` are invented scanner fixtures, deliberately
+public and specifically allowlisted in `.gitignore`. Ordinary credentials/databases
+remain ignored. Install-time registry downloads are separate from the no-provider-call
+demo. Docker contains test tools, not an AI model, and generated code receives neither
+keys/home folders nor daemon access. Existing Smee removal and real Gemini/DeepSeek
+settings are unaffected. See decision 35 in [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md).
+
+The scripted demonstration establishes reproducibility of this workflow. The separate
+[live acceptance report](BROWSER_LIVE_WORKFLOW.md) establishes the named real-model
+runs. Neither is a general model-accuracy or always-on deployment guarantee.

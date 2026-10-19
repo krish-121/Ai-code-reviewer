@@ -12,13 +12,13 @@ Plan on 1–2 hours a day. Every day has the same shape:
 
 For Windows/WSL prerequisites, complete commands and the distinction between offline,
 Ollama and GitHub testing, start with [LOCAL_SETUP_AND_GITHUB.md](LOCAL_SETUP_AND_GITHUB.md).
-The guide below assumes that environment is activated. Set up once:
+Use [PUBLIC_DEMO.md](PUBLIC_DEMO.md) for the required Node/Docker setup. The guide below assumes that environment is activated. Set up once:
 
 ```bash
 pip install -c requirements.lock -e ".[dev,postgres,analyzers]"
 python demo/build_demo_repo.py /tmp/demo          # the demo repository with planted bugs
 python scripts/seed_demo.py                       # a stored demo review (scripted AI replay)
-SENTINEL_DATABASE_URL=sqlite:///.demo/sentinel-demo.db sentinel serve   # http://127.0.0.1:8000
+python scripts/serve_demo.py                     # http://127.0.0.1:8820; isolated scripted demo
 ```
 
 Keep [ARCHITECTURE.md](ARCHITECTURE.md) and [WALKTHROUGH.md](WALKTHROUGH.md) open; the

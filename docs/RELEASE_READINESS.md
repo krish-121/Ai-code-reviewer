@@ -5,6 +5,20 @@ review, real AI, GitHub publication and guarded fix workflows. Final release
 acceptance is still open. This page replaces the older effort-percentage estimate
 with observable completion criteria; test coverage is not a project-completion score.
 
+## Public demo checkpoint
+
+[PUBLIC_DEMO.md](PUBLIC_DEMO.md) now provides public sample templates, a complete
+one-checkout quickstart, scripted-versus-real labels, current screenshots and a browser
+tour through rejected claims and validated Apply. Demo settings/database/cache are
+isolated, existing data are preserved, and the real Docker regression exercises the
+entrypoint, all seven validation gates, normal API Apply and six final sample tests.
+No private test repository was made public, and no AI key or model download is required.
+
+This closes the missing public-demo implementation. Keep quickstart rehearsal and
+hosted CI current for a release. Always-on deployment, complete recovery/accessibility/
+load evidence and broader model accuracy remain operational work below; this demo
+does not claim those are complete.
+
 ## Latest local browser checkpoint
 
 The [complete real browser workflow](BROWSER_LIVE_WORKFLOW.md) now passed with Gemini
@@ -68,7 +82,7 @@ acceptance tasks, rather than requests to add another framework or optional mode
 | --- | --- | --- | --- |
 | Done | Confirm the code revision's hosted checks. | Earlier green commits cannot stand in for changed code. | All three jobs for `d2cd45c` passed; retain successful checks for each intended release commit. |
 | Done locally | Rehearse the configured app in its browser with real AI, model display, provider errors, saved proposal reload, Docker validation and Apply. | The full local path must work together. | Both named model runs are applied/fixed; source preservation and independent checks passed. Complete outage/reconnection and distributed-profile tests remain operational acceptance. |
-| 1 | Finish the recruiter-facing demo and reproducible setup. The implementation has a public demo generator; the live App test repository is private. | SPEC §§54–55 ask for a clean public demonstration that another person can understand and repeat. | A clean generated example or deliberately published demo covers bug/security/performance/test-gap findings, a rejected false alarm and a validated fix; current screenshots or a short recording identify actual versus replayed model output. Rehearse the documented quickstart from a fresh checkout. |
+| Implemented | Public sample and repeatable demonstration. | SPEC §§54–55 need inspectable findings, rejected claims and a validated fix. | The public guide, sample templates, current labelled screenshots and real Docker entrypoint/Apply regression are provided; keep clean-checkout rehearsal and hosted checks current. |
 
 Publishing a demo does not mean changing the existing private test repository's
 visibility. Use invented data, review its files, and choose publication deliberately.

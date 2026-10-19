@@ -1,5 +1,31 @@
 # Current project status and remaining work
 
+## Public runnable demo — 19 October 2026
+
+The [public demo guide](PUBLIC_DEMO.md) now gives a single-checkout quickstart,
+plain-language explanations, browser tour, screenshots, stop/reopen/fresh-path
+instructions and an optional live-provider path. Sample templates stay in the public
+main repository; the private integration repository is unchanged.
+
+- Full sample review completed with real analysis/graph/verification and explicitly
+  scripted model replies. It surfaced bug/security/performance/test findings and
+  rejected three false claims. Scripted tokens are not reported as real API usage.
+- The SQL proposal adds four regression cases. All seven normal Docker gates passed,
+  sources stayed unchanged until explicit browser Apply, and the actual applied
+  sample passes six tests. No generated/sample code is executed on the host.
+- Shared demo wiring uses fresh Settings without saved/environment AI keys, its own
+  database/cache, one allowed sample root, copy transport and a loopback-only server.
+  Existing data and unrelated databases are refused. The ordinary queue and Apply
+  services remain in use; no fake production vendor or weakened validation is added.
+- Four regression tests exercise isolation, non-overwrite, the actual seed entrypoint
+  plus normal API Apply and final Docker tests, and the unmarked-database guard.
+  The Docker acceptance runs in hosted CI; demo scripts also get strict typing.
+- Gemini 3.8 remains the owner's default; no Ollama, paid service, GitHub App change,
+  Smee relay, private data publication or additional public repository is required.
+- Public-demo presentation and repeatability are covered by the runnable guide and
+  regression checks. Retain distributed live-profile, recovery, accessibility, load
+  and broader model-quality work as separate operational acceptance. Decision 35.
+
 **Local browser acceptance — 19 October 2026:** real Gemini 3.5 Flash-Lite and real
 free DeepSeek each completed browser review → fix generation → all seven Docker
 validation checks → explicit Apply. Final saved attempts are applied/fixed; independent
@@ -10,7 +36,7 @@ overconfirmed test-code claim. Normal CLI restored; Smee remains disconnected.
 **648 Python tests passed, 27 PostgreSQL variants skipped**; all **36 Docker tests** ran. Overall/core coverage: **93.59% / 97%**. Ruff lint/format and strict application/bridge/helper typing passed. Frontend: **27 tests passed**, type/format checks and production build passed.
 See [BROWSER_LIVE_WORKFLOW.md](BROWSER_LIVE_WORKFLOW.md).
 
-The remaining V1 demonstration task is the reproducible public demo. Live distributed
+The public demo task from this earlier checkpoint is now implemented above. Live distributed
 Compose-profile acceptance, outage/recovery, accessibility and capacity work remain
 under deployment operations; this local run does not silently close those checks.
 
@@ -24,7 +50,7 @@ repair or weakened gate was needed. Later documentation-only commits have separa
 
 This earlier checkpoint predates the successful local browser run above. The core
 local workflow and configured bridge browser acceptance now work; the reproducible
-recruiter-facing public demo remains. Production hosting/recovery/load work is separate. The current
+recruiter-facing public demo was the next task; it is now provided above. Production hosting/recovery/load work is separate. The current
 acceptance list is [RELEASE_READINESS.md](RELEASE_READINESS.md), replacing outdated
 release percentages and already-completed integration gaps.
 
@@ -218,9 +244,7 @@ The prior code revision's three hosted jobs passed. Keep CI passing on every rel
 
 The local browser/queued-worker workflow with real AI and the configured bridge passed.
 
-1. Finish a clean public demonstration and repeatable quickstart, with current evidence
-   for the SPEC's demonstration categories. The App test repository remains private;
-   publishing a demo is a separate deliberate choice.
+The public presentation task now has a runnable [guide](PUBLIC_DEMO.md), public sample templates, current labelled screenshots and a recurring Docker acceptance test. Keep the documented quickstart and hosted checks passing for releases. A supervised live GitHub demo still needs an approved reachable webhook endpoint.
 
 Before an always-on public service, test durable HTTPS/webhook deployment, outages and
 simultaneous pushes, backup/restore/upgrades, accessibility and sustained load/retention.

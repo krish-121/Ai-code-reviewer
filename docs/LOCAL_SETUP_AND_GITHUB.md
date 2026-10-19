@@ -95,12 +95,10 @@ For a visual demonstration, return to Sentinel's root and seed a separate demo d
 ```bash
 cd /mnt/d/sentinel-final-v2/sentinel
 python scripts/seed_demo.py
-export SENTINEL_DATABASE_URL="sqlite:///$PWD/.demo/sentinel-demo.db"
-export SENTINEL_LOCAL_ROOTS="$PWD/.demo"
-sentinel serve
+python scripts/serve_demo.py
 ```
 
-Open [the local UI](http://127.0.0.1:8000). The seed script uses scripted model responses,
+Open [the isolated demo UI](http://127.0.0.1:8820). Follow [the public demo guide](PUBLIC_DEMO.md). The seed script uses scripted model responses,
 explicitly labelled replay; the analysis and Docker validation are real. Keep this server
 local. Ctrl+C stops it. Its default demo destination also must be new; for repeat seeding
 use fresh `--repo` and `--db` paths instead of deleting learning work.

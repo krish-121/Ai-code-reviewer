@@ -628,3 +628,18 @@ calls that test function. Treat cited test code as neutral coverage evidence. Pr
 the original model run and replay saved sources separately, so a verifier correction
 does not masquerade as a fresh accurate model response. Broader assertion semantics
 remain outside this structural check. See [BROWSER_LIVE_WORKFLOW.md](BROWSER_LIVE_WORKFLOW.md).
+
+
+## 35. A public sample that does not depend on a free AI service
+
+Ship the sample templates and runnable demonstration with the public main repository,
+generating before/after Git branches locally. Keep the private integration repository
+private. Use explicitly labelled scripted replies so a recruiter can repeat the flow
+without keys, quota, subscriptions or a model download. Keep real-model results separate.
+
+Share only demo wiring between seed/server scripts; reuse the production services,
+queue, graph, verifier and Docker gates. Construct isolated settings without reading
+user secrets, bind localhost, authorize one sample root, check the database receipt,
+and refuse existing paths. Copy transport avoids Docker Desktop/WSL mount assumptions.
+Generate four regression cases and leave Apply to the visitor. This gives useful
+evidence of engineering behavior without pretending replay output measures AI quality.

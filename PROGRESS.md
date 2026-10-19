@@ -3,6 +3,34 @@
 Living log of what is built, what was decided, and what still needs a human eye.
 Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
 
+## Public runnable demo — 19 October 2026
+
+The [public demo guide](docs/PUBLIC_DEMO.md) now gives a single-checkout quickstart,
+plain-language explanations, browser tour, screenshots, stop/reopen/fresh-path
+instructions and an optional live-provider path. Sample templates stay in the public
+main repository; the private integration repository is unchanged.
+
+- Full sample review completed with real analysis/graph/verification and explicitly
+  scripted model replies. It surfaced bug/security/performance/test findings and
+  rejected three false claims. Scripted tokens are not reported as real API usage.
+- The SQL proposal adds four regression cases. All seven normal Docker gates passed,
+  sources stayed unchanged until explicit browser Apply, and the actual applied
+  sample passes six tests. No generated/sample code is executed on the host.
+- Shared demo wiring uses fresh Settings without saved/environment AI keys, its own
+  database/cache, one allowed sample root, copy transport and a loopback-only server.
+  Existing data and unrelated databases are refused. The ordinary queue and Apply
+  services remain in use; no fake production vendor or weakened validation is added.
+- Four regression tests exercise isolation, non-overwrite, the actual seed entrypoint
+  plus normal API Apply and final Docker tests, and the unmarked-database guard.
+  The Docker acceptance runs in hosted CI; demo scripts also get strict typing.
+- Gemini 3.8 remains the owner's default; no Ollama, paid service, GitHub App change,
+  Smee relay, private data publication or additional public repository is required.
+- Public-demo presentation and repeatability are covered by the runnable guide and
+  regression checks. Retain distributed live-profile, recovery, accessibility, load
+  and broader model-quality work as separate operational acceptance. Decision 35.
+
+Final local checks: **652 Python tests passed, 27 PostgreSQL variants skipped**; the real Docker tests include the new public entrypoint/Apply acceptance. Overall coverage **93.65%**, core **97%**. Ruff lint/format, strict application/bridge/evaluation-helper typing and strict typing of the three demo scripts passed. The separate browser-applied sample passed all six tests in Docker. Hosted results and fresh public-clone rehearsal are checked separately for the published revision.
+
 ## Complete local browser acceptance — 19 October 2026
 
 - Actual browser form → persisted queue → real AI review → generation → all seven

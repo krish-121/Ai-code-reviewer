@@ -58,45 +58,48 @@ flowchart LR
 Details and diagrams: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** ·
 reasons: **[docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md)**.
 
-## Demo
+## Demo — no AI key required
 
-The key-shaped demo/test values are invented scanner fixtures. The demo Stripe value
-uses a deliberately short synthetic suffix; never replace it with a live key.
-Source publication does not install the GitHub reviewing bot; see
-[GitHub upload notes](docs/GITHUB_UPLOAD.md).
-
-The demo repository ([`demo/`](demo/)) has a feature branch with planted problems: SQL
-injection (Python and TypeScript), authorization checked before authentication, N+1
-queries, an O(n²) loop, blocking calls and a forgotten `await` in async code, a swallowed
-exception, unhandled JSON parsing, untested code, a hard-coded Stripe key, a committed
-`.env`, and a comment that tries to talk the reviewer out of reporting anything.
+Try the [public sample and beginner walkthrough](docs/PUBLIC_DEMO.md). Everything
+is included in this repository; no GitHub account, AI subscription or model download
+is required. Use Linux or Ubuntu in WSL 2 with Python 3.11+, Node 22.13+ and Docker.
 
 ```bash
-python demo/build_demo_repo.py /tmp/demo && cd /tmp/demo
-sentinel review --range main..feature/search-and-reports --details
+git clone https://github.com/krish-121/Ai-code-reviewer.git sentinel
+cd sentinel
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -c requirements.lock -e ".[dev,analyzers]"
+npm ci --prefix tools/analyzers --omit=dev --no-audit --no-fund
+export PATH="$PWD/tools/analyzers/node_modules/.bin:$PATH"
+export NODE_PATH="$PWD/tools/analyzers/node_modules"
+docker build -f Dockerfile.sandbox -t sentinel-sandbox:latest .
+python scripts/seed_demo.py
+python scripts/serve_demo.py
 ```
 
-Without an API key, add `--no-ai` for a deterministic-only review. To see the full flow
-offline — including the AI stage — seed a database with a **scripted replay** of model
-output (it contains a deliberately wrong finding, a hallucinated helper function and a style
-remark, so you can watch them being rejected) and open the UI:
+Open **http://127.0.0.1:8820**. The sample has two Git branches with planted SQL,
+authorization, async, error-handling, performance and test-coverage problems. The
+review shows supported/likely findings and three rejected claims. Its prepared SQL
+proposal restores parameter binding and adds four test cases. All seven normal
+checks run; **Apply remains an explicit browser action** on the disposable sample.
 
-```bash
-python scripts/seed_demo.py                       # reviews the demo, validates one fix in Docker
-SENTINEL_DATABASE_URL=sqlite:///.demo/sentinel-demo.db sentinel serve
-```
+**AI replies are scripted**, labelled `replay / scripted-demo`. Analysis, code graph,
+verification, Docker tests, persistence and Apply are real. This is a repeatable
+workflow demonstration, not evidence of model accuracy. The script uses isolated
+demo settings and never loads your saved API keys. Setup downloads packages/images;
+the demonstration makes no AI service calls.
 
-What the demo shows (spec §54): ✓ bug detected · ✓ security issue detected · ✓ performance
-issue detected · ✓ test gap detected · ✓ false positive rejected · ✓ fix generated ·
-✓ fix validated in the sandbox.
+The intentionally committed `.env` and Stripe-shaped string are invented scanner
+fixtures. Never replace them with live credentials. Local `.demo/`, keys, dependencies
+and databases stay ignored. Rerunning the seed refuses existing paths; reopen with
+`serve_demo.py` or follow the guide's fresh-path example. No GitHub App is required.
 
-| Review overview | Architecture view |
-|---|---|
-| ![Overview](docs/screenshots/overview-light.png) | ![Architecture](docs/screenshots/architecture-light.png) |
-| **Files with inline findings** | **Dark mode** |
-| ![Files](docs/screenshots/files-dark.png) | ![Overview, dark](docs/screenshots/overview-dark.png) |
+![Public demo: scripted replies with real verification](docs/screenshots/public-demo-overview.jpg)
 
-> The screenshots come from the scripted replay above, not from a live model.
+The [guide](docs/PUBLIC_DEMO.md) explains each command, how to inspect rejected
+findings, Apply, restart, and optionally use your own live AI provider. Start with
+`--review-only` if Docker is unavailable; that does not claim fix-validation success.
 
 ### Actual browser acceptance
 
@@ -207,7 +210,7 @@ service failures. See [setup, source tour and verified limits](docs/FREE_AI_FALL
 ## Testing
 
 ```bash
-pytest                                            # 260+ tests: unit, integration, golden, e2e
+pytest                                            # unit, integration, golden and end-to-end tests
 pytest --cov=sentinel                              # ≈94% overall, ≈97% of core/
 SENTINEL_TEST_DATABASE_URL=postgresql://… pytest -m postgres   # store/queue/API/e2e on PostgreSQL
 ruff check src tests scripts && mypy               # lint (incl. complexity & docstrings), strict types
