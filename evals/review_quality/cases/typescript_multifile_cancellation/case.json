@@ -1,0 +1,15 @@
+{
+  "name": "typescript_multifile_cancellation",
+  "language": "typescript",
+  "expected_bug": true,
+  "source": "app/api.ts",
+  "contract": "The exact caller AbortSignal reaches the reader; pre-aborted and in-flight cancelled reads reject without snapshot writes.",
+  "test_command": [
+    "sh",
+    "test.sh"
+  ],
+  "oracle_command": [
+    "sh",
+    "test.sh"
+  ]
+}

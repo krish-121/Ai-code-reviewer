@@ -634,3 +634,73 @@ now merges Ruff and AI wording without lowering similarity thresholds. Node outp
 test-backed resolution have focused regressions; missing imports, incomplete/failed
 checks and stale files still cannot reach Apply. Empty reviews say no code was assessed.
 Full evidence, original failures and boundaries: [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md).
+
+## Following a change across several files
+
+The [multi-file quality evaluation](MULTIFILE_QUALITY_EVALUATION.md) adds nine applications
+to the learning corpus. Read an entry point first, then its service, then its shared
+helper/repository and data model. Ask what each caller expects and what each callee
+actually returns. Examples: minor currency units must stay consistent across pricing
+and receipts; a failed background job must reach the caller; an organization filter
+must survive the service-to-repository boundary.
+
+A new context repair lives in
+[`analysis/graph/import_context.py`](../src/sentinel/analysis/graph/import_context.py).
+Previously a model used only in a type annotation was often absent from the prompt:
+it is not a function call, so callee selection did not find it. The helper follows
+resolved repository import edges and exact named imports, including aliases, to add
+class/data definitions. It does not guess from an unrelated file with the same name.
+The ordinary context window, character budget, deduplication and secret redaction
+still apply. Wildcard/namespace/external imports are not expanded into whole projects.
+
+One actual clean Decimal refactor received a warning assuming fractional prices that
+this application did not support. The original review is retained. We supplied its
+missing cart definition and clarified that review claims need a concrete supported
+failure, then repeated the model experiment. Read the report for the observed result;
+a prompt instruction is not a mathematical guarantee against false alarms.
+
+Also distinguish context from edits. `FixRequest.files` includes related source to help
+the model reason, while `apply_edits` returns only touched files. The fix engine's
+target-change check must require the cited file to be present in that patch and its
+contents to differ. Looking up an omitted file with `dict.get` returns `None`; comparing
+that with the original text had incorrectly counted a helper-only edit as a target edit.
+Focused tests now keep both an omitted target and an explicit no-op target unverified.
+All other analysis, old/new tests, source-hash and Apply checks remain in force.
+
+Correct patches can still remain unverified when only a related helper changes or the
+model omits a reproducing regression. Inspect that evidence; never change a source
+comment just to pass the target-change check. Only validated proposals reach normal
+Apply, and the independent checks in this evaluation are an extra challenge, not AI
+generation feedback.
+
+### A review explanation and a passing test can both be incomplete
+
+The wider experiment found two more boundaries. An opaque JavaScript result property
+is not a declared repository function: the symbol verifier now leaves such unresolved
+references neutral, while invented free function calls still contradict evidence. Read
+[`symbol_evidence.py`](../src/sentinel/core/verification/symbol_evidence.py) to follow
+that distinction. A captured finding was replayed against its original source snapshot,
+without another AI call, so the report separates model output from verifier changes.
+
+Fix requests now also carry bounded original-review history. Trace `Review.changeset`
+through `FixService.run`, `FixEngine.generate`,
+[`review_context.py`](../src/sentinel/core/fixes/review_context.py), `FixRequest.review_diff`
+and `build_fix_prompt`. The diff is filtered/redacted again, restricted to allowed
+context files and capped at 16,000 characters. It can explain a removed contract but
+cannot authorize edits or replace current source for search strings.
+
+Five fixes passed independent checks and normal Apply in this experiment. One Python
+proposal passed normal validation and corrected the receipt, yet still broke the
+original pricing helper contract. Its retry made the same mistake. We withheld both
+and recorded evaluation-only failures after blind generation ended. Sentinel does not
+automatically have these hidden business tests for a new repository. Read the failed
+case as carefully as the successes: tests establish the behaviours they check, not
+every contract a developer cares about. The examples and original model results remain
+available for further learning and quality improvements.
+
+Historical paths matter too: `.env` renamed to `settings.py` still has a protected
+old side. The shared diff filter now checks both names, and `reviewed_fix_config`
+carries excluded paths into fix context. A copied in-memory ignore list prevents a
+graph neighbor from undoing that exclusion; saved configuration stays unchanged.
+Public-to-public renames still work. The [evaluation report](MULTIFILE_QUALITY_EVALUATION.md)
+records the focused privacy tests and the full regression run after the repair.

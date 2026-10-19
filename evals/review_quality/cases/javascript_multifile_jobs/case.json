@@ -1,0 +1,17 @@
+{
+  "name": "javascript_multifile_jobs",
+  "language": "javascript",
+  "expected_bug": true,
+  "source": "app/api.js",
+  "contract": "A failed background job must reject the batch API response and remain recorded as failed.",
+  "test_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ],
+  "oracle_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ]
+}

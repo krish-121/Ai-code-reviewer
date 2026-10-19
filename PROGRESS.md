@@ -3,6 +3,36 @@
 Living log of what is built, what was decided, and what still needs a human eye.
 Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
 
+## Cross-file quality evaluation — 19 October 2026
+
+- Added nine invented six-module applications with three staged source changes each:
+  six bugs and three correct changes across Python/JavaScript/TypeScript. Every safe
+  base passes separate checks; buggy heads pass old tests and fail withheld checks.
+- Initial live round: all six planted bugs detected, one false alarm among three
+  clean changes. Gemini's initial HTTP 503 was excluded from quality counts; evaluation
+  explicitly selected already-configured free DeepSeek, without changing saved settings.
+- Added bounded named imported class/data context and a generic concrete-counterexample
+  prompt rule. Preserved the original false alarm and repeated live reviews.
+- Reproduced and repaired omitted-target promotion: a helper-only patch must not count
+  an absent target entry as changed source. Missing/no-op targets remain unverified.
+- Repeat reviews: all six bug cases found, three clean controls clear; seven findings
+  include two related organization-boundary warnings. Added neutral opaque-property
+  verification and replayed captured findings against original source with no AI calls.
+- First fixes: four validated/two unverified; five met the held-out contract. Added
+  filtered, bounded original-review context and explicit regression guidance. Two
+  missing-test follow-ups then validated and applied; Python still missed a pricing
+  helper contract despite passing normal gates. Both failed proposals were independently
+  rejected, not applied, and retained. Final actual-tree checks: five applied/fixed
+  cases pass ordinary/held-out Docker tests; one contract miss remains. No oracle
+  test text or output was generation feedback. See design decisions 26–29.
+- Final privacy inspection repaired protected/ignored old paths on renames and
+  propagation of excluded review paths into fix context. Public renames still work;
+  saved config is unchanged. No example source contained actual credentials. Decision 30.
+- Required local checks: **631 passed, 27 PostgreSQL skips**, all 34 Docker tests;
+  **93.51% overall / 97% core** coverage, lint/format/application/bridge/helper typing passed.
+- See [MULTIFILE_QUALITY_EVALUATION.md](docs/MULTIFILE_QUALITY_EVALUATION.md) for final
+  model, independent Apply and automated verification results and their exact scope.
+
 ## Controlled multilingual quality evaluation - 19 October 2026
 
 - Added 15 invented Python/JS/TS cases, a safe preparation helper and offline Docker

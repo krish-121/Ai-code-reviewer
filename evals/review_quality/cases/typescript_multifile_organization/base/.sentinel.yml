@@ -1,0 +1,20 @@
+review:
+  categories:
+  - bug
+  - security
+fix:
+  context_files:
+  - app/models.ts
+  - app/validation.ts
+  - app/repository.ts
+  - app/service.ts
+  - app/response.ts
+  - app/api.ts
+  - tests/invoices.test.ts
+  test_command:
+  - sh
+  - test.sh
+  regression_command:
+  - sh
+  - test.sh
+  - '{files}'

@@ -1,0 +1,23 @@
+{
+  "name": "python_multifile_checkout",
+  "language": "python",
+  "expected_bug": true,
+  "source": "app/pricing.py",
+  "contract": "Pricing, quotes and receipts preserve exact integer minor units for nonempty carts.",
+  "test_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ],
+  "oracle_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ]
+}

@@ -1,0 +1,21 @@
+review:
+  categories:
+  - bug
+  - security
+fix:
+  context_files:
+  - app/job.js
+  - app/repository.js
+  - app/worker.js
+  - app/scheduler.js
+  - app/report.js
+  - app/api.js
+  - tests/jobs.test.js
+  test_command:
+  - node
+  - --test
+  - tests/*.test.js
+  regression_command:
+  - node
+  - --test
+  - '{files}'

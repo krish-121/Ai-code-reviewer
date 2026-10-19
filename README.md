@@ -250,6 +250,7 @@ Full table: [ARCHITECTURE.md §10](docs/ARCHITECTURE.md#10-security-boundaries).
 | [GITHUB_APP.md](docs/GITHUB_APP.md) · [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Running it for a team |
 | [GITHUB_LIVE_TEST.md](docs/GITHUB_LIVE_TEST.md) | Real GitHub App setup, PR review, retries and correction explained step by step |
 | [QUALITY_EVALUATION.md](docs/QUALITY_EVALUATION.md) · [Example corpus](evals/review_quality/README.md) | Real Python/JS/TS review and fix checks, reproducible samples and limits |
+| Cross-file live evaluation | [Multi-file examples, results and repairs](docs/MULTIFILE_QUALITY_EVALUATION.md) |
 | [BENCHMARKS.md](docs/BENCHMARKS.md) | Measured latency and memory by repository size |
 | [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) | Current checks, remaining gaps and rough work estimate |
 | [DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md) · [MULTI_FILE_FIXES.md](docs/MULTI_FILE_FIXES.md) | Upgrades, legacy adoption and coordinated fixes |

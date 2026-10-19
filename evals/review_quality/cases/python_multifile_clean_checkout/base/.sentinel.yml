@@ -1,0 +1,20 @@
+review:
+  categories:
+  - bug
+  - security
+fix:
+  context_files:
+  - app/__init__.py
+  - app/models.py
+  - app/pricing.py
+  - app/service.py
+  - app/receipt.py
+  - app/api.py
+  - tests/test_checkout.py
+  test_command:
+  - python
+  - -m
+  - pytest
+  - -q
+  - -p
+  - no:cacheprovider

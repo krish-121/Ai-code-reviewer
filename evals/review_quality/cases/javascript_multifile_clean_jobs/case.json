@@ -1,0 +1,17 @@
+{
+  "name": "javascript_multifile_clean_jobs",
+  "language": "javascript",
+  "expected_bug": false,
+  "source": "app/api.js",
+  "contract": "Waiting for all outcomes still rejects failed batches and preserves success order.",
+  "test_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ],
+  "oracle_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ]
+}

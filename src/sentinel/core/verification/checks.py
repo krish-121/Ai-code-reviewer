@@ -7,17 +7,10 @@ import re
 from sentinel.core.domain.graph import GraphNode, NodeKind
 from sentinel.core.domain.models import Category, CheckOutcome, Finding, VerificationCheck
 from sentinel.core.verification.engine import VerificationContext, reachability
+from sentinel.core.verification.symbol_evidence import IGNORED_NAMES, SymbolEvidenceCheck
 
-IDENT_BACKTICK = re.compile(r"`([A-Za-z_][\w.]*)(?:\(\))?`")
-IDENT_CALL = re.compile(r"\b([A-Za-z_][\w.]*)\(\)")
 CALL_CHAIN = re.compile(
     r"([A-Za-z_][\w.]*)\(\)?\s*(?:calls|->|→|invokes|passes .{0,40}? to)\s*`?([A-Za-z_][\w.]*)\(?"
-)
-IGNORED_NAMES = frozenset(
-    """print len str int float bool dict list set tuple open range isinstance type super self
-    this cls None True False null undefined true false json os sys re time math request
-    response req res await async return if else for while try except raise console log
-    Promise Error Exception ValueError TypeError KeyError""".split()
 )
 STYLE_RE = re.compile(
     r"\b(naming|rename|variable names?|camel ?case|snake_case|pep ?8|formatting|indentation|"
@@ -25,35 +18,6 @@ STYLE_RE = re.compile(
     r"typos?|spelling|readability|consistent style|code style|magic numbers?|unused import)\b",
     re.I,
 )
-
-
-def _mentioned(finding: Finding) -> set[str]:
-    texts = [
-        finding.title,
-        finding.explanation,
-        *(e.text for e in finding.evidence if e.source.startswith("ai")),
-    ]
-    names: set[str] = set()
-    for t in texts:
-        names.update(IDENT_BACKTICK.findall(t))
-        names.update(IDENT_CALL.findall(t))
-    out = set()
-    for n in names:
-        last = n.split(".")[-1]
-        if last in IGNORED_NAMES or len(last) < 3:
-            continue
-        out.add(n)
-    return out
-
-
-def _exists(name: str, finding: Finding, ctx: VerificationContext) -> bool:
-    last = name.split(".")[-1]
-    if ctx.graph.find_by_name(last):
-        return True
-    pattern = re.compile(rf"\b{re.escape(last)}\b")
-    if pattern.search(ctx.sources.get(finding.file, "")):
-        return True
-    return any(pattern.search(src) for src in ctx.sources.values())
 
 
 class LocationCheck:
@@ -129,36 +93,6 @@ class ChangeRelevanceCheck:
             outcome=CheckOutcome.CONTRADICTS,
             weight=0.5,
             detail="cited code is not touched by this change (pre-existing)",
-        )
-
-
-class SymbolEvidenceCheck:
-    """Catch hallucinated evidence: symbols the explanation relies on must exist."""
-
-    name = "symbols-exist"
-
-    def check(self, finding: Finding, ctx: VerificationContext) -> VerificationCheck | None:
-        """Look up every symbol the explanation and evidence mention."""
-        names = _mentioned(finding)
-        if not names:
-            return None
-        missing = sorted(n for n in names if not _exists(n, finding, ctx))
-        if not missing:
-            shown = ", ".join(f"`{n}`" for n in sorted(names)[:4])
-            return VerificationCheck(
-                name=self.name,
-                outcome=CheckOutcome.SUPPORTS,
-                weight=0.75,
-                detail=f"referenced symbols exist: {shown}",
-            )
-        ratio = len(missing) / len(names)
-        shown = ", ".join(f"`{n}`" for n in missing[:4])
-        return VerificationCheck(
-            name=self.name,
-            outcome=CheckOutcome.CONTRADICTS,
-            weight=1.5 if ratio >= 0.5 else 0.75,
-            decisive=len(missing) >= 2,
-            detail=f"evidence mentions {shown}, which do not exist in the repository",
         )
 
 

@@ -13,8 +13,17 @@ def test_example_has_real_staged_source_and_withholds_oracle(tmp_path: Path, nam
     root = tmp_path / "case-01"
     metadata = QualityCase.model_validate_json((CASES / name / "case.json").read_text())
     prepare_case(name, root)
-    assert run_git(root, "diff", "--cached", "--name-only").strip() == metadata.source
-    assert run_git(root, "show", ":" + metadata.source) == (root / metadata.source).read_text()
+    overlay = CASES / name / "change"
+    expected = sorted(
+        path.relative_to(overlay).as_posix() for path in overlay.rglob("*") if path.is_file()
+    )
+    assert metadata.source in expected
+    assert run_git(root, "diff", "--cached", "--name-only").splitlines() == expected
+    for source in expected:
+        assert run_git(root, "show", ":" + source) == (root / source).read_text()
+    for answer in (CASES / name / "oracle").rglob("*"):
+        if answer.is_file():
+            assert not (root / answer.relative_to(CASES / name / "oracle")).exists()
     assert not (root / "case.json").exists()
     assert not list(root.rglob("*holdout*"))
     assert run_git(root, "log", "-1", "--format=%ae").strip() == "example@example.invalid"

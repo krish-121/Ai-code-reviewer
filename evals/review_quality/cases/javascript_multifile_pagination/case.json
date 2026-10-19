@@ -1,0 +1,17 @@
+{
+  "name": "javascript_multifile_pagination",
+  "language": "javascript",
+  "expected_bug": true,
+  "source": "app/api.js",
+  "contract": "Zero-based public pages map to offset page * size; concatenated pages contain every ID exactly once.",
+  "test_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ],
+  "oracle_command": [
+    "node",
+    "--test",
+    "tests/*.test.js"
+  ]
+}

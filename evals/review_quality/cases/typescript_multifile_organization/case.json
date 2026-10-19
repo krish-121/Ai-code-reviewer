@@ -1,0 +1,15 @@
+{
+  "name": "typescript_multifile_organization",
+  "language": "typescript",
+  "expected_bug": true,
+  "source": "app/repository.ts",
+  "contract": "Invoice rows and total counts are scoped to the authenticated organization, including when the page is limited.",
+  "test_command": [
+    "sh",
+    "test.sh"
+  ],
+  "oracle_command": [
+    "sh",
+    "test.sh"
+  ]
+}

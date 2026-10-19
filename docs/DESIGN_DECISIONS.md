@@ -498,3 +498,63 @@ also used independent held-out checks never shown to the model. Pytest and Node 
 test-case failures are supported; failed module loading, cancellation, timeouts and
 unsupported/incomplete reports do not establish a regression.
 See [QUALITY_EVALUATION.md](QUALITY_EVALUATION.md) for original and repaired outcomes.
+
+## 26. Include named imported data contracts in review context
+
+A multi-file clean Decimal refactor exposed a false alarm about fractional amounts:
+the AI saw pricing functions but not the imported cart model's integer fields.
+Imported types are not necessarily callees. Add bounded class/data definition blocks
+through existing resolved import edges and exact named imports, including aliases.
+Reuse context budgets, overlap deduplication and redaction. Avoid whole-module dumps,
+global same-name guesses and a special-case suppression for Decimal findings. Add a
+general prompt reminder to demonstrate a concrete supported failing input. Tests cover
+Python/JS/TS aliases, unrelated same-name classes, caps, missing imports and redaction.
+
+This supplies evidence; it does not make Python annotations runtime validation or turn
+the graph into a full type checker. Models can still invent unsupported requirements.
+
+## 27. An omitted fix target is not a changed fix target
+
+`apply_edits` returns touched files rather than the entire context. A helper-only patch
+therefore has no entry for an unchanged target. Comparing the original target text to
+`after.get(target)` compared text with None and incorrectly promoted test-backed
+resolution. Require explicit membership plus different content. Keep missing/no-op
+targets unverified; keep existing static failures and other incomplete gates blocking.
+This preserves the conservative current rule rather than assuming any passing new
+test establishes every claimed cross-file correction. Broader causal validation would
+need separate design and evidence, not a changed comment to satisfy a text gate.
+
+## 28. Unknown runtime properties are neutral, not invented functions
+
+An actual job finding mentioned a rejected-result `reason` field; the verifier treated
+its absence from repository declarations as a contradiction. Extract symbol evidence
+into a focused module. Preserve checks for explicit invented free function calls, but
+leave unresolved fields/object members neutral: a property can belong to a library or
+runtime value. This does not claim it exists or independently confirm runtime behaviour.
+Retain the original captured review and record deterministic replay separately.
+
+## 29. Give fixes the original reviewed change as bounded untrusted history
+
+A checkout proposal corrected the API output while missing an old pricing helper unit
+contract, and two other proposals lacked new regressions. The generator previously saw
+only current files plus the finding. Supply the saved ChangeSet through the normal fix
+service without a schema migration. Re-filter it, scope it to allowed current context
+files, cap historical diff text at 16,000 characters and fence/redact it in the prompt.
+It grants no new paths or edits; search strings still come from current files. Explicitly
+request a new reproducing regression when a slot is available and preservation of public
+contracts. Do not expose held-out tests or their failure output as generation feedback.
+
+The follow-up fixed missing-test cases but still missed the pricing helper contract.
+Keep that failure visible. These are context/guidance improvements, not a semantic proof
+system. A validated result states which checks passed; independent business tests and
+developer inspection remain necessary. Separate evaluation-only rejection from built-in
+validation so the project does not pretend to have an oracle on arbitrary repositories.
+
+## 30. Historical paths cannot bypass the shared privacy policy
+
+Historical fix diffs prompted inspection of renames. Check sensitive names and ignored/
+generated paths on both old and new sides. A public destination cannot authorize old
+protected content. Carry review skip paths into a copied effective fix config so graph
+neighbors cannot reintroduce excluded source. Keep public renames reviewable and user
+configuration unchanged. This is shared source policy, not a model-specific redaction
+patch, and does not claim perfect semantic secret detection for arbitrary source text.

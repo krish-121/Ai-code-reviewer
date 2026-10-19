@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 
 from sentinel.analysis.diff.secrets import redact_text
 from sentinel.analysis.graph.architecture import DEFAULT_MAX_NODES, architecture_subgraph
+from sentinel.analysis.graph.import_context import imported_data_nodes
 from sentinel.core.domain.ai import ContextBlock
 from sentinel.core.domain.code import FileSymbols
 from sentinel.core.domain.graph import (
@@ -160,6 +161,21 @@ class ContextEngine:
             import_block = self._import_block(change)
             if import_block is not None:
                 candidates.append(import_block)
+            for definition in imported_data_nodes(
+                self.graph, self.symbols, change.path, limit=self.max_callees
+            ):
+                if definition.id not in changed_ids and definition.file in self.sources:
+                    lo, hi = self._symbol_window(definition, [], cap=CALLEE_WINDOW_LINES)
+                    candidates.append(
+                        self._code_block(
+                            TIER_CALLEE,
+                            "dependency",
+                            definition,
+                            lo,
+                            hi,
+                            f"named data import of {change.path}",
+                        )
+                    )
         blocks, truncated, dropped = self._fit(candidates)
         redactions = _redact(blocks)
         return ContextBundle(

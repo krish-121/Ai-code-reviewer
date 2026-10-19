@@ -257,6 +257,19 @@ def _skip_reason(change: FileChange, ignore: list[str]) -> str | None:
     return None
 
 
+def _sensitive_change_reason(change: FileChange) -> tuple[Severity, str] | None:
+    """A public destination cannot authorize a formerly sensitive source file."""
+    return sensitive_file_reason(change.path) or sensitive_file_reason(change.old_path or "")
+
+
+def _previous_path_reason(change: FileChange, ignore: list[str]) -> str | None:
+    """Keep ignored/generated old content out of renamed-file context as well."""
+    if not change.old_path or change.old_path == change.path:
+        return None
+    reason = source_exclusion_reason(change.old_path, ignore)
+    return f"previous path: {reason}" if reason else None
+
+
 def filter_changeset(
     changeset: ChangeSet,
     *,
@@ -278,7 +291,7 @@ def filter_changeset(
     findings: list[Finding] = []
     redactions = 0
     for change in changeset.files:
-        sensitive = sensitive_file_reason(change.path)
+        sensitive = _sensitive_change_reason(change)
         if sensitive is not None:
             severity, reason = sensitive
             note = f"sensitive file ({reason}) — never sent to AI"
@@ -286,7 +299,7 @@ def filter_changeset(
             if change.change_type is not ChangeType.DELETED:
                 findings.append(_sensitive_file_finding(change, severity, reason))
             continue
-        skip = _skip_reason(change, ignore or [])
+        skip = _skip_reason(change, ignore or []) or _previous_path_reason(change, ignore or [])
         if skip is not None:
             skipped.append(SkippedFile(path=change.path, reason=skip))
             continue

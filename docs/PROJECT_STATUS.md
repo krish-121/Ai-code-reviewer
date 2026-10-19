@@ -1,5 +1,17 @@
 # Current project status and remaining work
 
+**Cross-file quality checkpoint — 19 October 2026:** nine additional controlled
+applications, each with six application files and three changed source files. Initial
+round: all six bugs detected, one false alarm among three correct changes. After context
+repairs, the repeated round detected all six bugs and left all three controls clear.
+Five fix cases passed independent checks and normal Apply, including a two-production-
+file TypeScript fix. **One Python pricing-contract miss remains:** both model proposals
+passed normal checks but failed the separate contract test and were not applied.
+Added imported data context, safer target-change verification, neutral treatment of
+opaque properties and filtered original-review context for fixes. See
+[MULTIFILE_QUALITY_EVALUATION.md](MULTIFILE_QUALITY_EVALUATION.md) for exact evidence
+and limits. These are small authored applications, not production-scale proof.
+
 **Multilingual quality checkpoint — 19 October 2026:** 15 controlled examples
 under neutral project names: nine known bugs detected, six correct changes without
 warnings, and nine final real-model fixes validated/applied to disposable examples with
@@ -150,11 +162,11 @@ The normal fix-runtime setup and complete local Gemini fix/Apply acceptance are 
 The earlier unverified proposal is retained as historical evidence; a fresh example with
 a passing baseline completed every normal gate without bypasses.
 
-1. **Wider AI quality.** The 15 controlled cases and nine independently checked fixes
-   passed. Next add representative multi-file Python/TS/JS changes, harder clean controls,
-   repeated runs, dependency-heavy projects, and measure false alarms/missed bugs/fix quality. The live Gemini and DeepSeek examples establish
-   connectivity and specific behavior, not general accuracy. Ollama and Claude remain
-   optional choices; installing them is not required for this setup.
+1. **Wider AI and fix quality.** The original 15 cases plus nine cross-file cases are
+   recorded separately. Address the observed pricing helper contract miss: a proposal
+   can pass existing/new generated tests while violating another public contract.
+   Add representative larger real repositories, dependencies, subtler controls and
+   repeated runs. Group related cross-file warnings without hiding independent defects.
 2. **Extended GitHub acceptance.** The basic real App path, redelivery, second push and
    user isolation passed. Test concurrent pushes while publication is in flight, outages
    and recovery if moving beyond local development. The App currently covers only the

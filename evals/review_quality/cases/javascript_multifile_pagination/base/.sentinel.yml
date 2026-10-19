@@ -1,0 +1,21 @@
+review:
+  categories:
+  - bug
+  - security
+fix:
+  context_files:
+  - app/models.js
+  - app/repository.js
+  - app/validation.js
+  - app/service.js
+  - app/response.js
+  - app/api.js
+  - tests/catalog.test.js
+  test_command:
+  - node
+  - --test
+  - tests/*.test.js
+  regression_command:
+  - node
+  - --test
+  - '{files}'

@@ -1,0 +1,23 @@
+{
+  "name": "python_multifile_reservations",
+  "language": "python",
+  "expected_bug": true,
+  "source": "app/repository.py",
+  "contract": "Repeated SKU lines must be checked cumulatively; rejected reservations leave every stock count unchanged.",
+  "test_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ],
+  "oracle_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ]
+}

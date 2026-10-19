@@ -117,6 +117,9 @@ class FixRequest(BaseModel):
     allowed_new_files: list[str] = Field(
         default_factory=list, description="Only these absent regression-test files may be created"
     )
+    review_diff: str = Field(
+        default="", description="Filtered original change; historical context only"
+    )
     feedback: str | None = Field(
         default=None, description="Validation failures from a previous attempt, if retrying"
     )

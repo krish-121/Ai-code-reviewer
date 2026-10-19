@@ -1,0 +1,23 @@
+{
+  "name": "python_multifile_clean_checkout",
+  "language": "python",
+  "expected_bug": false,
+  "source": "app/pricing.py",
+  "contract": "The Decimal refactor keeps integer-minor-unit checkout behaviour unchanged.",
+  "test_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ],
+  "oracle_command": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ]
+}

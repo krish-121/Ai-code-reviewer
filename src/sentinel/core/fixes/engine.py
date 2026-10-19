@@ -24,13 +24,14 @@ from typing import Protocol
 from sentinel.analysis.diff.secrets import redact_text
 from sentinel.core.configuration.config import RepoConfig
 from sentinel.core.domain.ai import AIFixResult, FixRequest
-from sentinel.core.domain.models import AnalysisRun, Finding
+from sentinel.core.domain.models import AnalysisRun, ChangeSet, Finding
 from sentinel.core.domain.ports import AIError, AIProvider
 from sentinel.core.fixes.apply import ApplyError, apply_fix
 from sentinel.core.fixes.context import FixContext, analysis_targets, fix_context
 from sentinel.core.fixes.outcome import FixCheck, FixOutcome, FixStatus
 from sentinel.core.fixes.patch import PatchError, apply_edits, sha256, unified_diff
 from sentinel.core.fixes.regression import check_regression_tests, confirm_with_regression
+from sentinel.core.fixes.review_context import reviewed_fix_config, reviewed_fix_diff
 from sentinel.core.fixes.safety import check_fix_finding, check_fix_path
 from sentinel.core.fixes.scratch import scratch_copy
 from sentinel.core.fixes.validation import (
@@ -85,21 +86,24 @@ class FixEngine:
         self.syntax_checkers = syntax_checkers or [python_syntax]
         self.scratch = scratch or scratch_copy
         self.max_attempts = max_attempts
+        self.review_changeset: ChangeSet | None = None
 
     def generate(self, finding: Finding, repo_root: Path) -> FixOutcome:
         """Ask the AI for a patch and validate it; on failure, retry with the failures."""
+        self.config = reviewed_fix_config(self.review_changeset, self.config)
         try:
             check_fix_finding(finding, self.config)
             context = fix_context(repo_root, finding, self.config)
         except (OSError, UnicodeError, RepositoryPathError) as exc:
             return FixOutcome(status="error", error=f"cannot read {finding.file}: {exc}")
         files = context.files
+        review_diff = reviewed_fix_diff(self.review_changeset, files, self.config)
         feedback: str | None = None
         outcome = FixOutcome(status="error", error="no attempt made")
         for attempt in range(1, self.max_attempts + 1):
             try:
                 answer = self.ai.generate_fix(
-                    _fix_request(finding, files, feedback, context.new_files)
+                    _fix_request(finding, files, feedback, context.new_files, review_diff)
                 )
             except AIError as exc:
                 return FixOutcome(status="error", error=str(exc), attempts=attempt)
@@ -209,7 +213,8 @@ class FixEngine:
                 resolution = confirm_with_regression(
                     resolution,
                     regression,
-                    target_changed=before.get(finding.file) != after.get(finding.file),
+                    target_changed=finding.file in after
+                    and before.get(finding.file) != after[finding.file],
                 )
             return [analysis, resolution, *checks]
         finally:
@@ -222,6 +227,7 @@ def _fix_request(
     files: dict[str, str],
     feedback: str | None,
     new_files: list[str] | None = None,
+    review_diff: str = "",
 ) -> FixRequest:
     return FixRequest(
         finding_title=redact_text(finding.title)[0],
@@ -233,6 +239,7 @@ def _fix_request(
         suggested_fix=redact_text(finding.suggested_fix)[0] if finding.suggested_fix else None,
         files={path: redact_text(content)[0] for path, content in files.items()},
         allowed_new_files=new_files or [],
+        review_diff=redact_text(review_diff)[0],
         feedback=redact_text(feedback)[0] if feedback else None,
     )
 

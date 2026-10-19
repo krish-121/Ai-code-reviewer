@@ -1,7 +1,8 @@
 # Small review-quality corpus
 
-These 15 invented changes contain nine known bugs and six correct refactors, across
-Python, JavaScript and TypeScript. They are learning examples and regression cases.
+The corpus contains 24 invented changes across Python, JavaScript and TypeScript:
+the original 15 small cases (nine bugs, six correct changes), plus nine multi-file
+applications (six bugs, three correct changes). They are learning examples and regression cases.
 The live results and limits are in [QUALITY_EVALUATION.md](../../docs/QUALITY_EVALUATION.md).
 
 Each case contains:
@@ -60,3 +61,21 @@ these small tests. Everything executes inside the normal sandbox when checking f
 These fixtures do not need paid credentials, network access inside the sandbox, or a
 local model. Live reviews do require an available configured provider. The default
 test suite and CI never call a live AI service.
+
+## Cross-file examples
+
+Names containing `multifile` have six application files and three changed source files.
+They exercise checkout units, cumulative stock reservations, background-job failure
+propagation, page-to-offset conversion, organization-scoped invoices and cancellation.
+These are still small, dependency-light learning applications, not large real products.
+See [MULTIFILE_QUALITY_EVALUATION.md](../../docs/MULTIFILE_QUALITY_EVALUATION.md)
+for actual sizes, both model rounds, the observed false alarm and generated-fix results.
+
+Try `python_multifile_checkout`, `javascript_multifile_jobs` or
+`typescript_multifile_organization` with the same preparation command above. The helper
+stages every source file in `change/`; `case.json` and all `oracle/` checks stay outside
+the reviewed repository. Fix context explicitly lists the six application files and
+ordinary tests, within the default eight-file limit; it never includes the oracle.
+
+The offline suite validates every case. It does not assert that a future model run
+must reproduce today's result, and does not consume free-provider allowance in CI.

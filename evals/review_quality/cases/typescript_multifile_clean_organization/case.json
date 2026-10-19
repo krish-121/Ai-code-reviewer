@@ -1,0 +1,15 @@
+{
+  "name": "typescript_multifile_clean_organization",
+  "language": "typescript",
+  "expected_bug": false,
+  "source": "app/repository.ts",
+  "contract": "The required options object preserves organization-scoped invoice rows and counts.",
+  "test_command": [
+    "sh",
+    "test.sh"
+  ],
+  "oracle_command": [
+    "sh",
+    "test.sh"
+  ]
+}

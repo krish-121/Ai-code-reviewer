@@ -10,7 +10,7 @@ from pathlib import Path
 from sentinel.bootstrap import build_fix_engine
 from sentinel.core.configuration.config import Settings, load_repo_config
 from sentinel.core.domain.errors import SentinelError
-from sentinel.core.domain.models import FindingStatus, utcnow
+from sentinel.core.domain.models import ChangeSet, FindingStatus, utcnow
 from sentinel.core.fixes.engine import FixEngine, FixOutcome, apply_fix
 from sentinel.infrastructure.database.models import Finding as FindingRow
 from sentinel.infrastructure.database.models import FixAttempt, Review
@@ -60,6 +60,7 @@ class FixService:
             review = s.get_one(Review, row.review_id)
             request = dict(review.request)
             local_path = review.request.get("path")
+            saved_changeset = review.changeset
             fix.status = "running"
         tmp: Path | None = None
         try:
@@ -76,6 +77,8 @@ class FixService:
                 root, trusted = Path(local_path), True
             engine = self.engine_factory(root, trusted)
             try:
+                if saved_changeset:
+                    engine.review_changeset = ChangeSet.model_validate(saved_changeset)
                 outcome = engine.generate(finding, root)
             finally:
                 close_provider(engine)
