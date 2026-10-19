@@ -3,6 +3,26 @@
 Living log of what is built, what was decided, and what still needs a human eye.
 Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
 
+## Pricing contract investigation — 19 October 2026
+
+- Traced both original failed fixes to downstream compensation encouraged by the
+  review's suggestion and tests checking only callers; the retry already had history.
+- Improved root-cause localization and producer/consumer contract instructions.
+  Label suggestions as unverified; no new edit permissions or relaxed Apply checks.
+- Fresh free DeepSeek review found the pricing division; correct Decimal companion
+  stayed clear. Fresh root fix + three regressions passed all seven normal gates,
+  independent tests and normal Apply. Actual applied history is applied/fixed.
+- Original downstream finding also generated a correct helper repair, independently
+  passing, but stayed unverified and actual Apply refused it without writes. Added
+  clear rerun-review guidance for this case and retained conservative attribution.
+- Captured old/new patch pair has two offline Docker regressions: with the same
+  stronger tests, old compensation fails and root repair validates. Original corpus
+  truth/hidden tests and earlier experiment results are unchanged. Decision 31.
+- Actual applied tree also passed 63 supported integer amount/quantity/shipping
+  scenarios plus mixed/empty carts; these extra checks were authored after generation.
+- Required local checks: **633 passed, 27 PostgreSQL skips**; all **36 Docker tests** executed. Overall/core coverage: **93.55% / 97%**. Ruff lint/format, application typing (154 source files), strict bridge typing (3 files) and the strict case-preparation helper check passed. The normal sandbox image was rebuilt. No frontend source changed.
+- Full explanation: [PRICING_FIX_INVESTIGATION.md](docs/PRICING_FIX_INVESTIGATION.md).
+
 ## Cross-file quality evaluation — 19 October 2026
 
 - Added nine invented six-module applications with three staged source changes each:

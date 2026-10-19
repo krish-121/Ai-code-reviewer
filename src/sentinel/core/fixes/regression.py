@@ -112,8 +112,16 @@ def confirm_with_regression(
     original code and passing on the patch. A failed static recheck stays failed;
     editing only other context files cannot confirm the targeted finding.
     """
-    if resolution.status != "skipped" or regression.status != "passed" or not target_changed:
+    if resolution.status != "skipped" or regression.status != "passed":
         return resolution
+    if not target_changed:
+        return resolution.model_copy(
+            update={
+                "detail": "new regression tests pass, but the cited source file did not change; "
+                "test-backed attribution requires a changed target. Re-run review to locate "
+                "a dependency's root cause before generating a new fix"
+            }
+        )
     return FixCheck(
         name="finding-resolved",
         status="passed",

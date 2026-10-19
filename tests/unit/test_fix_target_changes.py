@@ -48,4 +48,6 @@ def test_helper_only_patch_cannot_claim_target_changed(
     assert outcome.status == "unverified", outcome.checks
     resolution = next(check for check in outcome.checks if check.name == "finding-resolved")
     assert resolution.status == "skipped"
+    assert "cited source file did not change" in resolution.detail
+    assert "Re-run review" in resolution.detail
     assert (tmp_path / "helper.py").read_text().endswith("return value or 3\n")

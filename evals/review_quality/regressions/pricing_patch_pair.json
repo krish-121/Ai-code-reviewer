@@ -1,0 +1,31 @@
+{
+  "description": "Actual old compensation versus corrected root fix; both use the same new model-generated public-contract tests. No model calls in CI.",
+  "old_edits": [
+    {
+      "file": "app/service.py",
+      "search": "    amount = int(subtotal(lines))\n    return Quote(subtotal_minor=amount, shipping_minor=shipping_minor)",
+      "replace": "    amount = int((subtotal(lines) * 100).to_integral_value())\n    return Quote(subtotal_minor=amount, shipping_minor=shipping_minor)",
+      "operation": "replace"
+    }
+  ],
+  "fixed_edits": [
+    {
+      "file": "app/pricing.py",
+      "search": "\"\"\"Use Decimal calculations for cart pricing.\"\"\"\nfrom decimal import Decimal\nfrom app.models import CartLine\n\ndef line_total(line: CartLine) -> Decimal:\n    unit = Decimal(line.unit_minor) / Decimal(100)\n    return unit * line.quantity\n\ndef subtotal(lines: list[CartLine]) -> Decimal:\n    return sum((line_total(line) for line in lines), Decimal(0))",
+      "replace": "\"\"\"Price every cart line; the checkout service consumes integer minor units.\"\"\"\nfrom app.models import CartLine\n\ndef line_total(line: CartLine) -> int:\n    return line.unit_minor * line.quantity\n\ndef subtotal(lines: list[CartLine]) -> int:\n    return sum(line_total(line) for line in lines)",
+      "operation": "replace"
+    },
+    {
+      "file": "app/service.py",
+      "search": "    amount = int(subtotal(lines))\n    return Quote(subtotal_minor=amount, shipping_minor=shipping_minor)",
+      "replace": "    return Quote(subtotal_minor=subtotal(lines), shipping_minor=shipping_minor)",
+      "operation": "replace"
+    }
+  ],
+  "regression_test": {
+    "file": "tests/test_pricing_regression.py",
+    "search": "",
+    "replace": "\"\"\"Regression: pricing helpers must return integer minor units.\"\"\"\nfrom app.api import checkout\nfrom app.models import CartLine\nfrom app.pricing import line_total, subtotal\nfrom app.service import quote_cart\n\n\ndef test_line_total_stays_in_minor_units():\n    line = CartLine(\"book\", 1234, 1)\n    assert line_total(line) == 1234\n    assert subtotal([line]) == 1234\n\n\ndef test_quote_and_receipt_preserve_minor_units():\n    lines = [CartLine(\"book\", 1234, 1)]\n    quote = quote_cart(lines, shipping_minor=250)\n    assert quote.subtotal_minor == 1234\n    assert quote.total_minor == 1484\n    assert checkout(lines, shipping_minor=250) == {\n        \"subtotal_minor\": 1234,\n        \"shipping_minor\": 250,\n        \"total_minor\": 1484,\n    }\n\n\ndef test_quantity_scales_minor_units_without_truncation():\n    lines = [CartLine(\"pen\", 199, 3)]\n    assert subtotal(lines) == 597\n    assert quote_cart(lines, shipping_minor=1).total_minor == 598\n",
+    "operation": "create"
+  }
+}

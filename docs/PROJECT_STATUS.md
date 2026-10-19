@@ -1,5 +1,17 @@
 # Current project status and remaining work
 
+**Pricing follow-up — 19 October 2026:** the observed Python helper-contract miss is
+repaired in a fresh normal review/fix/validate/Apply workflow. Independent tests and
+63 additional supported integer scenarios passed on the actual applied example.
+A correct fix generated from the older downstream finding remains safely unverified;
+rerunning review identifies the root cause. Stronger contract-focused instructions,
+clearer unverified guidance and an offline captured-patch Docker regression are added.
+See [PRICING_FIX_INVESTIGATION.md](PRICING_FIX_INVESTIGATION.md). This closes that
+observed example, not general public-contract completeness or causal helper validation.
+Local follow-up checks: **633 passed, 27 PostgreSQL skips**, 36 real Docker
+tests; overall/core coverage **93.55% / 97%**, lint/format/types passed.
+The cross-file checkpoint immediately below records the earlier result unchanged.
+
 **Cross-file quality checkpoint — 19 October 2026:** nine additional controlled
 applications, each with six application files and three changed source files. Initial
 round: all six bugs detected, one false alarm among three correct changes. After context
@@ -163,8 +175,9 @@ The earlier unverified proposal is retained as historical evidence; a fresh exam
 a passing baseline completed every normal gate without bypasses.
 
 1. **Wider AI and fix quality.** The original 15 cases plus nine cross-file cases are
-   recorded separately. Address the observed pricing helper contract miss: a proposal
-   can pass existing/new generated tests while violating another public contract.
+   recorded separately. The observed pricing helper miss has a verified follow-up
+   repair; broaden independent contract coverage and repeated model trials. A proposal
+   can still pass generated tests while violating an untested public contract.
    Add representative larger real repositories, dependencies, subtler controls and
    repeated runs. Group related cross-file warnings without hiding independent defects.
 2. **Extended GitHub acceptance.** The basic real App path, redelivery, second push and

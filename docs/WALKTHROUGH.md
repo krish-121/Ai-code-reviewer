@@ -704,3 +704,35 @@ carries excluded paths into fix context. A copied in-memory ignore list prevents
 graph neighbor from undoing that exclusion; saved configuration stays unchanged.
 Public-to-public renames still work. The [evaluation report](MULTIFILE_QUALITY_EVALUATION.md)
 records the focused privacy tests and the full regression run after the repair.
+
+
+## Investigating a fix that passes tests but breaks a public helper
+
+Read [the pricing investigation](PRICING_FIX_INVESTIGATION.md) after the multi-file
+evaluation. That earlier checkpoint had one unresolved case; this follow-up repairs
+it without erasing the failed attempts.
+
+1. Trace the value: `1299 * 2` should stay `2598` minor units. The changed helper
+   divided by 100. Multiplying back in checkout corrected only that caller.
+2. Inspect the model's actual input. The review suggested the caller workaround;
+   its historical diff already showed the old contract. Missing history alone did
+   not explain the second failure. Suggested fixes need checking against evidence.
+3. Inspect what the tests assert. Old generated tests checked the final response;
+   the new ones also call `line_total` and `subtotal` directly. Tests are executable
+   examples of a contract, not proof of behaviours that nobody asserted.
+4. Follow `SYSTEM_REVIEW` and `SYSTEM_FIX` in `ai/prompts/__init__.py`. Review now
+   asks for the first changed operation breaking a contract; fix generation treats
+   suggestions as hypotheses and asks for direct producer plus consumer tests.
+5. Follow `confirm_with_regression` in `core/fixes/regression.py`. A related helper
+   repair cannot pretend the cited caller changed. Its skipped check now explains
+   the reason and recommends rerunning review. No Apply gate was weakened.
+6. Follow `tests/integration/test_pricing_contract.py`. It replays real captured old
+   and new edits with identical stronger tests, entirely in Docker. The shortcut
+   fails; the root repair validates. CI makes no AI call for this regression.
+
+The live fresh review cited the pricing conversion, generated a root fix and three
+tests, passed all seven normal gates plus independent checks, and applied normally
+to a disposable example. The legacy downstream finding produced a correct helper
+fix but stayed unverified and could not Apply. The learning point is to fix the
+earliest broken contract and verify callers as well, while retaining conservative
+evidence rules. The detailed report separates both outcomes and their limits.

@@ -1,5 +1,9 @@
 # Cross-file Python, JavaScript and TypeScript quality evaluation
 
+**Later pricing follow-up:** [the investigation and retest](PRICING_FIX_INVESTIGATION.md)
+repairs the observed failed case through a fresh normal review and guarded Apply.
+This report preserves the original experiment's scores and failed attempts.
+
 Verified **19 October 2026 (India time)** using actual free DeepSeek through the
 existing OpenCode bridge and the normal Docker fix sandbox.
 

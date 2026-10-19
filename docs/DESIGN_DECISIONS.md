@@ -558,3 +558,25 @@ protected content. Carry review skip paths into a copied effective fix config so
 neighbors cannot reintroduce excluded source. Keep public renames reviewable and user
 configuration unchanged. This is shared source policy, not a model-specific redaction
 patch, and does not claim perfect semantic secret detection for arbitrary source text.
+
+
+## 31. Localize contract failures before choosing a workaround
+
+The Python pricing retry already saw the original diff but followed the review's
+conditional caller compensation. It fixed checkout while leaving the public helper
+wrong. Review should identify the first changed operation violating a visible
+established contract. Fix generation should treat the suggestion as an unverified
+hypothesis and request direct producer plus consumer regressions. Do not infer an
+intentional API change from a representation refactor alone.
+
+Keep the existing target-change rule: general causal verification of arbitrary
+helper-only fixes is a larger problem than import reachability. Improve its skipped
+message instead of accepting an unrelated test or cosmetic target edit. A fresh
+review can correctly locate the root defect and complete guarded Apply. Preserve
+the legacy unverified outcome and original rejected proposals as separate evidence.
+
+An offline Docker regression replays actual old/new patches with the same stronger
+model-generated tests. It guards this failure shape without an AI key or changing
+the original hidden tests. Prompt guidance does not automatically enforce every
+contract, and stronger tests must actually be present to detect the old shortcut.
+See [the focused investigation](PRICING_FIX_INVESTIGATION.md).

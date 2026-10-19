@@ -79,3 +79,13 @@ ordinary tests, within the default eight-file limit; it never includes the oracl
 
 The offline suite validates every case. It does not assert that a future model run
 must reproduce today's result, and does not consume free-provider allowance in CI.
+
+
+## Captured pricing regression
+
+`regressions/pricing_patch_pair.json` holds the actual old caller-compensation edits,
+the corrected root edits and the new model-generated helper/caller tests. This is
+separate from the 24 blinded case directories and is never copied into their model
+workspaces. `tests/integration/test_pricing_contract.py` replays both proposals through
+normal Docker fix validation without calling an AI. The original hidden contract
+tests remain unchanged. See [the investigation](../../docs/PRICING_FIX_INVESTIGATION.md).

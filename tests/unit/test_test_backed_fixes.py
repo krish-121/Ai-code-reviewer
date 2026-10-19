@@ -33,9 +33,17 @@ def test_regression_only_fills_missing_resolution(
     resolution = FixCheck(name="finding-resolved", status=resolution_status)
     regression = FixCheck(name="regression-tests", status=regression_status)
     result = confirm_with_regression(resolution, regression, target_changed=target_changed)
-    assert (result is not resolution) is promoted
     if promoted:
+        assert result is not resolution
         assert result.status == "passed" and result.detail.startswith("test-backed:")
+    else:
+        assert result.status == resolution.status
+        if resolution_status == "skipped" and regression_status == "passed":
+            assert "cited source file did not change" in result.detail
+            assert "Re-run review" in result.detail
+            assert resolution.detail == ""  # Do not mutate the static evidence.
+        else:
+            assert result is resolution
 
 
 def test_ai_only_logic_fix_requires_real_regression_gate(tmp_path: Path) -> None:

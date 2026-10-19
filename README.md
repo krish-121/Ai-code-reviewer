@@ -250,6 +250,7 @@ Full table: [ARCHITECTURE.md §10](docs/ARCHITECTURE.md#10-security-boundaries).
 | [GITHUB_APP.md](docs/GITHUB_APP.md) · [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Running it for a team |
 | [GITHUB_LIVE_TEST.md](docs/GITHUB_LIVE_TEST.md) | Real GitHub App setup, PR review, retries and correction explained step by step |
 | [QUALITY_EVALUATION.md](docs/QUALITY_EVALUATION.md) · [Example corpus](evals/review_quality/README.md) | Real Python/JS/TS review and fix checks, reproducible samples and limits |
+| Pricing contract repair | [Why the old fix failed, the repair and live retest](docs/PRICING_FIX_INVESTIGATION.md) |
 | Cross-file live evaluation | [Multi-file examples, results and repairs](docs/MULTIFILE_QUALITY_EVALUATION.md) |
 | [BENCHMARKS.md](docs/BENCHMARKS.md) | Measured latency and memory by repository size |
 | [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) | Current checks, remaining gaps and rough work estimate |
@@ -262,8 +263,9 @@ Full table: [ARCHITECTURE.md §10](docs/ARCHITECTURE.md#10-security-boundaries).
 The core V1 workflows are implemented; release acceptance and the remaining limitations
 are tracked in [PROGRESS.md](PROGRESS.md). Things to know:
 
-- The AI providers and the GitHub App are tested against faithful fakes, not live services —
-  test them with real keys before relying on them.
+- Gemini, the free DeepSeek bridge and the GitHub App have local live acceptance
+  evidence alongside offline tests. Broader model accuracy and production hosting
+  remain open; see the current status and evaluation reports.
 - The web UI is a React + TypeScript single-page app bundled with esbuild rather than the
   recommended Next.js/Tailwind/shadcn/Monaco stack (the build environment had no npm
   registry access).
