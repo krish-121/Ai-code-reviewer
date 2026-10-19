@@ -1,5 +1,17 @@
 # Current project status and remaining work
 
+**GitHub recovery checkpoint — 19 October 2026:** a real signed ping and
+[PR #2](https://github.com/krish-121/sentinel-integration-demo/pull/2) succeeded through
+a temporary, explicitly approved Smee relay. Gemini completed all eight stages and
+published one summary plus one inline SQL-injection warning. No fix was applied and
+the PR is unmerged. Smee has now been disconnected: routing removed, temporary
+container/image/gateway and private channel/restoration records deleted. The existing
+test-only App and saved AI keys remain. **New automatic GitHub reviews are currently
+disconnected by request.** This latest state supersedes earlier running-connection
+descriptions. Added public readiness checks before saving a Cloudflare address;
+647 local tests passed, 27 PostgreSQL variants skipped, all 36 Docker tests ran.
+See [GITHUB_CONNECTION_RECOVERY.md](GITHUB_CONNECTION_RECOVERY.md).
+
 **Pricing follow-up — 19 October 2026:** the observed Python helper-contract miss is
 repaired in a fresh normal review/fix/validate/Apply workflow. Independent tests and
 63 additional supported integer scenarios passed on the actual applied example.

@@ -230,3 +230,14 @@ Share the step number, which terminal you used, and the error text with secrets 
 For Ollama, include whether PowerShell and Ubuntu can each read `/api/tags`, the model name
 and whether the AI stage failed or timed out. For GitHub, include the delivery status and
 review ID. This distinguishes installation, connectivity, configuration and code problems.
+
+
+## Latest connection state — 19 October 2026
+
+The follow-up [real PR recovery test](GITHUB_CONNECTION_RECOVERY.md) passed, and its
+temporary Smee relay was disconnected afterward as requested. App installation and
+saved AI keys remain; new automatic reviews are currently disconnected. Cloudflare
+names failed authoritative DNS in that session. The local helper now checks public
+readiness before changing GitHub's address and still requires a signed ping. It does
+not silently enable Smee. Start local-only mode for learning without public webhooks;
+connecting a future reachable endpoint remains a separate deliberate step.

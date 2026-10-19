@@ -3,6 +3,26 @@
 Living log of what is built, what was decided, and what still needs a human eye.
 Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
 
+## GitHub notification recovery — 19 October 2026
+
+- Cloudflare generated names failed public and authoritative DNS despite a connected
+  tunnel process. Added credential-free public gateway readiness checks before the
+  computer-specific connector updates the App URL. Signed GitHub ping remains required.
+- With explicit temporary data-sharing consent, tested official Smee client 5.0.0 in
+  a restricted container without project mounts or saved credentials. A real signed
+  ping reached Sentinel. Real PR #2 produced one completed Gemini review, a supported
+  SQL-injection finding, one summary and one inline comment on the exact head revision.
+- PR remains open/unmerged; no fix generation or Apply was performed in this test.
+- Cleanup verified: GitHub no longer points to Smee, prior inactive webhook setting
+  restored, temporary container/image/gateway removed, channel/restoration records
+  deleted. Existing test-only App installation and AI keys preserved. New automatic
+  reviews are disconnected by request. External data erasure is not claimed.
+- Required local checks: **647 passed, 27 PostgreSQL skips**, all **36 Docker tests**;
+  **93.55% overall / 97% core** coverage, Ruff lint/format and application (155 files),
+  bridge and helper typing passed. Added 14 offline readiness tests. No frontend change.
+- See [GITHUB_CONNECTION_RECOVERY.md](docs/GITHUB_CONNECTION_RECOVERY.md) for the
+  beginner explanation, evidence boundaries, cleanup and remaining work. Decision 32.
+
 ## Pricing contract investigation — 19 October 2026
 
 - Traced both original failed fixes to downstream compensation encouraged by the

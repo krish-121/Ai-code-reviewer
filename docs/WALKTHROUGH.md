@@ -736,3 +736,37 @@ to a disposable example. The legacy downstream finding produced a correct helper
 fix but stayed unverified and could not Apply. The learning point is to fix the
 earliest broken contract and verify callers as well, while retaining conservative
 evidence rules. The detailed report separates both outcomes and their limits.
+
+
+## Following a real notification, then removing temporary access
+
+Read [the GitHub recovery walkthrough](GITHUB_CONNECTION_RECOVERY.md). A GitHub App
+installation gives permission; a reachable webhook address supplies the route. Both
+are necessary. A running connection program is insufficient when DNS cannot find its
+generated name.
+
+1. Follow `public_gateway_ready` in
+   [`integrations/github/dev_readiness.py`](../src/sentinel/integrations/github/dev_readiness.py).
+   The local connector calls it before changing the App setting. It sends independent
+   unsigned requests, hides the private API, checks signature enforcement and rejects
+   redirects. It deliberately carries none of the authenticated GitHub client's defaults.
+2. Read [`test_github_dev_readiness.py`](../tests/unit/test_github_dev_readiness.py).
+   These 14 offline cases cover the failed connection boundary and credential handling;
+   they do not contact Cloudflare or replace a real signed GitHub ping.
+3. Trace the real event through webhook signature verification, its durable delivery
+   reservation, the queued review, all eight stages and GitHub publication. The saved
+   PR #2 review completed on `30d0d11e4de9f9d2e1c8f58f5c27100779b5bddd` with Gemini,
+   one supported SQL-injection finding, one summary and one inline comment. A relay's
+   HTTP 200 alone proves less than that full chain.
+4. Distinguish testing from deployment. Smee temporarily forwarded invented test-repo
+   events with explicit consent. Its restricted Docker container held no project mount
+   or AI/App keys. The original GitHub signature was still checked locally.
+5. Finish the lifecycle: restore the prior inactive GitHub webhook setting, remove the
+   temporary relay container/image, stop its gateway and delete the saved channel and
+   restoration records. All were checked. Existing App permissions and saved review
+   data remain; no ongoing notifications are connected. Remote erasure is not claimed.
+
+The PR remains open and unmerged so its result can be inspected. This exercise verified
+notification → review → publication; earlier fix/Apply evidence remains separate. A
+future permanent service needs a durable reachable HTTPS address and its own acceptance
+checks. The normal Cloudflare launcher does not automatically reconnect Smee.

@@ -580,3 +580,24 @@ model-generated tests. It guards this failure shape without an AI key or changin
 the original hidden tests. Prompt guidance does not automatically enforce every
 contract, and stronger tests must actually be present to detect the old shortcut.
 See [the focused investigation](PRICING_FIX_INVESTIGATION.md).
+
+
+## 32. Verify public readiness before changing a development webhook address
+
+A tunnel can connect to its provider while its generated public name remains absent
+from authoritative DNS. Do not treat process startup or an edge registration log as
+working GitHub delivery. The computer-specific connector now probes its strict HTTPS
+Quick Tunnel origin before updating GitHub: hidden private API (404), unsigned hook
+rejected (401). Build unsigned independent requests, disable redirects and omit client
+authentication/cookie/query defaults. A real signed GitHub ping is still required.
+
+Keep the reusable probe in the GitHub integration; core code gains no tunnel or vendor
+dependency. Keep machine-specific process orchestration in the exported local helper.
+Offline tests guard the probe; a real PR demonstrates the wider delivery path.
+
+Do not silently switch a private repository's notifications to another intermediary.
+The Smee experiment required explicit temporary data-sharing consent and retained
+signature validation. Cleanup removed its route, container/image, gateway and private
+channel/restoration records. Preserve the existing App and AI credentials. State that
+new reviews are disconnected afterward and do not claim remote event erasure.
+See [GITHUB_CONNECTION_RECOVERY.md](GITHUB_CONNECTION_RECOVERY.md).
