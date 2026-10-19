@@ -218,6 +218,13 @@ class TestClaimCheck:
         node = ctx.enclosing(finding)
         if node is None:
             return None
+        if node.kind is NodeKind.TEST or _is_test_path(finding.file):
+            return VerificationCheck(
+                name=self.name,
+                outcome=CheckOutcome.NEUTRAL,
+                detail="the finding cites test code; missing assertions or edge cases "
+                "cannot be established from test-call relationships",
+            )
         tests = ctx.graph.tests_for(node.id)
         changed_test_files = {f.path for f in ctx.changeset.files if _is_test_path(f.path)}
         touched = [t for t in tests if t.file in changed_test_files]

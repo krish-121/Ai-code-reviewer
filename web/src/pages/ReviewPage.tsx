@@ -25,7 +25,15 @@ const TAB_LABEL: Record<Tab, string> = {
 };
 const RUNNING = new Set(["queued", "running"]);
 
-function Header({ review }: { review: ReviewDetail }) {
+function reviewerLabel(review: ReviewDetail): string {
+  const aiStage = review.stages.find((stage) => stage.name === "ai_review");
+  if (aiStage?.status === "failed") return "AI review unavailable";
+  if (RUNNING.has(review.status)) return "Awaiting review result";
+  if (aiStage?.status === "skipped") return "Static analysis only";
+  return review.provider ? `${review.provider} / ${review.model}` : "Static analysis only";
+}
+
+export function ReviewHeader({ review }: { review: ReviewDetail }) {
   const s = review.summary?.stats;
   return (
     <div className="review-head">
@@ -72,9 +80,7 @@ function Header({ review }: { review: ReviewDetail }) {
           ) : null}
           <div>
             <dt>Reviewer</dt>
-            <dd>
-              {review.provider ? `${review.provider} / ${review.model}` : "Static analysis only"}
-            </dd>
+            <dd>{reviewerLabel(review)}</dd>
           </div>
           <div>
             <dt>Took</dt>
@@ -159,7 +165,7 @@ export function ReviewPage({
   if (RUNNING.has(r.status)) {
     return (
       <section className="page">
-        <Header review={r} />
+        <ReviewHeader review={r} />
         <LiveProgress review={r} onDone={reload} />
       </section>
     );
@@ -179,7 +185,7 @@ export function ReviewPage({
 
   return (
     <section className="page page-wide">
-      <Header review={r} />
+      <ReviewHeader review={r} />
       <div className="tabs" role="tablist" aria-label="Review sections">
         {TABS.map((t) => (
           <button

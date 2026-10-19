@@ -206,7 +206,11 @@ def test_spa_fallback(tmp_path: Path) -> None:
     client = TestClient(create_app(settings, static_dir=ui))
     assert client.get("/").text == "<html>app</html>"
     assert client.get("/reviews/R-1/findings").text == "<html>app</html>"
-    assert client.get("/assets/app.js").text == "console.log(1)"
+    asset = client.get("/assets/app.js")
+    assert asset.text == "console.log(1)"
+    assert asset.headers["Cache-Control"] == "no-cache"
+    assert client.get("/index.html").headers["Cache-Control"] == "no-cache"
+    assert client.get("/assets/app.js?v=new-build").text == "console.log(1)"
     assert client.get("/api/unknown").status_code == 404
     assert client.get("/../../etc/passwd").text == "<html>app</html>"
     bare = TestClient(

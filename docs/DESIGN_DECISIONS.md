@@ -601,3 +601,30 @@ signature validation. Cleanup removed its route, container/image, gateway and pr
 channel/restoration records. Preserve the existing App and AI credentials. State that
 new reviews are disconnected afterward and do not claim remote event erasure.
 See [GITHUB_CONNECTION_RECOVERY.md](GITHUB_CONNECTION_RECOVERY.md).
+
+
+## 33. Version bundled browser assets by content
+
+The actual browser retained old JavaScript after the server's rebuilt file changed.
+Stable `app.js`/`app.css` paths alone did not establish that a client loaded the new UI.
+The build now adds a short SHA-256 version derived from both outputs to their HTML
+URLs. An esbuild end hook writes the index after every successful normal/watch build.
+Stable file paths also require revalidation. This preserves package/server paths and
+gives changed builds distinct browser URLs; fully hashed filenames plus a manifest
+would require a larger serving/build contract. Revalidation adds modest requests.
+The live same-tab rebuild and HTTP/real Compose assertions establish the selected path.
+
+## 34. Keep completed evidence separate from missing review work
+
+An unavailable AI stage can coexist with a supported deterministic finding. Carry
+failed stages into summary limitations and protect older partial summaries in the UI.
+Pending labels must not imply static-only completion; a configured default must be
+distinguished from a saved review/fix's actual model. Keep generation and Apply gates
+unchanged. Hiding local findings would discard useful evidence; claiming complete AI
+coverage would overstate it. Display both the useful result and the missing work.
+
+A test-location warning likewise cannot gain strong support merely because no test
+calls that test function. Treat cited test code as neutral coverage evidence. Preserve
+the original model run and replay saved sources separately, so a verifier correction
+does not masquerade as a fresh accurate model response. Broader assertion semantics
+remain outside this structural check. See [BROWSER_LIVE_WORKFLOW.md](BROWSER_LIVE_WORKFLOW.md).

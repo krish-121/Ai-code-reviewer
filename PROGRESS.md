@@ -3,6 +3,28 @@
 Living log of what is built, what was decided, and what still needs a human eye.
 Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
 
+## Complete local browser acceptance — 19 October 2026
+
+- Actual browser form → persisted queue → real AI review → generation → all seven
+  Docker validation checks → explicit Apply passed in two disposable SQL examples.
+- Gemini 3.5 Flash-Lite produced the successful Gemini review/fix, three final tests
+  and independent quoting/injection checks. Saved Gemini 3.8 returned two real busy
+  503s; a listed legacy 2.5 model returned account-specific 404. Retain those attempts.
+- Controlled local Gemini 429 triggered production quota fallback to real free
+  DeepSeek. Its fix used shared cooldown, added two tests and applied normally; four
+  final tests plus independent checks passed. No DeepSeek answer was replayed.
+- Source/new-test files stayed unchanged until browser Apply. Reload retained the
+  saved validated proposal. Both attempts are applied/fixed with actual model metadata.
+- Repaired failed-stage uncertainty, pending/unavailable/provider UI labels, missing
+  fix-model display, stale rebuilt assets and overconfirmation of test-code coverage
+  claims. Captured warning replay changed supported → uncertain without AI/history writes.
+- Owner chose to keep saved Gemini 3.8. Normal CLI restored; no quota injection,
+  widened saved roots, credential upload, public relay or Smee reconnection. Decisions 33–34.
+- **648 Python tests passed, 27 PostgreSQL variants skipped**; all **36 Docker tests** ran. Overall/core coverage: **93.59% / 97%**. Ruff lint/format and strict application/bridge/helper typing passed. Frontend: **27 tests passed**, type/format checks and production build passed.
+- See [BROWSER_LIVE_WORKFLOW.md](docs/BROWSER_LIVE_WORKFLOW.md). Current browser
+  acceptance is local with the real bridge; distributed live Compose-profile and
+  complete outage/accessibility/load acceptance remain separate operational checks.
+
 ## Hosted checks and completion assessment — 19 October 2026
 
 - All three code-check jobs in `39286099864` for `d2cd45c` report success. Retrieved

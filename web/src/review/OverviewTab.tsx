@@ -77,7 +77,11 @@ export function OverviewTab({ review, findings }: { review: ReviewDetail; findin
         <Section
           title="What remains uncertain"
           items={summary?.uncertain ?? []}
-          empty="Nothing: every surfaced finding was confirmed."
+          empty={
+            review.status === "partial" || review.status === "failed"
+              ? "This review is incomplete. Some checks did not finish; see Errors and Pipeline."
+              : "Every surfaced finding was confirmed by the available checks."
+          }
         />
         {review.errors.length ? (
           <section className="ov-section">

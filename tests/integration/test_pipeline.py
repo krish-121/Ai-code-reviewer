@@ -260,6 +260,8 @@ def test_ai_failure_degrades_to_partial(repo: Path) -> None:
     assert ai_stage.status is StageStatus.FAILED and "boom" in ai_stage.detail
     # deterministic findings still present
     assert any("SQL" in f.title for f in result.findings)
+    assert any("ai_review did not complete" in line for line in result.summary.uncertain)
+    assert any("boom" in line for line in result.summary.uncertain)
 
 
 def test_no_provider_is_deterministic_only(repo: Path) -> None:

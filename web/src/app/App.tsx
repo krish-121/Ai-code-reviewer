@@ -66,7 +66,7 @@ export function App() {
             <span className="engine" title="AI provider configured on the server">
               {health.data.provider === "none"
                 ? "Static analysis only"
-                : `Reviewer: ${health.data.provider}`}
+                : `Default AI: ${health.data.provider}`}
             </span>
           ) : null}
           {health.data && health.data.queue > 0 ? (

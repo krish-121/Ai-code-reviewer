@@ -185,7 +185,10 @@ class Acceptance:
         self.compose("up", "-d", "--wait", "--wait-timeout", "180", timeout=240)
         self.port = int(self.compose("port", "api", "8000").strip().rsplit(":", 1)[1])
         assert self.request("/api/health")["database"] == "postgresql"
-        assert "app.js" in self.request("/")
+        html = self.request("/")
+        assets = re.findall(r"/assets/app\.(?:js|css)\?v=[a-f0-9]{16}", html)
+        assert len(assets) == 2, "built UI must use content-versioned script and stylesheet URLs"
+        assert all(len(self.request(asset)) > 1_000 for asset in assets)
         assert len(self.request("/assets/app.js")) > 10_000
         self.request("/api/reviews", expected=401)
         user = json.loads(

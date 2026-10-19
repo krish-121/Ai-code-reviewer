@@ -26,7 +26,8 @@ def single_page_app(full_path: str, context: ContextDep) -> Response:
     root = context.static_dir.resolve()
     candidate = (root / full_path).resolve()
     if full_path and candidate.is_file() and candidate.is_relative_to(root):
-        return FileResponse(candidate)
+        # Asset paths stay stable; revalidate them after an application upgrade.
+        return FileResponse(candidate, headers={"Cache-Control": "no-cache"})
     index = root / "index.html"
     if index.is_file():
         return FileResponse(index, headers={"Cache-Control": "no-cache"})

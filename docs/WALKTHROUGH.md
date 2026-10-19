@@ -812,3 +812,53 @@ Keep a separate list for an always-on public service: stable HTTPS, outage/backu
 recovery, concurrent pushes, usability, capacity and retention measurements. Optional
 Ollama/Claude/GLM setup and compiler-grade analysis do not block this V1. Smee remains
 disconnected; this documentation update did not restore any temporary relay access.
+
+
+## From a browser button to a real, applied AI fix
+
+Follow [the live browser walkthrough](BROWSER_LIVE_WORKFLOW.md) alongside the code.
+This exercise used the actual served UI, the normal queue/services and two invented
+repositories. Its successful model replies are real, with errors retained separately.
+
+1. The form in [ReviewsPage.tsx](../web/src/pages/ReviewsPage.tsx) posts to
+   [the review route](../src/sentinel/apps/api/routes/reviews.py). The server checks the
+   explicitly allowed folder and queues the job; it does not run a model in the button
+   handler. [ReviewService](../src/sentinel/services/reviews.py) and the worker save stages.
+2. [The provider factory](../src/sentinel/ai/providers/factory.py) builds Gemini-first
+   fallback. A test-only HTTP transport supplied Gemini's quota 429; the real local
+   OpenCode bridge then obtained a real DeepSeek answer. Saved stage details record
+   the switch. Fix generation sees the same shared cooldown. No fake model answer or
+   permanent provider change was used. Ordinary 503/404 failures remain visible.
+3. [ReviewPage.tsx](../web/src/pages/ReviewPage.tsx) distinguishes pending work,
+   unavailable AI and the actual successful model. [OverviewTab.tsx](../web/src/review/OverviewTab.tsx)
+   also warns on older partial summaries. [Finalization](../src/sentinel/core/review/orchestrator.py)
+   now carries failed-stage limitations into fresh summaries, even when local findings exist.
+4. [FixPanel.tsx](../web/src/findings/FixPanel.tsx) queues generation and displays the
+   saved generating model. [FixService](../src/sentinel/services/fixes.py) calls the
+   [fix engine](../src/sentinel/core/fixes/engine.py). Temporary copies receive the edits;
+   seven normal gates must pass before the browser offers Apply. We checked that the
+   real example's hash stayed unchanged and its new test did not exist until Apply.
+5. Apply separately rechecks verdicts/hashes and writes the allowed files. Both live
+   attempts became applied/fixed; independent final-tree tests ran in Docker. Reloading
+   the browser retained the proposal. The review's original source/risk stay historical;
+   Apply writes the working tree and does not automatically stage files in Git.
+
+The exercise also caught a browser-cache defect. [build.mjs](../web/build.mjs) now
+writes content-versioned JS/CSS URLs after successful builds, including watch rebuilds.
+[Static routes](../src/sentinel/apps/api/routes/web.py) require revalidation for stable
+paths. The same browser immediately loaded the corrected UI, with its sign-in intact.
+[Compose acceptance](../scripts/verify_compose.py) checks the actual built versioned URLs.
+
+Finally, a DeepSeek warning about missing edge-case assertions cited an existing test.
+[TestClaimCheck](../src/sentinel/core/verification/checks.py) had treated that test as
+untested production code. Test-code locations now contribute neutral evidence. A saved-
+source replay changed supported to uncertain without another model request or rewriting
+the historical finding. Call graphs can show relationships; they do not prove assertion
+semantics. Keep that limit when explaining verification to another developer.
+
+Gemini 3.8 returned busy errors; the successful Gemini run used free 3.5 Flash-Lite as
+a session override. A listed old 2.5 model was account-restricted. The owner chose to
+keep Gemini 3.8 as the saved default. The quota-test server is stopped, the normal CLI
+is restored, credentials stayed private and Smee remains disconnected. The remaining
+V1 demonstration work is the public demo; distributed live-profile, recovery, complete
+accessibility and load measurements retain their separate acceptance tasks.

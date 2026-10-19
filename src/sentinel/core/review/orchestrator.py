@@ -361,13 +361,18 @@ class ReviewOrchestrator:
             for c in (state.bundle.changed_symbols if state.bundle else [])
             if c.kind is not NodeKind.FILE
         ]
+        incomplete_stages = [
+            f"{stage.name.value} did not complete: {stage.detail}"
+            for stage in result.stages
+            if stage.status is StageStatus.FAILED
+        ]
         result.summary = build_summary(
             state.changeset,
             surfaced,
             suppressed,
             changed_symbols=changed_names,
             runs=result.analysis_runs,
-            limitations=state.limitations,
+            limitations=[*state.limitations, *incomplete_stages],
         )
         if state.bundle is not None:
             result.graph = state.bundle.subgraph.to_dict()

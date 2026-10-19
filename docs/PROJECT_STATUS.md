@@ -1,5 +1,19 @@
 # Current project status and remaining work
 
+**Local browser acceptance — 19 October 2026:** real Gemini 3.5 Flash-Lite and real
+free DeepSeek each completed browser review → fix generation → all seven Docker
+validation checks → explicit Apply. Final saved attempts are applied/fixed; independent
+injection/quoting tests passed. DeepSeek used a controlled local Gemini 429, not a
+scripted model response. Gemini 3.8 was busy; its saved default is unchanged by the
+owner's choice. Fixed misleading uncertainty/model labels, stale UI assets and an
+overconfirmed test-code claim. Normal CLI restored; Smee remains disconnected.
+**648 Python tests passed, 27 PostgreSQL variants skipped**; all **36 Docker tests** ran. Overall/core coverage: **93.59% / 97%**. Ruff lint/format and strict application/bridge/helper typing passed. Frontend: **27 tests passed**, type/format checks and production build passed.
+See [BROWSER_LIVE_WORKFLOW.md](BROWSER_LIVE_WORKFLOW.md).
+
+The remaining V1 demonstration task is the reproducible public demo. Live distributed
+Compose-profile acceptance, outage/recovery, accessibility and capacity work remain
+under deployment operations; this local run does not silently close those checks.
+
 **Completion assessment — 19 October 2026:** all three code-check jobs in
 [39286099864 on `d2cd45c`](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39286099864)
 report success. Completed logs confirm **673 Python tests passed, one optional skip**,
@@ -8,9 +22,9 @@ variants ran; Ruff, strict typing, builds and coverage gates passed. GitHub's in
 delayed status visibility; the initial queued results were not code failures. No code
 repair or weakened gate was needed. Later documentation-only commits have separate runs.
 
-The core local workflow works. Remaining V1 demonstration acceptance is a complete
-current browser run with the configured OpenCode bridge and a reproducible recruiter-
-facing public demo. Production hosting/recovery/load work is separate. The current
+This earlier checkpoint predates the successful local browser run above. The core
+local workflow and configured bridge browser acceptance now work; the reproducible
+recruiter-facing public demo remains. Production hosting/recovery/load work is separate. The current
 acceptance list is [RELEASE_READINESS.md](RELEASE_READINESS.md), replacing outdated
 release percentages and already-completed integration gaps.
 
@@ -200,11 +214,11 @@ Use [RELEASE_READINESS.md](RELEASE_READINESS.md) as the current acceptance list.
 The basic real review/fix/Apply and GitHub integration work is implemented and tested;
 its results should not stay listed as missing work.
 
-The latest code revision's three hosted jobs passed. Keep CI passing on every release.
-1. Rehearse the current complete browser/queued-worker workflow with the optional
-   OpenCode bridge, saved model display, validation/Apply and service/reconnection errors.
-   Current Compose CI uses a controlled provider and does not exercise that profile.
-2. Finish a clean public demonstration and repeatable quickstart, with current evidence
+The prior code revision's three hosted jobs passed. Keep CI passing on every release.
+
+The local browser/queued-worker workflow with real AI and the configured bridge passed.
+
+1. Finish a clean public demonstration and repeatable quickstart, with current evidence
    for the SPEC's demonstration categories. The App test repository remains private;
    publishing a demo is a separate deliberate choice.
 

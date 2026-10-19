@@ -98,6 +98,16 @@ issue detected · ✓ test gap detected · ✓ false positive rejected · ✓ fi
 
 > The screenshots come from the scripted replay above, not from a live model.
 
+### Actual browser acceptance
+
+The [19 October live browser walkthrough](docs/BROWSER_LIVE_WORKFLOW.md) records real
+Gemini 3.5 Flash-Lite and free DeepSeek reviews, fix generation, seven Docker checks
+and explicit Apply on disposable examples. DeepSeek's quota trigger was controlled
+locally; its answer was real. The saved Gemini 3.8 default was busy and remains unchanged.
+These screenshots show actual applied fixes; the earlier demo screenshots remain labelled replay.
+
+![A real Gemini-generated fix applied through the browser after all checks passed](docs/screenshots/browser-gemini-applied.jpg)
+
 ## Installation
 
 Runs on Linux and macOS. **On Windows, use WSL 2** (Ubuntu): the sandbox code uses

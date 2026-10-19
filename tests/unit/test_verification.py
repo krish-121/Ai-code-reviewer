@@ -214,6 +214,21 @@ def test_missing_test_claims_are_checked_against_the_graph() -> None:
     assert TestClaimCheck().check(finding(title="SQL injection"), c) is None
 
 
+def test_test_code_does_not_prove_a_missing_edge_case_claim() -> None:
+    context = ctx(tests__test_lookup_py="def test_exact_match():\n    assert 1 == 1\n")
+    claim = finding(
+        category=Category.TESTS,
+        title="No test covers quoting or injection",
+        file="tests/test_lookup.py",
+        line_start=2,
+        line_end=2,
+    )
+    check = TestClaimCheck().check(claim, context)
+    assert check is not None and check.outcome is CheckOutcome.NEUTRAL
+    assert "cannot be established" in check.detail
+    assert default_verifier().verify(claim, context).status is not VerificationStatus.SUPPORTED
+
+
 def test_style_remarks_filed_as_bugs_are_rejected() -> None:
     c = ctx()
     res = StyleOnlyCheck().check(finding(category=Category.BUG, title="Rename variable cur"), c)

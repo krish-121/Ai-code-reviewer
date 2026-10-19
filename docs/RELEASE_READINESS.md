@@ -5,6 +5,16 @@ review, real AI, GitHub publication and guarded fix workflows. Final release
 acceptance is still open. This page replaces the older effort-percentage estimate
 with observable completion criteria; test coverage is not a project-completion score.
 
+## Latest local browser checkpoint
+
+The [complete real browser workflow](BROWSER_LIVE_WORKFLOW.md) now passed with Gemini
+3.5 Flash-Lite and free DeepSeek through the existing OpenCode bridge. Each generated
+a fix, passed all seven Docker gates and reached normal Apply on an invented example.
+Independent final-tree checks passed. DeepSeek's quota trigger was controlled locally;
+the model output was real. Gemini 3.8 was busy, and remains the saved default by the
+owner's choice. The local browser task is closed. This is not a live acceptance run
+of the distributed Compose OpenCode profile or a full accessibility/outage matrix.
+
 ## Verified GitHub checks
 
 All three jobs for code revision `d2cd45c` in
@@ -38,7 +48,7 @@ PostgreSQL skips are not claimed as local passes. See [the recovery report](GITH
 | Choose an AI provider | Provider abstraction and configuration exist. Gemini and free DeepSeek through OpenCode were live-tested, including actual quota fallback. Claude/Ollama are optional and were not live-accepted here. GLM was unavailable and is disabled. |
 | Generate, validate and apply fixes | Actual Gemini and DeepSeek experiments completed Docker checks and normal Apply on disposable examples. Unverified proposals cannot Apply. Tests establish the behaviours asserted, not every business rule. |
 | Real GitHub pull-request reviews | Signed delivery, actual Gemini analysis, summary/inline publication, duplicate-event protection, second-push update and owner isolation were tested. Latest PR #2 completed all eight stages. |
-| CLI, web UI and queued workers | Implemented with saved history, progress events and worker routing. Earlier browser smoke and Compose acceptance passed; the complete current bridge-enabled browser scenario remains to be rehearsed. |
+| CLI, web UI and queued workers | Saved history, progress events and routing work. Complete current local browser review/fix/validation/Apply passed with real Gemini and DeepSeek; distributed live-profile and full outage/accessibility checks remain. |
 | Storage and deployment foundation | SQLite/local mode, PostgreSQL, migrations, separate fix worker, confined Docker execution and service-recreation persistence are tested. Production backup/restore and sustained load remain unmeasured. |
 | Learning material | README, architecture, design decisions, walkthrough and study guide exist. Current evidence is linked rather than treating old checkpoint counts as today's total. |
 
@@ -57,8 +67,8 @@ acceptance tasks, rather than requests to add another framework or optional mode
 | Priority | Remaining task | Why it matters | Evidence that closes it |
 | --- | --- | --- | --- |
 | Done | Confirm the code revision's hosted checks. | Earlier green commits cannot stand in for changed code. | All three jobs for `d2cd45c` passed; retain successful checks for each intended release commit. |
-| 1 | Rehearse the current configured app from its browser through queued review, fix generation, Docker validation and explicit Apply. Include model display, unavailable-provider messages and interrupted progress recovery. | Separate CLI/model tests and an older browser run do not prove every part works together with today's OpenCode bridge. | A dated run on a disposable example records the selected provider/model, saved review, validated patch, applied files and clear failure/retry behaviour. |
-| 2 | Finish the recruiter-facing demo and reproducible setup. The implementation has a public demo generator; the live App test repository is private. | SPEC §§54–55 ask for a clean public demonstration that another person can understand and repeat. | A clean generated example or deliberately published demo covers bug/security/performance/test-gap findings, a rejected false alarm and a validated fix; current screenshots or a short recording identify actual versus replayed model output. Rehearse the documented quickstart from a fresh checkout. |
+| Done locally | Rehearse the configured app in its browser with real AI, model display, provider errors, saved proposal reload, Docker validation and Apply. | The full local path must work together. | Both named model runs are applied/fixed; source preservation and independent checks passed. Complete outage/reconnection and distributed-profile tests remain operational acceptance. |
+| 1 | Finish the recruiter-facing demo and reproducible setup. The implementation has a public demo generator; the live App test repository is private. | SPEC §§54–55 ask for a clean public demonstration that another person can understand and repeat. | A clean generated example or deliberately published demo covers bug/security/performance/test-gap findings, a rejected false alarm and a validated fix; current screenshots or a short recording identify actual versus replayed model output. Rehearse the documented quickstart from a fresh checkout. |
 
 Publishing a demo does not mean changing the existing private test repository's
 visibility. Use invented data, review its files, and choose publication deliberately.
