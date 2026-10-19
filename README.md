@@ -18,7 +18,7 @@ containing project dependencies. POSIX filesystem confinement requires Linux/WSL
 See [release readiness](docs/RELEASE_READINESS.md) for current evidence, and the dated
 [audit remediation](docs/REMAINING_AUDIT_REMEDIATION.md) for the earlier defect history.
 
-Learning on Windows? Start with [local setup, Ollama and GitHub explained step by step](docs/LOCAL_SETUP_AND_GITHUB.md).
+Learning on Windows? Start with [local setup, free AI and GitHub explained step by step](docs/LOCAL_SETUP_AND_GITHUB.md).
 For how the code works, follow [WALKTHROUGH.md](docs/WALKTHROUGH.md) and
 [the code-graph explanation](docs/GRAPH_ANALYSIS.md).
 
@@ -110,7 +110,7 @@ POSIX-only calls. You need:
 - PostgreSQL 16 — optional; SQLite is the default
 
 ```bash
-git clone <this repository> sentinel && cd sentinel     # or unzip the project archive
+git clone https://github.com/krish-121/Ai-code-reviewer.git sentinel && cd sentinel     # or unzip the project archive
 python3 -m venv .venv && source .venv/bin/activate
 pip install -U pip && pip install -c requirements.lock -e ".[dev,analyzers]" # + ",postgres" for PostgreSQL
 npm ci --prefix tools/analyzers --omit=dev --no-audit --no-fund

@@ -1,5 +1,20 @@
 # Current project status and remaining work
 
+**Completion assessment — 19 October 2026:** latest code run
+[39286099864 on `d2cd45c`](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39286099864)
+still reports all three jobs queued, without assigned runners or error annotations.
+GitHub is reporting an Actions service incident. The previous `ff4759b` run passed
+all three jobs; latest code has 647 passing local tests and 27 PostgreSQL skips.
+No failed code check has yet been reported to repair. A later documentation-only
+commit has its own CI run and must be assessed separately.
+
+The core local workflow works. Remaining V1 acceptance is current hosted CI,
+a complete browser run with the configured OpenCode bridge, and a reproducible
+recruiter-facing public demo. Production hosting/recovery/load work is separate.
+The current acceptance list is [RELEASE_READINESS.md](RELEASE_READINESS.md), which
+replaces outdated release percentages and already-completed integration gaps.
+
+
 **GitHub recovery checkpoint — 19 October 2026:** a real signed ping and
 [PR #2](https://github.com/krish-121/sentinel-integration-demo/pull/2) succeeded through
 a temporary, explicitly approved Smee relay. Gemini completed all eight stages and
@@ -182,39 +197,31 @@ extra languages and V2 features are not needed to close V1.
 
 ## Ordered remaining work
 
-The normal fix-runtime setup and complete local Gemini fix/Apply acceptance are finished.
-The earlier unverified proposal is retained as historical evidence; a fresh example with
-a passing baseline completed every normal gate without bypasses.
+Use [RELEASE_READINESS.md](RELEASE_READINESS.md) as the current acceptance list.
+The basic real review/fix/Apply and GitHub integration work is implemented and tested;
+its results should not stay listed as missing work.
 
-1. **Wider AI and fix quality.** The original 15 cases plus nine cross-file cases are
-   recorded separately. The observed pricing helper miss has a verified follow-up
-   repair; broaden independent contract coverage and repeated model trials. A proposal
-   can still pass generated tests while violating an untested public contract.
-   Add representative larger real repositories, dependencies, subtler controls and
-   repeated runs. Group related cross-file warnings without hiding independent defects.
-2. **Extended GitHub acceptance.** The basic real App path, redelivery, second push and
-   user isolation passed. Test concurrent pushes while publication is in flight, outages
-   and recovery if moving beyond local development. The App currently covers only the
-   private test repo; the temporary connection must be running for new reviews.
-3. **Current full-stack and browser acceptance.** Rebuild the complete app with the new
-   optional OpenCode bridge and check web/worker reviews, fixes, saved model display and
-   service failures. Earlier full Compose/browser acceptance predates this fallback. Expand
-   checks to keyboard navigation, small screens, reconnection, retries and long jobs.
-4. **Operations before public hosting.** Rehearse backup/restore and upgrades on copies
-   of deployment data, worker/daemon outages and the chosen HTTPS/proxy/webhook setup.
-   Rootless/remote Docker and multi-host operation need their own acceptance runs if chosen.
-5. **Load/failure and retention measurements.** Measure concurrent reviews/fixes, worker
-   interruption, database/history growth and sustained resource use. Existing size benchmarks
-   are review-latency measurements, not production-throughput evidence.
-6. **Portfolio/release evidence.** Record a real working demo, publish reproducible setup
-   instructions and actual model/settings/results, and keep hosted CI passing. Existing
-   scripted demo screenshots remain labelled as replay; they are not live-AI evidence.
+1. Confirm the intended release commit's hosted checks when GitHub processes them;
+   investigate actual failures without weakening gates.
+2. Rehearse the current complete browser/queued-worker workflow with the optional
+   OpenCode bridge, saved model display, validation/Apply and service/reconnection errors.
+   Current Compose CI uses a controlled provider and does not exercise that profile.
+3. Finish a clean public demonstration and repeatable quickstart, with current evidence
+   for the SPEC's demonstration categories. The App test repository remains private;
+   publishing a demo is a separate deliberate choice.
 
-Items 1–3 are the next practical checks. Operations/load work is needed before claiming
-production readiness; it is not a requirement to install Ollama or buy an AI subscription.
-See [LOCAL_SETUP_AND_GITHUB.md](LOCAL_SETUP_AND_GITHUB.md) for the beginner-oriented setup
-sequence and explanations. Gemini and the free OpenCode route are configured. The source repository and private test App are configured; the webhook uses a temporary local development connection. Ollama is optional.
+Before an always-on public service, test durable HTTPS/webhook deployment, outages and
+simultaneous pushes, backup/restore/upgrades, accessibility and sustained load/retention.
+Broaden independent business-contract and real-project model evaluations. Existing
+retries/leases/migrations and small-corpus successes are foundations, not production
+capacity or general accuracy measurements. Rootless/remote Docker needs testing only
+if chosen. Optional providers and compiler-grade V2 analysis are not V1 blockers.
 
+Gemini and the free OpenCode route are configured. Ollama is optional. The test-only
+GitHub App remains installed; Smee and the temporary notification gateway were removed
+after the real test. New automatic notifications are currently disconnected by request.
+A supervised GitHub demo needs an approved reachable endpoint; paid hosting is not
+required just to run that demonstration. See [LOCAL_SETUP_AND_GITHUB.md](LOCAL_SETUP_AND_GITHUB.md).
 ## Supported limits to retain
 
 Variable access covers ordinary module/global and known imported bindings. Local-variable

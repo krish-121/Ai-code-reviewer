@@ -770,3 +770,43 @@ The PR remains open and unmerged so its result can be inspected. This exercise v
 notification → review → publication; earlier fix/Apply evidence remains separate. A
 future permanent service needs a durable reachable HTTPS address and its own acceptance
 checks. The normal Cloudflare launcher does not automatically reconnect Smee.
+
+
+## Understanding GitHub checks and deciding when V1 is finished
+
+Follow [the current release acceptance list](RELEASE_READINESS.md). The important
+distinction is what was observed on which version, rather than how many files exist.
+
+GitHub Actions is a separate computer running this repository's
+[CI workflow](../.github/workflows/ci.yml). It starts three independent jobs:
+
+- **Python:** install locked tools, build the Docker sandbox, check style/types, run
+  tests including PostgreSQL variants, and enforce overall/core coverage gates.
+- **Frontend:** install the locked browser dependencies, check types/formatting, run
+  component tests and build the UI files.
+- **Compose:** start a disposable full server with PostgreSQL and separate workers;
+  exercise review, Docker-validated multi-file Apply and persistence, then clean it up.
+
+`queued` means GitHub has not reported a running/completed job. `in_progress` means
+work is underway; `success` means its checks passed; `failure` means inspect that
+job's failing step/log before changing code. Runner or service problems and assertion
+failures require different repairs. Do not call an older green commit proof of a new
+commit, remove a failing test, or bypass a coverage gate to obtain a green badge.
+
+At this assessment, code revision `d2cd45c` is queued without assigned runners or
+failure annotations. GitHub reports an Actions incident with processing/status delays;
+that is consistent with the queue and does not establish a Sentinel code defect.
+The previous `ff4759b` run passed; current code separately passed 647 local tests,
+with 27 PostgreSQL variants skipped. No new code failure was reported to fix.
+
+The core already completes local review → AI findings → proposed fix → Docker checks
+→ explicit Apply. Real GitHub reviews also worked. Final V1 demonstration work is
+to confirm latest hosted CI, rehearse today's complete browser workflow with the
+configured bridge, and finish a repeatable public demo. Compose's controlled HTTP
+provider proves service wiring without spending AI quota; it is not a live Gemini or
+DeepSeek acceptance test. The OpenCode Compose profile still needs its own complete run.
+
+Keep a separate list for an always-on public service: stable HTTPS, outage/backup
+recovery, concurrent pushes, usability, capacity and retention measurements. Optional
+Ollama/Claude/GLM setup and compiler-grade analysis do not block this V1. Smee remains
+disconnected; this documentation update did not restore any temporary relay access.

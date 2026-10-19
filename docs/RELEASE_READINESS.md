@@ -1,148 +1,112 @@
 # Release readiness and remaining SPEC work
 
-**Current continuation:** [PROJECT_STATUS.md](PROJECT_STATUS.md) supersedes the snapshot
-below for graph coverage, validated-only Apply, sandbox report budgets, browser smoke
-acceptance and refreshed benchmarks. The latest local GitHub setup/gateway suite has **525 passing Python tests and 27 PostgreSQL skips**;
-earlier frontend acceptance has **21 passing tests**. Gemini and DeepSeek fallback are now
-live-tested; real GitHub App/PR acceptance also passed (see [GITHUB_LIVE_TEST.md](GITHUB_LIVE_TEST.md)). Ollama is optional. Older results below describe their dated checkpoint. See the current status for exact evidence and remaining
-acceptance work. The following deployment batch is retained as a historical checkpoint.
+Assessment: **19 October 2026**. The core V1 is implemented and has working local
+review, real AI, GitHub publication and guarded fix workflows. Final release
+acceptance is still open. This page replaces the older effort-percentage estimate
+with observable completion criteria; test coverage is not a project-completion score.
 
-Verified **2026-10-18**. The Docker-capable validation worker, runtime analyzer consistency,
-database migrations and bounded multi-file generated fixes are implemented and regression-tested.
-The original 33 audited defects (including the 24 follow-up issues S10–S33) remain closed within
-their documented scope. Full production/SPEC acceptance is still incomplete. Changes are local
-and uncommitted; no user database or repository was migrated or modified by the acceptance tests.
+## Latest GitHub checks
 
-## How much work is left?
+For code revision `d2cd45c`, [run 39286099864](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39286099864)
+currently reports **queued**, not passed or failed. Its Python, frontend and Compose
+jobs have no assigned runner, no conclusion and no failure annotations. The latest
+completed run, [39242790419 on `ff4759b`](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39242790419),
+passed all three jobs. That earlier success does not establish success for the newer
+revision.
 
-After the preceding migration/multi-file batch, the planning estimate was roughly **20%** of
-release-readiness effort remaining (15–25%). This deployment batch brings the estimate to
-roughly **10–20%, centred on 15%**. Most remaining effort is live integration, quality, browser,
-operations and performance validation; graph representation still has implementation gaps.
+GitHub's [status service](https://www.githubstatus.com/) reports an active Actions,
+Pages and Webhooks incident at this assessment. It warns of delayed workflow processing
+and status updates. That is consistent with the queue; it is not proof of a Sentinel
+code failure. No failing code check has been reported to repair. Keep the existing
+checks enabled and inspect their results when GitHub processes the run. A later
+documentation-only publication may have its own run; each result belongs to its commit.
 
-These are judgment-based effort estimates, not a measured completion score or test-coverage
-percentage. They exclude compiler-grade V2 analysis. Real acceptance work may uncover additional
-defects and change the estimate. No automated-check failures remain in the verified snapshot.
+Independent local checks for `d2cd45c` passed: **647 tests**, **27 PostgreSQL skips**,
+all **36 Docker tests executed**, **93.55% overall / 97% core coverage**, Ruff lint
+and formatting, application typing (155 source files), strict bridge typing and
+strict evaluation-helper typing. No frontend code changed in that revision. The
+PostgreSQL skips are not claimed as local passes. See [the recovery report](GITHUB_CONNECTION_RECOVERY.md).
 
-## What is fixed
+## What already works
 
-- **Docker-capable validation worker:** Compose has separate review/publication and fix-only
-  workers. Only the fix worker receives the Docker client/socket. Job-kind routing is tested
-  on SQLite and PostgreSQL. Its required-sandbox startup check refuses a missing Docker image
-  or daemon; Compose healthchecks verify schema compatibility and daemon/image availability.
-- **Scratch transfer:** bounded regular files/directories travel over stdin to an installed
-  isolated-mode launcher and a private container tmpfs. Worker/daemon paths need not match.
-  Empty directories and file contents survive; secrets/dependencies are omitted, and traversal,
-  symlinks, hard links, special entries and byte/entry overflow are rejected. Generated changes
-  never return to the worker filesystem. Network/root-filesystem/resource restrictions remain.
-- **Analyzer parity:** API, both workers, sandbox and CI use one npm lock: Node 22,
-  TypeScript **5.9.3**, ESLint **10.13.0**, parser **8.71.2**. Python tools use `requirements.lock`.
-  The installed trusted parser now works for local reviews without project dependencies.
-  Missing TypeScript parser coverage is incomplete even when JavaScript linting succeeds.
-  The old ESLint 9 pin was replaced after npm reported its unsupported status; see the
-  [official support policy](https://eslint.org/version-support/).
-- **Compose integration:** ordered PostgreSQL/schema/application startup, sandbox-image build,
-  shared repository paths, healthchecks, independent worker scaling and restart persistence.
-  An unset database password is rejected instead of falling back to `change-me`.
-- **Earlier batch remains verified:** packaged Alembic history and explicit legacy adoption,
-  migration rollback/data preservation, coordinated existing-file edits plus an advertised
-  new regression test, before/after diagnostics and tests, guarded Apply and ordinary-error rollback.
+| Capability | Evidence and limit |
+| --- | --- |
+| Review Python, JavaScript and TypeScript changes | Real parsing, bounded graph/context, six analyzer integrations, AI review and deterministic verification. Dynamic/runtime relationships remain partial. |
+| Choose an AI provider | Provider abstraction and configuration exist. Gemini and free DeepSeek through OpenCode were live-tested, including actual quota fallback. Claude/Ollama are optional and were not live-accepted here. GLM was unavailable and is disabled. |
+| Generate, validate and apply fixes | Actual Gemini and DeepSeek experiments completed Docker checks and normal Apply on disposable examples. Unverified proposals cannot Apply. Tests establish the behaviours asserted, not every business rule. |
+| Real GitHub pull-request reviews | Signed delivery, actual Gemini analysis, summary/inline publication, duplicate-event protection, second-push update and owner isolation were tested. Latest PR #2 completed all eight stages. |
+| CLI, web UI and queued workers | Implemented with saved history, progress events and worker routing. Earlier browser smoke and Compose acceptance passed; the complete current bridge-enabled browser scenario remains to be rehearsed. |
+| Storage and deployment foundation | SQLite/local mode, PostgreSQL, migrations, separate fix worker, confined Docker execution and service-recreation persistence are tested. Production backup/restore and sustained load remain unmeasured. |
+| Learning material | README, architecture, design decisions, walkthrough and study guide exist. Current evidence is linked rather than treating old checkpoint counts as today's total. |
 
-This batch adds **21 pytest regression cases** and the reusable full-stack acceptance script
-`scripts/verify_compose.py`. The previous batch added 37 cases. An old real-ESLint test assumed
-the installed TypeScript parser was absent; it now controls that missing-parser case explicitly,
-and a separate real TypeScript test verifies successful installed-parser analysis. No assertions
-or coverage gates were disabled. The test-only verification image also needed writable ownership
-for its coverage directory; the final non-root run succeeds without warnings.
+The original audit's 33 reported defects are recorded as repaired within their
+documented scope. Later quality experiments found additional problems and preserved
+their failed attempts. See [the project status](PROJECT_STATUS.md),
+[multifile evaluation](MULTIFILE_QUALITY_EVALUATION.md) and
+[pricing investigation](PRICING_FIX_INVESTIGATION.md). This is not a claim that no
+unknown bug remains.
 
-## Final verification
+## Work to close the V1 demonstration
 
-| Check | Final result |
-|---|---|
-| Focused worker/transfer/parser/Docker suite | **29 passed**, no skips or warnings |
-| Full Python 3.14.4 + Node 22 | **460 passed, zero skipped**, 64.39 seconds |
-| Full Python 3.11.17 + Node 22 | **459 passed, 1 platform skip**, 80.91 seconds |
-| PostgreSQL 16 | All backend variants ran, in separate disposable databases per suite |
-| Actual Docker cases | **All five ran and passed inside each full suite** |
-| Overall branch-inclusive coverage | **93.36%** on both Python versions; gate 80% |
-| Core branch-inclusive coverage | **96.16%** on both versions; gate 90% |
-| Ruff / formatting / strict mypy | Pass; **197** Python files formatted, **147** source files type-checked |
-| Frontend | Clean locked install, **20 tests**, types/Prettier and production build pass |
-| Full Compose | All services start; migration/image jobs exit 0; API and both workers become healthy |
-| Real HTTP workflow | Auth rejection, UI/assets, all six analyzers, graph, SSE and metrics pass |
-| Real queued fix | Two existing files plus a new regression test validate in Docker; Apply writes all three |
-| Persistence | Review, applied-fix record and all three files survive full service recreation |
-| Installed images | Three production targets have identical analyzer versions and matching source hashes; only fix-worker target has Docker CLI |
-| Dependencies | Both Python dependency checks and locked JS installs pass |
+The SPEC's definition of done is in sections 53–55. The following are concrete
+acceptance tasks, rather than requests to add another framework or optional model.
 
-The Python 3.11 skip is optional unprivileged process network namespaces inside its test
-container; that check passed under WSL. No Docker or PostgreSQL case was skipped. The WSL test
-Docker shim delegates CLI calls to Docker Desktop; it does not translate paths, replace test
-bodies or mock Docker. Production source and pytest cases were unchanged after the final suites;
-the final Compose harness was separately linted and exercised after its HTTP/config assertions
-were completed. Documentation was finalized afterward.
+| Priority | Remaining task | Why it matters | Evidence that closes it |
+| --- | --- | --- | --- |
+| 1 | Confirm the latest hosted CI result after GitHub recovers; fix any actual failed job and rerun it. | Local success and a green older commit cannot stand in for the latest hosted checks. | The intended release commit has successful Python/PostgreSQL, frontend and Compose jobs. |
+| 2 | Rehearse the current configured app from its browser through queued review, fix generation, Docker validation and explicit Apply. Include model display, unavailable-provider messages and interrupted progress recovery. | Separate CLI/model tests and an older browser run do not prove every part works together with today's OpenCode bridge. | A dated run on a disposable example records the selected provider/model, saved review, validated patch, applied files and clear failure/retry behaviour. |
+| 3 | Finish the recruiter-facing demo and reproducible setup. The implementation has a public demo generator; the live App test repository is private. | SPEC §§54–55 ask for a clean public demonstration that another person can understand and repeat. | A clean generated example or deliberately published demo covers bug/security/performance/test-gap findings, a rejected false alarm and a validated fix; current screenshots or a short recording identify actual versus replayed model output. Rehearse the documented quickstart from a fresh checkout. |
 
-The application, dedicated validation-worker and sandbox Docker targets all build. Installed
-image checks verify trusted launcher/migrations/UI contents, source hashes and UID 10001.
-Build logs retain normal root-pip notices and the existing BuildKit warning about the non-secret
-`SENTINEL_AUTH_MODE=token` variable name; those are not failed checks. The deprecated ESLint 9
-install warning is absent from the final locked install.
+Publishing a demo does not mean changing the existing private test repository's
+visibility. Use invented data, review its files, and choose publication deliberately.
+No private repository was made public by this assessment.
 
-## Remaining gaps and unverified areas
+For a live GitHub demonstration, a reachable approved webhook endpoint must be running.
+**Smee remains disconnected**, with its route, temporary container/image/gateway and
+saved channel/restoration records removed. The App remains installed only on the test
+repository. A future reachable local connection is sufficient for a supervised demo;
+an always-on public server is not necessary just to demonstrate V1.
 
-| Area | Work still required |
-|---|---|
-| Live AI providers | Real Claude/Gemini/Ollama model compatibility, error envelopes, rate limits, cost and latency. Compose uses a deterministic Ollama HTTP fixture, not a real model. |
-| Review/fix quality | Representative real-repository precision/recall, false-positive rates and fix-success evaluation; golden/adversarial tests do not establish these. |
-| Live GitHub App | Private-repository installation permissions, real signed delivery/publication/updates and push-race acceptance. HTTP shapes are tested locally. |
-| Actual browser | Login/token handling, navigation, SSE disconnect/reconnect, retries and Apply through a real browser; accessibility/responsiveness. HTTP serving and SSE completion are now verified. |
-| Deployment variants | Rootless/remote Docker, TLS/reverse proxy/public webhook deployment, daemon outages and stronger VM isolation. Local Docker Desktop Compose startup/validation/recreation/persistence now pass. |
-| Database operations | Backup/restore and upgrades on copies of deployment data; competing/mixed-version migration and multi-host rehearsals. Unknown custom legacy schemas need explicit conversion. Ordered multi-process Compose startup is verified. |
-| Graph coverage | Module/variable representation and some data-flow relationships remain partial. Compiler-grade tracing and complete dynamic behavior remain outside V1. |
-| Performance/load | Updated small/medium/large benchmarks, whole-tree/deletion/fix scans, sustained concurrency, worker disruption, database growth and metrics scrape costs. Earlier benchmark numbers are historical. |
-| Hosted CI and public release | New deployment CI job is configured and its command passes locally; hosted workflow execution, public deployment and demo repository are unverified. |
+## Work before offering an always-on public service
 
-## Supported boundaries
+These tasks matter if other people will rely on Sentinel while this computer is off.
+They should not be confused with missing core V1 classes or a requirement to pay for AI.
 
-The trusted validation worker controls its Docker daemon. A rootful socket grants host-level
-authority even with a non-root worker UID and dropped capabilities. The API, review worker and
-generated containers receive no socket. Use a dedicated engine/VM; rootless operation requires
-its own acceptance run. [Docker's security guidance](https://docs.docker.com/engine/security/)
-explains this daemon boundary. Healthchecks establish readiness, not forward job progress.
+1. **Durable HTTPS/webhooks:** choose a reachable deployment and test its reverse proxy,
+   authentication and notification route. A temporary relay is not a permanent host.
+2. **Recovery and timing:** rehearse provider outages, worker/daemon interruption and
+   simultaneous PR pushes. Retries, leases and stale-revision guards already exist;
+   exercise the complete real service under these conditions.
+3. **Data recovery:** restore a database backup into a separate environment and rehearse
+   migration/upgrade recovery on copies. Migration unit/integration tests alone do not
+   prove an operator can recover a deployed service.
+4. **Capacity and usability:** measure simultaneous jobs, long-running work, retained
+   history and resource use; check keyboard access, small screens and reconnects.
+   Existing size benchmarks measure review latency, not production throughput.
+5. **Independent model quality:** broaden real-project and repeated-model evaluations,
+   recording missed bugs, false warnings and fix failures. Keep independent business
+   tests: the pricing experiment showed that generated tests can miss a public contract.
 
-Scratch transfer caps uncompressed content at 128 MiB and 10,000 entries. Local fix confinement
-requires POSIX/WSL. Project test dependencies belong in the trusted image; generated code cannot
-install packages over the network. Static analysis cannot prove arbitrary runtime behavior;
-budgets/missing tools remain explicit incomplete results. GitHub lacks an atomic revision-check
-and comment operation; an already-running provider request cannot be force-cancelled on lease loss.
+Rootless/remote Docker and additional providers need acceptance only if selected for
+the deployment. A trusted Docker-capable fix worker still controls its engine; follow
+[DEPLOYMENT.md](DEPLOYMENT.md) for that boundary. See
+[DATABASE_MIGRATIONS.md](DATABASE_MIGRATIONS.md) for schema operations.
 
-Generated fixes may edit supplied existing files and create advertised regression-test slots.
-Arbitrary new source modules/directories and deletion edits are unsupported. New Python tests
-must fail before/pass after; other frameworks need a compatible configured regression command.
-Apply has ordinary-error rollback, not crash/power-loss atomicity. A failed database commit after
-filesystem writes may need reconciliation. Backups/version control remain necessary.
+## What is optional or intentionally limited
 
-## Implementation evidence
+- You do **not** need to install Ollama, download a local model, buy an AI subscription,
+  enable billing, add GLM or support every possible AI vendor to complete this V1.
+- Free cloud services can become unavailable or reach quotas. Sentinel must explain
+  that failure; a fallback is another available route, not a promise of unlimited use.
+- Compiler-grade data flow, extra languages and repository-wide semantic search are
+  V2 work. The current bounded graph and partial-review labels should remain honest.
+- General automatic acceptance of helper-only fixes from an unchanged downstream
+  finding is a separate design problem. Current conservative validation may refuse
+  such a proposal; rerun review to identify the root cause rather than bypass Apply.
+- Keeping React/TypeScript served by FastAPI is a documented choice; adopting Next.js
+  is not a requirement for finishing the recommended frontend stack.
 
-| Change | Current source |
-|---|---|
-| Worker and sandbox Compose wiring | [docker-compose.yml:97](D:/sentinel-final-v2/sentinel/docker-compose.yml:97) |
-| Docker-only worker image | [Dockerfile:58](D:/sentinel-final-v2/sentinel/Dockerfile:58) |
-| Job-kind routing | [src/sentinel/apps/worker/main.py:59](D:/sentinel-final-v2/sentinel/src/sentinel/apps/worker/main.py:59) |
-| Required-sandbox startup | [src/sentinel/apps/cli/server_commands.py:67](D:/sentinel-final-v2/sentinel/src/sentinel/apps/cli/server_commands.py:67) |
-| Scratch packing/extraction | [src/sentinel/sandbox/workspace.py:29](D:/sentinel-final-v2/sentinel/src/sentinel/sandbox/workspace.py:29) |
-| Installed scratch launcher | [src/sentinel/sandbox/launch.py:18](D:/sentinel-final-v2/sentinel/src/sentinel/sandbox/launch.py:18) |
-| Trusted parser fallback | [src/sentinel/analysis/static/js_tools.py:100](D:/sentinel-final-v2/sentinel/src/sentinel/analysis/static/js_tools.py:100) |
-| Full-stack acceptance | [scripts/verify_compose.py:164](D:/sentinel-final-v2/sentinel/scripts/verify_compose.py:164) |
-| Routing/health regressions | [tests/unit/test_validation_worker.py:22](D:/sentinel-final-v2/sentinel/tests/unit/test_validation_worker.py:22) |
-| Transfer regressions | [tests/unit/test_sandbox_transfer.py:28](D:/sentinel-final-v2/sentinel/tests/unit/test_sandbox_transfer.py:28) |
-| Installed-parser regressions | [tests/unit/test_runtime_analyzers.py:18](D:/sentinel-final-v2/sentinel/tests/unit/test_runtime_analyzers.py:18) |
-
-## Operator guides and evidence
-
-[Deployment](DEPLOYMENT.md), [Database upgrades](DATABASE_MIGRATIONS.md),
-[Multi-file fixes](MULTI_FILE_FIXES.md). The dated original audit/S16 reports are historical
-checkpoints; this report supersedes their statements that migrations, multi-file edits,
-Compose Docker validation and delivered analyzer parity are missing.
-
-Final [logs, commands, dependency versions, image IDs, coverage and source hashes](C:/Users/Krishna/Documents/Codex/2026-10-14/referenced-chatgpt-conversation-this-is-an/outputs/Sentinel-Deployment-Evidence-2026-10-18).
+For the source trace, read [WALKTHROUGH.md](WALKTHROUGH.md). For detailed implementation
+history and SPEC mapping, read [PROJECT_STATUS.md](PROJECT_STATUS.md) and
+[PROGRESS.md](../PROGRESS.md). Historical audit/deployment results retain their original
+scope; they are not the latest CI result.
