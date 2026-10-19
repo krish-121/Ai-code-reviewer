@@ -5,22 +5,25 @@ review, real AI, GitHub publication and guarded fix workflows. Final release
 acceptance is still open. This page replaces the older effort-percentage estimate
 with observable completion criteria; test coverage is not a project-completion score.
 
-## Latest GitHub checks
+## Verified GitHub checks
 
-For code revision `d2cd45c`, [run 39286099864](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39286099864)
-currently reports **queued**, not passed or failed. Its Python, frontend and Compose
-jobs have no assigned runner, no conclusion and no failure annotations. The latest
-completed run, [39242790419 on `ff4759b`](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39242790419),
-passed all three jobs. That earlier success does not establish success for the newer
-revision.
+All three jobs for code revision `d2cd45c` in
+[run 39286099864](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39286099864)
+now report **success**. The completed logs confirm:
 
-GitHub's [status service](https://www.githubstatus.com/) reports an active Actions,
-Pages and Webhooks incident at this assessment. It warns of delayed workflow processing
-and status updates. That is consistent with the queue; it is not proof of a Sentinel
-code failure. No failing code check has been reported to repair. Keep the existing
-checks enabled and inspect their results when GitHub processes the run. A later
-documentation-only publication may have its own run; each result belongs to its commit.
+| Job | Result |
+| --- | --- |
+| Python | Ruff, formatting, strict application/bridge typing and coverage gates passed; **673 tests passed, one optional test skipped**. PostgreSQL variants ran. |
+| Frontend | **21 tests passed**, types/formatting and production build passed. |
+| Docker/Compose | Full isolated server acceptance passed: database/startup, analysis, queued multi-file fix, Docker validation, explicit Apply and restart persistence. |
 
+Initial API polls reported queued jobs with no runners or failure annotations. GitHub's
+[status service](https://www.githubstatus.com/) reported an Actions/Pages/Webhooks
+incident with processing/status delays. Job conclusions and completed logs became
+visible later; no failing code check was reported and no code repair or disabled gate
+was needed. The aggregate workflow status may lag its completed jobs during that
+incident. A subsequent documentation-only publication has its own CI run; the result
+above identifies the exact checked code revision rather than predicting future runs.
 Independent local checks for `d2cd45c` passed: **647 tests**, **27 PostgreSQL skips**,
 all **36 Docker tests executed**, **93.55% overall / 97% core coverage**, Ruff lint
 and formatting, application typing (155 source files), strict bridge typing and
@@ -53,9 +56,9 @@ acceptance tasks, rather than requests to add another framework or optional mode
 
 | Priority | Remaining task | Why it matters | Evidence that closes it |
 | --- | --- | --- | --- |
-| 1 | Confirm the latest hosted CI result after GitHub recovers; fix any actual failed job and rerun it. | Local success and a green older commit cannot stand in for the latest hosted checks. | The intended release commit has successful Python/PostgreSQL, frontend and Compose jobs. |
-| 2 | Rehearse the current configured app from its browser through queued review, fix generation, Docker validation and explicit Apply. Include model display, unavailable-provider messages and interrupted progress recovery. | Separate CLI/model tests and an older browser run do not prove every part works together with today's OpenCode bridge. | A dated run on a disposable example records the selected provider/model, saved review, validated patch, applied files and clear failure/retry behaviour. |
-| 3 | Finish the recruiter-facing demo and reproducible setup. The implementation has a public demo generator; the live App test repository is private. | SPEC §§54–55 ask for a clean public demonstration that another person can understand and repeat. | A clean generated example or deliberately published demo covers bug/security/performance/test-gap findings, a rejected false alarm and a validated fix; current screenshots or a short recording identify actual versus replayed model output. Rehearse the documented quickstart from a fresh checkout. |
+| Done | Confirm the code revision's hosted checks. | Earlier green commits cannot stand in for changed code. | All three jobs for `d2cd45c` passed; retain successful checks for each intended release commit. |
+| 1 | Rehearse the current configured app from its browser through queued review, fix generation, Docker validation and explicit Apply. Include model display, unavailable-provider messages and interrupted progress recovery. | Separate CLI/model tests and an older browser run do not prove every part works together with today's OpenCode bridge. | A dated run on a disposable example records the selected provider/model, saved review, validated patch, applied files and clear failure/retry behaviour. |
+| 2 | Finish the recruiter-facing demo and reproducible setup. The implementation has a public demo generator; the live App test repository is private. | SPEC §§54–55 ask for a clean public demonstration that another person can understand and repeat. | A clean generated example or deliberately published demo covers bug/security/performance/test-gap findings, a rejected false alarm and a validated fix; current screenshots or a short recording identify actual versus replayed model output. Rehearse the documented quickstart from a fresh checkout. |
 
 Publishing a demo does not mean changing the existing private test repository's
 visibility. Use invented data, review its files, and choose publication deliberately.

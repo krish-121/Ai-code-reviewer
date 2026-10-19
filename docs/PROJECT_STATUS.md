@@ -1,19 +1,18 @@
 # Current project status and remaining work
 
-**Completion assessment — 19 October 2026:** latest code run
+**Completion assessment — 19 October 2026:** all three code-check jobs in
 [39286099864 on `d2cd45c`](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39286099864)
-still reports all three jobs queued, without assigned runners or error annotations.
-GitHub is reporting an Actions service incident. The previous `ff4759b` run passed
-all three jobs; latest code has 647 passing local tests and 27 PostgreSQL skips.
-No failed code check has yet been reported to repair. A later documentation-only
-commit has its own CI run and must be assessed separately.
+report success. Completed logs confirm **673 Python tests passed, one optional skip**,
+**21 frontend tests passed**, and successful isolated Compose acceptance. PostgreSQL
+variants ran; Ruff, strict typing, builds and coverage gates passed. GitHub's incident
+delayed status visibility; the initial queued results were not code failures. No code
+repair or weakened gate was needed. Later documentation-only commits have separate runs.
 
-The core local workflow works. Remaining V1 acceptance is current hosted CI,
-a complete browser run with the configured OpenCode bridge, and a reproducible
-recruiter-facing public demo. Production hosting/recovery/load work is separate.
-The current acceptance list is [RELEASE_READINESS.md](RELEASE_READINESS.md), which
-replaces outdated release percentages and already-completed integration gaps.
-
+The core local workflow works. Remaining V1 demonstration acceptance is a complete
+current browser run with the configured OpenCode bridge and a reproducible recruiter-
+facing public demo. Production hosting/recovery/load work is separate. The current
+acceptance list is [RELEASE_READINESS.md](RELEASE_READINESS.md), replacing outdated
+release percentages and already-completed integration gaps.
 
 **GitHub recovery checkpoint — 19 October 2026:** a real signed ping and
 [PR #2](https://github.com/krish-121/sentinel-integration-demo/pull/2) succeeded through
@@ -201,12 +200,11 @@ Use [RELEASE_READINESS.md](RELEASE_READINESS.md) as the current acceptance list.
 The basic real review/fix/Apply and GitHub integration work is implemented and tested;
 its results should not stay listed as missing work.
 
-1. Confirm the intended release commit's hosted checks when GitHub processes them;
-   investigate actual failures without weakening gates.
-2. Rehearse the current complete browser/queued-worker workflow with the optional
+The latest code revision's three hosted jobs passed. Keep CI passing on every release.
+1. Rehearse the current complete browser/queued-worker workflow with the optional
    OpenCode bridge, saved model display, validation/Apply and service/reconnection errors.
    Current Compose CI uses a controlled provider and does not exercise that profile.
-3. Finish a clean public demonstration and repeatable quickstart, with current evidence
+2. Finish a clean public demonstration and repeatable quickstart, with current evidence
    for the SPEC's demonstration categories. The App test repository remains private;
    publishing a demo is a separate deliberate choice.
 

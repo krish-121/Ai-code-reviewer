@@ -5,19 +5,20 @@ Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections ref
 
 ## Hosted checks and completion assessment — 19 October 2026
 
-- Checked real GitHub run `39286099864` for `d2cd45c`: all three jobs still report
-  queued, with no assigned runners or failure annotations. The preceding `ff4759b`
-  run passed Python/PostgreSQL, frontend and Compose. Do not reuse that result for
-  a newer commit. GitHub reports an active Actions/Pages/Webhooks incident, consistent
-  with the delayed processing/status. No failing code check has been reported.
-- Replaced outdated release estimates and already-closed provider/GitHub/browser
-  gaps with current evidence and observable completion criteria. Reused the passing
-  647-test local code verification; this continuation changes documentation only.
-- Next V1 acceptance: latest hosted checks, current bridge-enabled browser workflow,
-  and a reproducible recruiter-facing demo. Separate production hosting/recovery/load
-  work and optional models from that list. No Smee connection or permissions restored.
-- See [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) and the walkthrough. A pending
-  external check is not reported as passed, failed or bypassed.
+- All three code-check jobs in `39286099864` for `d2cd45c` report success. Retrieved
+  completed logs: **673 Python tests passed, one optional skip**, **21 frontend tests**,
+  full Docker/Compose acceptance, Ruff/format/strict types/coverage/build gates passed.
+  PostgreSQL variants ran. No failing code check or required code repair was found.
+- GitHub's active Actions/Pages/Webhooks incident delayed status visibility. Initial
+  polls showed queued jobs without assigned runners. Keep this chronology separate
+  from the final successful job results and from subsequent documentation-only runs.
+- Replaced outdated release estimates and already-closed integration gaps with current
+  evidence and observable completion criteria. This continuation changes documentation
+  only. Checked 191 source-document links and exported working GitHub source links.
+- Remaining V1 demonstration acceptance: current bridge-enabled browser workflow and
+  a repeatable recruiter-facing demo. Public hosting/recovery/load and optional models
+  are separate. Smee remains disconnected; no temporary permissions were restored.
+- See [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) and the walkthrough.
 
 ## GitHub notification recovery — 19 October 2026
 

@@ -793,16 +793,18 @@ job's failing step/log before changing code. Runner or service problems and asse
 failures require different repairs. Do not call an older green commit proof of a new
 commit, remove a failing test, or bypass a coverage gate to obtain a green badge.
 
-At this assessment, code revision `d2cd45c` is queued without assigned runners or
-failure annotations. GitHub reports an Actions incident with processing/status delays;
-that is consistent with the queue and does not establish a Sentinel code defect.
-The previous `ff4759b` run passed; current code separately passed 647 local tests,
-with 27 PostgreSQL variants skipped. No new code failure was reported to fix.
+The initial assessment of `d2cd45c` reported queued jobs without runners or failure
+annotations while GitHub reported an Actions incident. Later, all three jobs reported
+success. Their completed logs confirm **673 Python tests passed, one optional skip**,
+**21 frontend tests passed**, successful Compose acceptance and the style/type/build/
+coverage gates. PostgreSQL variants ran in CI. Local verification separately passed
+647 tests with 27 PostgreSQL skips. Those are different environments, not conflicting
+counts. No code failure was reported and no gate was weakened to obtain success.
 
 The core already completes local review → AI findings → proposed fix → Docker checks
 → explicit Apply. Real GitHub reviews also worked. Final V1 demonstration work is
-to confirm latest hosted CI, rehearse today's complete browser workflow with the
-configured bridge, and finish a repeatable public demo. Compose's controlled HTTP
+to rehearse today's complete browser workflow with the
+configured bridge and finish a repeatable public demo. Keep hosted CI passing for each release. Compose's controlled HTTP
 provider proves service wiring without spending AI quota; it is not a live Gemini or
 DeepSeek acceptance test. The OpenCode Compose profile still needs its own complete run.
 
