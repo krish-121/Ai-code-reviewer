@@ -71,14 +71,14 @@ provider, paid service or bypass of validation.
 | Check | Executed result |
 | --- | --- |
 | Full local Python 3.14.4 suite, including real Docker validation | **665 passed, 27 PostgreSQL variants skipped**; no local PostgreSQL test URL was configured. This full run includes the first 13 new input cases. |
-| Final focused suite after the additional dotted-origin repair | **20 passed**; includes all input cases and seven origin cases. Existing valid CLI/diff tests also passed. |
+| Final focused suite after the dotted-origin and coloured-terminal test repairs | **30 passed**; includes invalid CLI inputs with/without forced colour, missing paths and seven origin cases. Existing valid CLI/diff tests also passed. |
 | Coverage from the full run | **93.64% overall / 97% core**; above the SPEC's 80% / 90% gates. |
 | Final source Ruff lint/format and strict application typing | Passed; 235 Python files formatted, 155 application modules typed. Bridge and demo-tool strict typing passed in the full check. |
 | Independent installable-wheel smoke | Passed: imports came from the temporary wheel install, bundled JS was present, packaged migrations initialized a new database, browser assets served and CLI version worked. No AI calls. |
 | Documentation links and saved-credential comparison | 437 document/source links resolve; edited public files/exports contain none of the checked saved credentials. Private key/config/token permissions remain 0600. |
 
 The full local run completed while the final origin-only repair was added. Its 665
-tests and the final focused 20 are **not added together** as a distinct-test total.
+tests and the final focused 30 are **not added together** as a distinct-test total.
 The published revision's CI runs the complete final tree, including PostgreSQL and
 frontend/Compose checks; use the linked workflow to identify its exact revision.
 
@@ -88,6 +88,13 @@ The preceding uploaded revision `48a83fe` also passed all three hosted jobs in
 678 Python tests, one skip, 27 frontend tests and Compose acceptance. Those historical
 counts are kept distinct from this repair's results. The [CI page](https://github.com/krish-121/Ai-code-reviewer/actions/workflows/ci.yml)
 identifies the exact commit and newest hosted outcome.
+
+The first repair upload, `0bcaa7c`, exposed three failures in new test assertions
+in [39386345248](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39386345248).
+Forced terminal colour split the expected messages with ANSI decoration. The
+expected refusals/exit codes worked. Reproduced the exact three failures locally,
+then stripped decoration before asserting the message and covered both plain and
+forced-colour output. No application error handling or CI gate was disabled.
 
 No new billable/live model requests or GitHub notification relays were needed to
 verify these input repairs. Earlier real-model and signed-PR evidence retains its

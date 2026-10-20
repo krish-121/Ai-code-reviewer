@@ -4,12 +4,14 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from sentinel.analysis.diff.git import GitError, path_changeset
 from sentinel.apps.cli.main import app
 
 
+@pytest.mark.parametrize("force_color", [False, True])
 @pytest.mark.parametrize(
     ("arguments", "message"),
     [
@@ -26,16 +28,24 @@ from sentinel.apps.cli.main import app
     ],
 )
 def test_invalid_selection_fails_before_settings_database_or_ai(
-    arguments: list[str], message: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    arguments: list[str],
+    message: str,
+    force_color: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def forbid_settings(**kwargs: object) -> None:
         pytest.fail("invalid inputs must not load private settings or begin a review")
 
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    if force_color:
+        monkeypatch.setenv("FORCE_COLOR", "1")
     monkeypatch.setattr("sentinel.apps.cli.review_commands.load_cli_settings", forbid_settings)
-    result = CliRunner().invoke(app, ["review", *arguments])
+    result = CliRunner().invoke(app, ["review", *arguments], color=force_color)
     assert result.exit_code == 2, result.output
-    assert message in " ".join(result.output.replace("│", " ").split())
+    plain_output = unstyle(result.output)
+    assert message in " ".join(plain_output.replace("│", " ").split())
     assert not list(tmp_path.iterdir())
 
 

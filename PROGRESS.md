@@ -11,10 +11,13 @@ real Gemini/DeepSeek and signed-PR evidence are distinct and explicitly labelled
 Permanent hosting, broader quality and production operational acceptance remain.
 
 Fixed ambiguous CLI inputs, nonexistent paths returning empty changes, and GitHub
-origin inference for valid dotted repository names. Twenty focused regressions now
-protect these cases; the existing valid-mode tests remain. Updated the README,
+origin inference for valid dotted repository names. Thirty focused regressions now
+protect these cases, including both plain and forced-colour terminal output; the existing valid-mode tests remain. Updated the README,
 walkthrough, current status/readiness, study guide and superseded runtime assumptions.
 The completion report records verification after repairs rather than reusing old counts.
+The initial hosted repair run exposed three message assertions interrupted by ANSI
+colour codes. Reproduced all three failures locally and fixed only assertion
+normalization, adding forced-colour coverage. Application refusals were correct.
 No saved credentials/providers, GitHub installations or disconnected Smee routes changed.
 
 ## Fresh public download accepted — 20 October 2026

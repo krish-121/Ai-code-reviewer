@@ -972,3 +972,12 @@ V1 completion means the intended review → evidence → proposed fix → isolat
 → human Apply loop works and is explained/tested. It does not require installing an
 unused local model, buying a subscription or building the V2 feature list. See the
 completion report before treating an old progress note as today's missing work.
+
+
+The final GitHub check also taught a testing lesson: the first new assertions passed
+locally but three failed when CI forced coloured terminal output. The error messages
+and refusal codes were correct; invisible ANSI colour codes split their captured text.
+The tests now use Click's `unstyle` before joining wrapped lines, and run invalid-input
+cases both with and without forced colour. We first reproduced the same three failures
+locally, then verified all thirty focused cases. Keep presentation differences out of
+behaviour assertions while still checking the real message and exit code.
