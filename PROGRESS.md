@@ -3,6 +3,24 @@
 Living log of what is built, what was decided, and what still needs a human eye.
 Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
 
+## Fresh public download accepted — 20 October 2026
+
+- Rechecked implementation `a435e0c`: all three GitHub jobs passed in
+  [39299740562](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39299740562).
+  Logs confirm 678 Python tests passed, one skipped; 27 frontend tests and full
+  Docker/Compose acceptance passed. No code failure or weakened gate.
+- The actual public clone/new Python environment prepared a completed replay review
+  and seven-check validated proposal while preserving source before Apply. Restarting
+  the demo retained them. The browser exposed the rejected safe-SQL warning, generated
+  a distinct fix via the worker, validated and applied it; six final-tree tests passed
+  in Docker. Reload kept applied/fixed state; outside-sample review was refused.
+- Docker Desktop had stopped after interruption. Restarted the existing engine;
+  no new application-code defect was found. Added the restart instruction and exact
+  fresh-download evidence to the walkthrough. Saved provider/key setup stays separate.
+- See [PUBLIC_DEMO_VERIFICATION.md](docs/PUBLIC_DEMO_VERIFICATION.md). The replies are
+  explicitly scripted; this closes public-demo acceptance, not general model accuracy
+  or the separate production/recovery/accessibility/load acceptance work.
+
 ## Public runnable demo — 19 October 2026
 
 The [public demo guide](docs/PUBLIC_DEMO.md) now gives a single-checkout quickstart,

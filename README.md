@@ -101,6 +101,8 @@ The [guide](docs/PUBLIC_DEMO.md) explains each command, how to inspect rejected
 findings, Apply, restart, and optionally use your own live AI provider. Start with
 `--review-only` if Docker is unavailable; that does not claim fix-validation success.
 
+The [fresh public-download confirmation](docs/PUBLIC_DEMO_VERIFICATION.md) records a new environment, browser regeneration, seven real Docker checks, explicit Apply and six final sample tests. All three implementation checks passed in GitHub.
+
 ### Actual browser acceptance
 
 The [19 October live browser walkthrough](docs/BROWSER_LIVE_WORKFLOW.md) records real

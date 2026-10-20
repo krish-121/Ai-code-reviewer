@@ -31,28 +31,24 @@ of the distributed Compose OpenCode profile or a full accessibility/outage matri
 
 ## Verified GitHub checks
 
-All three jobs for code revision `d2cd45c` in
-[run 39286099864](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39286099864)
-now report **success**. The completed logs confirm:
+Rechecked **20 October 2026**: implementation revision `a435e0c` passed all three jobs
+in [run 39299740562](https://github.com/krish-121/Ai-code-reviewer/actions/runs/39299740562).
+Completed logs confirm **678 Python tests passed, one skipped**, **27 frontend tests
+passed**, strict lint/typing/coverage and full isolated Docker/Compose acceptance.
+PostgreSQL variants ran in GitHub. The local suite separately passed **652 tests**
+with **27 PostgreSQL variants skipped**; these are different environments.
 
-| Job | Result |
-| --- | --- |
-| Python | Ruff, formatting, strict application/bridge typing and coverage gates passed; **673 tests passed, one optional test skipped**. PostgreSQL variants ran. |
-| Frontend | **21 tests passed**, types/formatting and production build passed. |
-| Docker/Compose | Full isolated server acceptance passed: database/startup, analysis, queued multi-file fix, Docker validation, explicit Apply and restart persistence. |
+The [fresh public-download browser rehearsal](PUBLIC_DEMO_VERIFICATION.md) is also
+complete: new environment, seeded replay, restart, rejected claim, regenerated
+proposal through the queue, seven Docker checks, explicit Apply, reload persistence,
+six tests on the actual written sample, and refusal to review outside the sample.
+Docker Desktop needed restarting after interruption; no application-code repair or
+weakened gate was needed. This closes the public visitor acceptance for the named
+revision. Later documentation-only commits have separate runs.
 
-Initial API polls reported queued jobs with no runners or failure annotations. GitHub's
-[status service](https://www.githubstatus.com/) reported an Actions/Pages/Webhooks
-incident with processing/status delays. Job conclusions and completed logs became
-visible later; no failing code check was reported and no code repair or disabled gate
-was needed. The aggregate workflow status may lag its completed jobs during that
-incident. A subsequent documentation-only publication has its own CI run; the result
-above identifies the exact checked code revision rather than predicting future runs.
-Independent local checks for `d2cd45c` passed: **647 tests**, **27 PostgreSQL skips**,
-all **36 Docker tests executed**, **93.55% overall / 97% core coverage**, Ruff lint
-and formatting, application typing (155 source files), strict bridge typing and
-strict evaluation-helper typing. No frontend code changed in that revision. The
-PostgreSQL skips are not claimed as local passes. See [the recovery report](GITHUB_CONNECTION_RECOVERY.md).
+Earlier `d2cd45c`/`d762067` hosted confirmations remain historical checkpoints in
+the progress log. Keep all intended release revisions green. This demonstration
+does not close the production or live distributed-provider work below.
 
 ## What already works
 

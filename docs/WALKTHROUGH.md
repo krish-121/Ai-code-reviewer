@@ -909,3 +909,26 @@ settings are unaffected. See decision 35 in [DESIGN_DECISIONS.md](DESIGN_DECISIO
 The scripted demonstration establishes reproducibility of this workflow. The separate
 [live acceptance report](BROWSER_LIVE_WORKFLOW.md) establishes the named real-model
 runs. Neither is a general model-accuracy or always-on deployment guarantee.
+
+
+## Fresh-download browser confirmation
+
+On 20 October 2026 we completed [the public visitor rehearsal](PUBLIC_DEMO_VERIFICATION.md)
+on the actual GitHub download and its new Python environment. The seeded review and
+validated proposal survived restarting the local demo server. The browser's suppressed
+finding view explained why the parameterized `find_user` query was safe. Regenerating
+the supported `search_products` fix then created a new queue job and proposal, distinct
+from the seed script's proposal. Seven normal checks passed before explicit Apply.
+Reload retained the applied/fixed state, and six tests passed on the written sample
+in Docker. A request outside the sample root was refused.
+
+The setup issue was Docker Desktop being stopped after the interruption. Starting
+the installed engine restored validation; no code repair, weakened check or host
+execution of sample/generated tests was needed. After a computer restart, start
+Docker before Generate fix. A validated proposal is saved evidence, not evidence
+that a newly requested validation process has Docker available right now.
+
+The implementation revision's three GitHub jobs passed: 678 Python tests, one skip,
+27 frontend tests and isolated Compose acceptance. See the linked report for exact
+revision/run and source-versus-patched-tree evidence. Scripted replies stay labelled
+`replay / scripted-demo`; actual model-quality claims belong to separate live tests.

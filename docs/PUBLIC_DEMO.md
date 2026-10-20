@@ -172,6 +172,8 @@ Git's staging area. Re-reviewing the same committed range still reviews that old
 
 ## 8. Stop, reopen or start a fresh sample
 
+After a computer restart, start Docker Desktop and check `docker info` before generating another fix. The database preserves reviews and proposals; the Docker engine must also be running for new validation.
+
 Press **Ctrl+C** in the demo server terminal to stop it. Run `serve_demo.py` again to
 reopen saved results. This does not stop another Sentinel server or the owner's
 OpenCode bridge. Rerunning `seed_demo.py` on existing paths deliberately fails.
@@ -221,3 +223,5 @@ checks and always-on hosting remain separate operational work.
 ## Verification checkpoint
 
 The 19 October 2026 rehearsal completed all seven normal checks, explicit browser Apply and six tests on the actual applied sample in Docker. Four demo regressions pass, including settings isolation and existing/unrelated-data protection. See [PROGRESS.md](../PROGRESS.md) for the full local suite and [GitHub Actions](https://github.com/krish-121/Ai-code-reviewer/actions) for hosted checks on each published revision. These results describe the scripted sample workflow, not model accuracy.
+
+The [fresh-download browser confirmation](PUBLIC_DEMO_VERIFICATION.md), completed 20 October 2026, verifies the actual public download, new environment, restart persistence, rejected-claim inspection, browser regeneration, all seven checks, Apply, six final-tree tests and sample-root restriction. The named implementation revision's three GitHub jobs passed.
