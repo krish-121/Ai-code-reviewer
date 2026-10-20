@@ -38,22 +38,26 @@ from sentinel.integrations.github.webhooks import PullRequestEvent
 from sentinel.services.reviews import ReviewService
 from sentinel.services.workspaces import LocalRequest
 
-ORIGIN_RE = re.compile(r"github\.com[:/]([^/]+/[^/.]+?)(?:\.git)?$")
+ORIGIN_RE = re.compile(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$")
 DEFAULT_RANGE_BASE, DEFAULT_RANGE_HEAD = "HEAD~1", "HEAD"
 RICH, JSON, MARKDOWN = "rich", "json", "markdown"
 
 
 def review(
-    target: Annotated[Path | None, typer.Argument(help="Review all files under this path.")] = None,
+    target: Annotated[
+        Path | None, typer.Argument(help="Review all files under this path.", exists=True)
+    ] = None,
     staged: Annotated[bool, typer.Option("--staged", help="Review staged changes.")] = False,
     worktree: Annotated[
         bool, typer.Option("--worktree", help="Review uncommitted changes.")
     ] = False,
     path: Annotated[
-        Path | None, typer.Option("--path", help="Review all files under a path.")
+        Path | None, typer.Option("--path", help="Review all files under a path.", exists=True)
     ] = None,
     range_: Annotated[str | None, typer.Option("--range", help="Review BASE..HEAD.")] = None,
-    pr: Annotated[int | None, typer.Option("--pr", help="Review a GitHub pull request.")] = None,
+    pr: Annotated[
+        int | None, typer.Option("--pr", help="Review a GitHub pull request.", min=1)
+    ] = None,
     repo: Annotated[
         str | None, typer.Option("--repo", help="owner/name for --pr (default: origin).")
     ] = None,
@@ -78,6 +82,7 @@ def review(
         raise typer.BadParameter("must be high, medium, low, or none", param_hint="--fail-on")
     if output not in {RICH, JSON, MARKDOWN}:
         raise typer.BadParameter("must be rich, json, or markdown", param_hint="--format")
+    _validate_selection(target, staged, worktree, path, range_, pr, repo)
     settings = load_cli_settings(provider=provider, model=model)
     if no_ai:
         settings = settings.model_copy(update={"provider": "none"})
@@ -92,6 +97,34 @@ def review(
         raise typer.Exit(EXIT_FAILED)
     if _reaches_threshold(result, fail_on):
         raise typer.Exit(EXIT_FINDINGS)
+
+
+def _validate_selection(
+    target: Path | None,
+    staged: bool,
+    worktree: bool,
+    path: Path | None,
+    range_: str | None,
+    pr: int | None,
+    repo: str | None,
+) -> None:
+    """Reject ambiguous inputs before loading settings, opening a database or calling AI."""
+    selected = [
+        label
+        for label, enabled in (
+            ("path argument", target is not None),
+            ("--path", path is not None),
+            ("--staged", staged),
+            ("--worktree", worktree),
+            ("--range", range_ is not None),
+            ("--pr", pr is not None),
+        )
+        if enabled
+    ]
+    if len(selected) > 1:
+        raise typer.BadParameter("choose only one review source: " + ", ".join(selected))
+    if repo is not None and pr is None:
+        raise typer.BadParameter("--repo requires --pr")
 
 
 def _review_local(

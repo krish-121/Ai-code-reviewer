@@ -9,8 +9,9 @@ with the evidence, the call path from the nearest entry point, and the exact che
 confirmed or rejected them. For confirmed problems Sentinel can generate a fix, test it in a
 locked-down sandbox, and apply it when you say so.
 
-**Release status:** an audited V1 implementation with explicit limits, not a guarantee of complete
-bug detection or exploit proof. Changes that remove code compare diagnostics across the eligible
+**Release status:** V1 is complete against the SPEC's definition of done within its
+documented supported limits; see the [requirement comparison and remaining work](docs/SPEC_COMPLETION.md).
+This is not a guarantee of complete bug detection or exploit proof. Changes that remove code compare diagnostics across the eligible
 base and head source trees, including unchanged dependents. Missing snapshots, tools or analysis
 coverage make that review partial. Static patterns and inferred call paths remain limited.
 Fix validation requires a Docker image
@@ -143,6 +144,11 @@ Team server with PostgreSQL, API, UI, review worker and Docker validation worker
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## CLI usage
+
+Choose one review source per command: a path, `--staged`, `--worktree`, `--range`
+or `--pr`. Conflicting sources are rejected. `--repo` is used only with `--pr`.
+Paths must exist; an existing empty folder is valid. With no explicit source,
+Sentinel chooses staged changes if present, otherwise uncommitted changes.
 
 ```bash
 sentinel review --staged                 # what you are about to commit

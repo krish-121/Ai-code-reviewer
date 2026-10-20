@@ -1,9 +1,11 @@
 # Release readiness and remaining SPEC work
 
-Assessment: **19 October 2026**. The core V1 is implemented and has working local
-review, real AI, GitHub publication and guarded fix workflows. Final release
-acceptance is still open. This page replaces the older effort-percentage estimate
-with observable completion criteria; test coverage is not a project-completion score.
+Assessment: **20 October 2026**. **The specified V1 is complete within its documented
+supported limits.** Local review, real AI, GitHub publication, guarded fixes and the
+fresh-download public demo have acceptance evidence. See the current
+[section-by-section SPEC comparison](SPEC_COMPLETION.md), including the final input
+repairs and verification. Always-on production-service acceptance remains open below.
+Test coverage is not a project-completion score.
 
 ## Public demo checkpoint
 
@@ -69,16 +71,16 @@ their failed attempts. See [the project status](PROJECT_STATUS.md),
 [pricing investigation](PRICING_FIX_INVESTIGATION.md). This is not a claim that no
 unknown bug remains.
 
-## Work to close the V1 demonstration
+## Completed V1 acceptance
 
 The SPEC's definition of done is in sections 53–55. The following are concrete
 acceptance tasks, rather than requests to add another framework or optional model.
 
 | Priority | Remaining task | Why it matters | Evidence that closes it |
 | --- | --- | --- | --- |
-| Done | Confirm the code revision's hosted checks. | Earlier green commits cannot stand in for changed code. | All three jobs for `d2cd45c` passed; retain successful checks for each intended release commit. |
+| Done | Confirm the code revision's hosted checks. | Earlier green commits cannot stand in for changed code. | All three jobs for `48a83fe` passed; the current repair results are in [SPEC_COMPLETION.md](SPEC_COMPLETION.md). Retain successful checks for every release. |
 | Done locally | Rehearse the configured app in its browser with real AI, model display, provider errors, saved proposal reload, Docker validation and Apply. | The full local path must work together. | Both named model runs are applied/fixed; source preservation and independent checks passed. Complete outage/reconnection and distributed-profile tests remain operational acceptance. |
-| Implemented | Public sample and repeatable demonstration. | SPEC §§54–55 need inspectable findings, rejected claims and a validated fix. | The public guide, sample templates, current labelled screenshots and real Docker entrypoint/Apply regression are provided; keep clean-checkout rehearsal and hosted checks current. |
+| Done | Public sample and repeatable demonstration. | SPEC §§54–55 need inspectable findings, rejected claims and a validated fix. | The actual fresh public clone/new environment/browser rehearsal passed on 20 October, including seven checks, explicit Apply and six final sample tests. Keep it current for releases. |
 
 Publishing a demo does not mean changing the existing private test repository's
 visibility. Use invented data, review its files, and choose publication deliberately.

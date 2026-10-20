@@ -1,7 +1,21 @@
 # Sentinel — build progress
 
 Living log of what is built, what was decided, and what still needs a human eye.
-Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-19.
+Spec: [`docs/SPEC.md`](docs/SPEC.md) (originally `project (1).md`) (sections referenced as §N). Last updated: 2026-10-20.
+
+## SPEC completion comparison — 20 October 2026
+
+The [current SPEC comparison](docs/SPEC_COMPLETION.md) maps all requirement groups
+and concludes that the V1 is complete within supported limits. Fresh public demo,
+real Gemini/DeepSeek and signed-PR evidence are distinct and explicitly labelled.
+Permanent hosting, broader quality and production operational acceptance remain.
+
+Fixed ambiguous CLI inputs, nonexistent paths returning empty changes, and GitHub
+origin inference for valid dotted repository names. Twenty focused regressions now
+protect these cases; the existing valid-mode tests remain. Updated the README,
+walkthrough, current status/readiness, study guide and superseded runtime assumptions.
+The completion report records verification after repairs rather than reusing old counts.
+No saved credentials/providers, GitHub installations or disconnected Smee routes changed.
 
 ## Fresh public download accepted — 20 October 2026
 
@@ -592,18 +606,22 @@ Full write-ups go in `docs/DESIGN_DECISIONS.md` (step 7). Short version:
 
 ## Assumptions (small decisions where the spec is silent)
 
-- Default models: `claude-sonnet-5-5`, `gemini-2.5-flash`, `qwen2.5-coder:7b` (Ollama);
-  all overridable in `.sentinel.yml` or environment variables.
+- New installations default to provider `none`; model defaults are centralized in
+  `core/configuration/config.py`. User configuration, environment variables and CLI
+  provider/model flags select the AI. `.sentinel.yml` holds repository review rules,
+  not credentials/provider selection. The owner's saved Gemini 3.8 setting is separate.
 - Local mode (`SENTINEL_AUTH_MODE=local`) is single-user and binds to loopback; it rejects
   foreign `Host` headers and requires an `X-Sentinel-Client` header (CSRF/DNS-rebinding guard).
   Token mode issues per-user bearer tokens; every query is scoped by user.
-- Local repositories can only be reviewed from directories listed in `SENTINEL_LOCAL_ROOTS`
-  (defaults to the home directory).
+- The API authorizes local repositories through `SENTINEL_LOCAL_ROOTS`: the default
+  is the home directory in local mode and no allowed roots in token mode. The CLI
+  runs as the local user. Queued API work rechecks its authorized effective Git root.
 - At most 10 findings per review are shown by default (`review.max_findings` in `.sentinel.yml`;
   the demo repository raises it to 15);
   lower-priority ones are kept as "suppressed", not deleted.
-- The demo seeding script writes to `.demo/` in the repo (git-ignored). The weaker process
-  sandbox is opt-in only (`--allow-process-sandbox`).
+- The demo uses its own ignored `.demo/` paths, settings, cache and receipt. Existing
+  paths are refused. The current public seed script requires Docker for fix validation;
+  `--review-only` explicitly omits that acceptance. No process-sandbox CLI bypass is provided.
 
 ## Original-build verification snapshot (superseded by the 2026-10-17 report)
 
@@ -625,7 +643,9 @@ PostgreSQL is **no longer mock-only**: the store, job queue (including a race be
 worker threads), API lifecycle, tenancy and the end-to-end GitHub flow were run against a
 real PostgreSQL 16 (`SENTINEL_TEST_DATABASE_URL`, marker `postgres`).
 
-## NEEDS REVIEW
+## Recorded choices and deployment follow-up
+
+These choices are documented/implemented; this heading does not request a new user approval.
 
 1. **Frontend stack (§31).** The spec *recommends* Next.js, Tailwind, shadcn/ui, Monaco and
    TanStack Query. The original build used React 19 +

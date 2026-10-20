@@ -133,6 +133,8 @@ def list_files(root: Path, sub: Path | None = None) -> list[str]:
 
 def path_changeset(root: Path, sub: Path | None = None) -> ChangeSet:
     """Treat every file under ``sub`` as newly added: review existing code as-is."""
+    if not (sub or root).exists():
+        raise GitError(f"review path does not exist: {sub or root}")
     cs = ChangeSet(source="path", title=f"Review of {(sub or root).name or root}")
     for rel in list_files(root, sub):
         full = root / rel

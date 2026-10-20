@@ -431,9 +431,17 @@ you would take it next.
 
 **Run.** The full gate, as CI runs it:
 ```bash
-ruff check src tests scripts && ruff format --check src tests scripts && mypy
+ruff check src tests scripts tools/opencode_bridge
+ruff format --check src tests scripts tools/opencode_bridge
+mypy
+mypy --strict tools/opencode_bridge
+MYPYPATH=demo:scripts mypy --strict scripts/demo_support.py scripts/seed_demo.py scripts/serve_demo.py
 pytest --cov=sentinel --cov-fail-under=80
-cd web && npm run lint && npm test && npm run build
+coverage report --include="*/sentinel/core/*" --fail-under=90
+cd web
+npm run lint
+npm test
+npm run build
 ```
 
 **Try.** Pick one recipe from *How to change common things* you have not done yet and do it
@@ -444,4 +452,4 @@ end to end, with tests.
 2. The life of a pull request from webhook to inline comment.
 3. Why the demo's `find_user` "SQL injection" never reaches the developer.
 4. Three security threats specific to an AI code reviewer and how each is handled.
-5. Two things you would build next and why (see spec §46 and the gaps in PROGRESS.md).
+5. Two things you would build next and why (see spec §46 and the current [completion report](SPEC_COMPLETION.md), rather than historical gaps in PROGRESS.md).

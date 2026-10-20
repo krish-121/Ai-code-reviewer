@@ -860,8 +860,8 @@ Gemini 3.8 returned busy errors; the successful Gemini run used free 3.5 Flash-L
 a session override. A listed old 2.5 model was account-restricted. The owner chose to
 keep Gemini 3.8 as the saved default. The quota-test server is stopped, the normal CLI
 is restored, credentials stayed private and Smee remains disconnected. The remaining
-V1 demonstration work is the public demo; distributed live-profile, recovery, complete
-accessibility and load measurements retain their separate acceptance tasks.
+V1 public demonstration is now accepted below. Distributed live-profile, recovery,
+complete accessibility and load measurements retain their separate operational acceptance tasks.
 
 
 ## How the public demo stays repeatable
@@ -932,3 +932,43 @@ The implementation revision's three GitHub jobs passed: 678 Python tests, one sk
 27 frontend tests and isolated Compose acceptance. See the linked report for exact
 revision/run and source-versus-patched-tree evidence. Scripted replies stay labelled
 `replay / scripted-demo`; actual model-quality claims belong to separate live tests.
+
+
+## Completion check: reject wrong review inputs before doing work
+
+Read [SPEC_COMPLETION.md](SPEC_COMPLETION.md) for the final V1 requirement comparison
+and the remaining operational/optional work. The public demo is accepted; the saved
+GitHub App configuration does not mean its disconnected notification route is running.
+
+This comparison found a small but important boundary mistake. If you wrote
+`sentinel review app --staged`, the old CLI silently chose all of `app`; it ignored
+your request for staged changes. A misspelled folder could also look like an empty
+review. Neither result should reassure a developer that the intended code was checked.
+
+Follow the repair in [review_commands.py](../src/sentinel/apps/cli/review_commands.py):
+
+1. Typer checks that an explicit path exists and that a PR number is positive.
+2. `review` calls `_validate_selection` before reading settings or opening a database.
+   Exactly one explicit source may be selected. No source still means the existing
+   automatic staged/worktree choice. `--repo` is meaningful only alongside `--pr`.
+3. Valid requests continue into the same `ReviewService`; no alternative pipeline or
+   provider call was added. The chosen input, rather than option order, decides the review.
+4. [path_changeset](../src/sentinel/analysis/diff/git.py) checks existence too, so a
+   queued missing subdirectory cannot become a successful empty change set. This shared
+   boundary also protects callers outside the CLI. Existing empty directories remain valid.
+5. [The regression tests](../tests/unit/test_review_selection.py) deliberately forbid
+   even loading settings for invalid CLI input, and check missing Git/non-Git targets.
+   Existing integration tests still exercise legitimate review modes.
+6. `_origin_repo` also preserves valid dotted GitHub names when it removes the final
+   `.git` suffix. HTTPS and SSH examples are regression-tested; a name like
+   `reviewer.demo` no longer unnecessarily requires a manual `--repo` override.
+
+Try `sentinel review --staged --worktree`: it now explains the conflicting choices.
+Then choose one, such as `sentinel review --staged`. Fixing the input requires no AI
+tokens and does not modify your files. This is why validation belongs near the input
+boundary, with a shared check for paths that may disappear while queued work waits.
+
+V1 completion means the intended review → evidence → proposed fix → isolated tests
+→ human Apply loop works and is explained/tested. It does not require installing an
+unused local model, buying a subscription or building the V2 feature list. See the
+completion report before treating an old progress note as today's missing work.

@@ -1,5 +1,18 @@
 # Current project status and remaining work
 
+## Current V1 completion assessment — 20 October 2026
+
+The [SPEC comparison](SPEC_COMPLETION.md) checks all requirement groups and the
+definition of done. V1 is complete within its supported limits. This comparison repaired
+ambiguous CLI review choices, missing paths that could look empty, and dotted GitHub origin inference;
+regressions protect both. It also removes stale claims that the public demo is still
+unverified. See that report for current test results and the exact remaining list.
+
+Continuous GitHub notifications remain disconnected by request. Permanent hosting,
+full production recovery/load/accessibility acceptance and broader model evaluation
+remain separate follow-up work. Ollama, GLM, OpenTelemetry and V2 expansion are not
+required to use the completed configured workflow. Earlier dated entries below are history.
+
 ## Fresh public download accepted — 20 October 2026
 
 - Rechecked implementation `a435e0c`: all three GitHub jobs passed in
@@ -246,7 +259,7 @@ ordinary package-manager notices and the existing warning about the non-secret
 | Security (§40) | Filtering/redaction, untrusted inputs, confined Apply, tenant checks and sandbox regressions. Trusted fix-worker daemon authority remains an operator boundary. |
 | Observability/performance (§41–42) | Structured stage logs, metrics, updated synthetic size benchmarks. Sustained load and production capacity unmeasured. |
 | Documentation (§48–52) | README, architecture, decisions, walkthrough and 14-day guide updated with current paths/limits. |
-| CI/demo/release (§53–55) | Source is on GitHub; actual hosted Python/PostgreSQL, frontend and Docker/Compose jobs passed. Public demo/release remains unverified. |
+| CI/demo/release (§53–55) | Source is on GitHub; actual hosted Python/PostgreSQL, frontend and Docker/Compose jobs passed. The public demo and fresh-download browser/Apply acceptance passed on 20 October. V1 is complete within documented limits; see [SPEC_COMPLETION.md](SPEC_COMPLETION.md). |
 
 The frontend tool list in §31 is recommended. Keeping React/TypeScript served by FastAPI
 is a documented design choice, not a missing Next.js folder. Compiler-grade dynamic flow,
